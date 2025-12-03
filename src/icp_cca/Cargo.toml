@@ -1,0 +1,39 @@
+[package]
+name = "icp_cca"
+description = ""
+publish = false
+repository = "https://github.com/ldclabs/token-listing/tree/main/src/icp_cca"
+version = "0.1.0"
+edition.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+base64 = { workspace = true }
+bincode = { workspace = true }
+candid = { workspace = true }
+ciborium = { workspace = true }
+futures = { workspace = true }
+ic-cdk = { workspace = true }
+ic-cdk-timers = { workspace = true }
+ic-stable-structures = { workspace = true }
+ic-http-certification = { workspace = true }
+ic_auth_types = { workspace = true }
+ic-secp256k1 = { workspace = true }
+ic-ed25519 = { workspace = true }
+icrc-ledger-types = { workspace = true }
+lazy_static = { workspace = true }
+once_cell = { workspace = true }
+num-traits = { workspace = true }
+url = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+serde_json = { workspace = true }
+k256 = { workspace = true, features = ["ecdsa"] }
+ic-dummy-getrandom-for-wasm = { workspace = true }

@@ -1,0 +1,33 @@
+{
+  "canisters": {
+    "icp_cca": {
+      "candid": "src/icp_cca/icp_cca.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "package": "icp_cca",
+      "optimize": "cycles",
+      "gzip": true,
+      "type": "rust"
+    },
+    "token_listing_app": {
+      "dependencies": [],
+      "build": [
+        "echo 'Disable dfx build for token_listing_app because some issue, you should run npm build manually'"
+      ],
+      "source": [
+        "src/token_listing_app/build"
+      ],
+      "type": "assets",
+      "workspace": "token_listing_app"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
