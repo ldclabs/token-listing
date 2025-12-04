@@ -23,8 +23,8 @@ The core logic replaces the discrete "Tick" system of Uniswap with a continuous 
 ### 2.1 Variables
 - $S_{total}$: Total Supply to distribute.
 - $T_{start}, T_{end}$: Auction duration.
-- $F(t)$: Current Global Flow Rate (Total Currency / ns) from all active bidders.
-- $R_{supply}(t)$: Supply Rate (Tokens / ns).
+- $F(t)$: Current Global Flow Rate (Total Currency / ms) from all active bidders.
+- $R_{supply}(t)$: Supply Rate (Tokens / ms).
 - $P(t)$: Clearing Price at time $t$.
 
 ### 2.2 Clearing Price & Flow
@@ -60,7 +60,7 @@ The auction is initialized with strict parameters to prevent manipulation:
 *   `floor_price`: Implicitly defined by `required_currency_raised` / `total_supply`.
 
 ### 3.2 Bidding (`submit_bid`)
-When a user submits a bid with Amount $A$ and Max Price $P_{max}$:
+When a user submits a bid with Amount $A$ and Max Price $P_{max}$ :
 1.  **Flow Calculation:** The bid is converted into a flow rate: $f_u = \frac{A}{T_{remaining}}$.
 2.  **State Update:** The global state (accumulators, total flow) is updated to the current nanosecond.
 3.  **Price Check:** The system verifies $P_{max}$ against the current market.
@@ -69,7 +69,7 @@ When a user submits a bid with Amount $A$ and Max Price $P_{max}$:
 ### 3.3 Outbidding Logic
 Every time the state updates or a new bid increases the Global Flow $F(t)$, the Clearing Price $P(t)$ rises.
 The system checks the bottom of the heap:
-*   If $P_{clearing} > \text{Bidder}_{min}.P_{max}$:
+*   If $P_{clearing} > \text{Bidder}_{min}.P_{max}$ :
     1.  The bidder is **evicted**.
     2.  Their flow $f_u$ is removed from $F(t)$.
     3.  A snapshot of the accumulator is taken to fix their earnings up to that moment.
