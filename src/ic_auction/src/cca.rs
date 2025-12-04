@@ -130,7 +130,6 @@ impl PartialOrd for BidOrder {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Auction {
     cfg: AuctionConfig,
-    max_bid_price: u128,
     // 10 ** token_decimals
     one_token: u128,
     // Floor price per token, in currency atomic units
@@ -207,7 +206,6 @@ impl Auction {
             one_token,
             floor_price,
             price_precision,
-            max_bid_price: floor_price * 1000, // Set max price to 1000 times the floor price
             last_update_time: cfg.start_time,
             supply_rate,
             total_amount: 0,
@@ -294,6 +292,18 @@ impl Auction {
         self.floor_price.max(price)
     }
 
+    pub fn get_max_price_threshold(&self, flow_rate: u128) -> u128 {
+        if self.supply_rate == 0 {
+            return 0;
+        }
+        let clearing_price = self.get_clearing_price();
+        let price_delta = Nat::from(flow_rate) * Nat::from(self.one_token);
+        let denominator = Nat::from(self.supply_rate);
+        let price_delta = (price_delta + denominator.clone() - Nat::from(1u64)) / denominator;
+        let price_delta: u128 = price_delta.0.try_into().expect("Clearing price overflow");
+        clearing_price + price_delta
+    }
+
     /// State advancement and settlement
     /// Includes: Time advancement -> Token accumulation -> Currency accumulation -> Accumulator update
     pub fn update_state(&mut self, now_ms: u64) {
@@ -358,6 +368,7 @@ impl Auction {
     fn process_outbids<B: BidStorage>(&mut self, bids: &B, now_ms: u64) {
         loop {
             let clearing_price = self.get_clearing_price();
+
             let should_pop = match self.outbid_heap.peek() {
                 Some(candidate) => candidate.max_price * self.price_precision < clearing_price,
                 None => false,
@@ -411,6 +422,26 @@ impl Auction {
         }
     }
 
+    pub fn estimate_max_price(&self, amount: u128, now_ms: u64) -> u128 {
+        let remaining_time = self
+            .cfg
+            .end_time
+            .saturating_sub(now_ms.max(self.cfg.start_time));
+        if remaining_time < self.cfg.min_bid_duration {
+            return 0;
+        }
+
+        // Calculate flow rate: Linear distribution
+        let flow_rate = Nat::from(amount) * Nat::from(RATE_PRECISION * self.price_precision)
+            / Nat::from(remaining_time);
+        let flow_rate: u128 = flow_rate.0.try_into().unwrap_or_default();
+        if flow_rate == 0 {
+            return 0;
+        }
+
+        self.get_max_price_threshold(flow_rate) / self.price_precision
+    }
+
     /// Submit Bid
     pub fn submit_bid<B: BidStorage>(
         &mut self,
@@ -429,13 +460,6 @@ impl Auction {
         if amount > self.cfg.max_amount {
             return Err("InvalidBidAmount: Bid amount exceeds maximum allowed".to_string());
         }
-        let pp = max_price * self.price_precision;
-        if pp > self.max_bid_price {
-            return Err("InvalidBidPrice: Price limit exceeds maximum allowed".to_string());
-        }
-        if pp < self.get_clearing_price() {
-            return Err("InvalidBidPrice: Price limit below current market".to_string());
-        }
 
         let remaining_time = self
             .cfg
@@ -448,9 +472,6 @@ impl Auction {
             );
         }
 
-        // Must update state to latest first
-        self.update_state(now_ms);
-
         // Calculate flow rate: Linear distribution
         let flow_rate = Nat::from(amount) * Nat::from(RATE_PRECISION * self.price_precision)
             / Nat::from(remaining_time);
@@ -461,6 +482,14 @@ impl Auction {
                 "InvalidBidAmount: Bid amount too low for the remaining auction duration"
                     .to_string(),
             );
+        }
+
+        // Must update state to latest first
+        self.update_state(now_ms);
+
+        let pp = max_price * self.price_precision;
+        if pp < self.get_max_price_threshold(flow_rate) {
+            return Err("InvalidBidPrice: Price limit below current market".to_string());
         }
 
         let id = self.next_bid_id;
@@ -742,15 +771,16 @@ mod tests {
         let owner = Principal::anonymous();
 
         // User 1: Low price, early
+        let max_price = auction.estimate_max_price(20_000, 1000); // 120
         let bid1 = auction
-            .submit_bid(&storage, owner, 20_000, 100, 1000) // Price limit 100 (Floor)
+            .submit_bid(&storage, owner, 20_000, max_price, 1000)
             .unwrap();
         assert!(bid1.outbid_time.is_none());
 
         // Advance halfway
         let mid_time = 6000; // 5000ms passed
         let bid2 = auction
-            .submit_bid(&storage, owner, 200_000, 500, mid_time)
+            .submit_bid(&storage, owner, 200_000, 1000, mid_time)
             .unwrap();
 
         // Check if bid1 is outbid
@@ -764,18 +794,18 @@ mod tests {
         // End auction and claim
         let end_time = cfg.end_time + 1;
         let bid1 = auction.claim(&storage, bid1.id, end_time).unwrap();
-        println!("Bid1 Claimed: {:?}", bid1);
+        // println!("Bid1 Claimed: {:?}", bid1);
         assert_eq!(bid1.outbid_time, Some(mid_time));
         assert_eq!(bid1.refund, 10_000);
         assert_eq!(bid1.tokens_filled, 10_000_000_000);
         let bid2 = auction.claim(&storage, bid2.id, end_time).unwrap();
-        println!("Bid2 Claimed: {:?}", bid2);
+        // println!("Bid2 Claimed: {:?}", bid2);
         assert_eq!(bid2.outbid_time, None);
         assert_eq!(bid2.refund, 0);
         assert_eq!(bid2.tokens_filled, 89_999_999_996);
 
         let info = auction.get_info(end_time);
-        println!("Auction Info: {:?}", info);
+        // println!("Auction Info: {:?}", info);
         assert_eq!(
             info.total_tokens_filled,
             bid1.tokens_filled + bid2.tokens_filled
@@ -799,7 +829,7 @@ mod tests {
 
         // User 1: Low price, early
         let bid1 = auction
-            .submit_bid(&storage, owner, 10_000, 100, 1000)
+            .submit_bid(&storage, owner, 10_000, 200, 1000)
             .unwrap();
 
         let bid2 = auction
@@ -833,7 +863,7 @@ mod tests {
         assert_eq!(bid3.claim_time, end_time);
 
         let info = auction.get_info(end_time);
-        println!("Auction Info: {:?}", info);
+        // println!("Auction Info: {:?}", info);
         // AuctionInfo { auction: AuctionConfig { start_time: 1000, end_time: 11000, min_bid_duration: 100, token_decimals: 8, total_supply: 100000000000, min_amount: 1000, max_amount: 1000000000, required_currency_raised: 100000 }, timestamp: 11001, clearing_price: 100, total_amount: 80000, total_tokens_filled: 0, total_refunded: 80000, cumulative_demand_raised: 79999, cumulative_supply_released: 79999999999, is_graduated: false }
         assert_eq!(info.total_tokens_filled, 0);
         assert_eq!(info.total_refunded, 80_000);
