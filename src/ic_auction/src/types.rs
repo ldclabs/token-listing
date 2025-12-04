@@ -1,4 +1,5 @@
 use candid::{CandidType, Principal};
+use ic_auth_types::ByteArrayB64;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use serde_json::Value;
@@ -45,15 +46,21 @@ pub struct RPCResponse<T> {
 #[derive(CandidType, Serialize, Deserialize)]
 pub struct StateInfo {
     // The currency being raised in the auction
-    pub currency: Principal,
+    pub currency: AuctionToken,
     // The token being sold in the auction
-    pub token: Principal,
-    pub token_name: String,
-    pub token_symbol: String,
-    pub token_decimals: u8,
-    pub token_logo: String,
-    pub token_total_supply: u128,
+    pub token: AuctionToken,
+    pub key_name: String,
+    pub icp_address: Principal,
+    pub evm_address: String,
+    pub svm_address: String,
     pub governance_canister: Option<Principal>,
+}
+
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum AuctionToken {
+    Icp(Principal),
+    Sol(ByteArrayB64<32>), // Pubkey
+    Evm(ByteArrayB64<20>), // Address
 }
 
 /// Auction Information Snapshot
@@ -156,8 +163,6 @@ impl AuctionConfig {
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
 pub struct BidInfo {
     pub id: u64,
-    // Who will receive the tokens filled and currency refunded
-    pub owner: Principal,
     // User's currency amount
     pub amount: u128,
     // The max price of the bid

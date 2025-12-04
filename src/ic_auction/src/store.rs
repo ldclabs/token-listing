@@ -37,7 +37,7 @@ use crate::{
         create_associated_token_account_idempotent, get_associated_token_address, instruction,
         transfer_checked_instruction,
     },
-    types::{PublicKeyOutput, StateInfo},
+    types::{AuctionInfo, AuctionToken, BidInfo, PublicKeyOutput, StateInfo},
 };
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
@@ -45,14 +45,14 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct State {
     // The currency being raised in the auction
-    pub currency: Principal,
+    pub currency: AuctionToken,
     // The token being sold in the auction
-    pub token: Principal,
-    pub token_name: String,
-    pub token_symbol: String,
-    pub token_decimals: u8,
-    pub token_logo: String,
-    pub token_total_supply: u128,
+    pub token: AuctionToken,
+    // pub token_name: String,
+    // pub token_symbol: String,
+    // pub token_decimals: u8,
+    // pub token_logo: String,
+    // pub token_total_supply: u128,
     pub key_name: String,
     pub icp_address: Principal,
     pub evm_address: Address,
@@ -66,13 +66,12 @@ pub struct State {
 impl From<&State> for StateInfo {
     fn from(s: &State) -> Self {
         Self {
-            currency: s.currency,
-            token: s.token,
-            token_name: s.token_name.clone(),
-            token_symbol: s.token_symbol.clone(),
-            token_decimals: s.token_decimals,
-            token_logo: s.token_logo.clone(),
-            token_total_supply: s.token_total_supply,
+            currency: s.currency.clone(),
+            token: s.token.clone(),
+            key_name: s.key_name.clone(),
+            icp_address: s.icp_address,
+            evm_address: s.evm_address.to_string(),
+            svm_address: s.svm_address.to_string(),
             governance_canister: s.governance_canister,
         }
     }
@@ -81,13 +80,8 @@ impl From<&State> for StateInfo {
 impl State {
     fn new() -> Self {
         Self {
-            currency: Principal::anonymous(),
-            token: Principal::anonymous(),
-            token_name: String::new(),
-            token_symbol: String::new(),
-            token_decimals: 0,
-            token_logo: String::new(),
-            token_total_supply: 0,
+            currency: AuctionToken::Icp(Principal::anonymous()),
+            token: AuctionToken::Icp(Principal::anonymous()),
             governance_canister: None,
             key_name: "dfx_test_key".to_string(),
             icp_address: ic_cdk::api::canister_self(),
@@ -101,35 +95,37 @@ impl State {
 }
 
 #[derive(Clone, CandidType, Default, Serialize, Deserialize)]
-pub struct UserBids {
+pub struct UserState {
+    pub currency_amount: u128,
+    pub token_amount: u128,
     pub bids: BTreeSet<u64>,
 }
 
-impl Storable for UserBids {
+impl Storable for UserState {
     const BOUND: Bound = Bound::Unbounded;
 
     fn into_bytes(self) -> Vec<u8> {
         let mut buf = vec![];
-        into_writer(&self, &mut buf).expect("failed to encode UserBids data");
+        into_writer(&self, &mut buf).expect("failed to encode UserState data");
         buf
     }
 
     fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buf = vec![];
-        into_writer(&self, &mut buf).expect("failed to encode UserBids data");
+        into_writer(&self, &mut buf).expect("failed to encode UserState data");
         Cow::Owned(buf)
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode UserBids data")
+        from_reader(&bytes[..]).expect("failed to decode UserState data")
     }
 }
 
 const STATE_MEMORY_ID: MemoryId = MemoryId::new(0);
-const BIDS_MEMORY_ID: MemoryId = MemoryId::new(1);
-const USER_BIDS_MEMORY_ID: MemoryId = MemoryId::new(2);
-const BRIDGE_LOGS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(3);
-const BRIDGE_LOGS_DATA_MEMORY_ID: MemoryId = MemoryId::new(4);
+const USERS_MEMORY_ID: MemoryId = MemoryId::new(1);
+const BIDS_MEMORY_ID: MemoryId = MemoryId::new(2);
+const TX_LOGS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(3);
+const TX_LOGS_DATA_MEMORY_ID: MemoryId = MemoryId::new(4);
 
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State::new());
@@ -145,18 +141,34 @@ thread_local! {
         )
     );
 
+    static USERS: RefCell<StableBTreeMap<Principal, UserState, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with_borrow(|m| m.get(USERS_MEMORY_ID)),
+        )
+    );
+
     static BIDS: RefCell<StableBTreeMap<u64, cca::Bid, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with_borrow(|m| m.get(BIDS_MEMORY_ID)),
         )
     );
-
-    static USER_BIDS: RefCell<StableBTreeMap<Principal, UserBids, Memory>> = RefCell::new(
-        StableBTreeMap::init(
-            MEMORY_MANAGER.with_borrow(|m| m.get(USER_BIDS_MEMORY_ID)),
-        )
-    );
 }
+
+struct BidStorage;
+
+impl cca::BidStorage for BidStorage {
+    fn get(&self, bid_id: u64) -> Option<cca::Bid> {
+        BIDS.with_borrow(|r| r.get(&bid_id))
+    }
+
+    fn insert(&self, bid_id: u64, bid: cca::Bid) {
+        BIDS.with_borrow_mut(|r| {
+            r.insert(bid_id, bid);
+        });
+    }
+}
+
+static BS: BidStorage = BidStorage;
 
 pub mod state {
     use std::str::FromStr;
@@ -260,5 +272,140 @@ pub mod state {
     pub fn info() -> StateInfo {
         let info = STATE.with_borrow(|s| StateInfo::from(s));
         info
+    }
+
+    pub fn evm_address(user: &Principal) -> Address {
+        STATE.with_borrow(|s| {
+            let pk = derive_public_key(&s.ecdsa_public_key, vec![user.as_slice().to_vec()])
+                .expect("derive_public_key failed");
+            pk.to_evm_adress().unwrap()
+        })
+    }
+
+    pub fn svm_address(user: &Principal) -> Pubkey {
+        STATE.with_borrow(|s| {
+            let pk = derive_schnorr_public_key(
+                &s.ed25519_public_key,
+                vec![user.as_slice().to_vec()],
+                None,
+            )
+            .expect("derive_schnorr_public_key failed");
+            pk.to_svm_pubkey().unwrap()
+        })
+    }
+
+    pub fn auction_info(now_ms: u64) -> Option<AuctionInfo> {
+        STATE.with_borrow(|s| s.auction.as_ref().map(|a| a.get_info(now_ms)))
+    }
+
+    pub fn get_grouped_bids(precision: u128) -> Vec<(u128, u128)> {
+        STATE.with_borrow(|s| {
+            if let Some(auction) = &s.auction {
+                auction.get_grouped_bids(precision)
+            } else {
+                vec![]
+            }
+        })
+    }
+
+    pub fn estimate_max_price(amount: u128, now_ms: u64) -> u128 {
+        STATE.with_borrow(|s| {
+            if let Some(auction) = &s.auction {
+                auction.estimate_max_price(amount, now_ms)
+            } else {
+                0
+            }
+        })
+    }
+
+    pub fn submit_bid(
+        caller: Principal,
+        amount: u128,
+        max_price: u128,
+        now_ms: u64,
+    ) -> Result<BidInfo, String> {
+        STATE.with_borrow_mut(|s| {
+            let auction = s
+                .auction
+                .as_mut()
+                .ok_or_else(|| "auction is not ready".to_string())?;
+            USERS.with_borrow_mut(|u| {
+                let mut user = u.get(&caller).unwrap_or_default();
+                if user.currency_amount < amount {
+                    return Err("insufficient currency balance".to_string());
+                }
+                let bid = auction.submit_bid(&BS, amount, max_price, now_ms)?;
+                user.currency_amount -= amount;
+                user.bids.insert(bid.id);
+                u.insert(caller, user);
+
+                Ok(bid)
+            })
+        })
+    }
+
+    pub fn claim(caller: Principal, bid_id: u64, now_ms: u64) -> Result<BidInfo, String> {
+        STATE.with_borrow_mut(|s| {
+            let auction = s
+                .auction
+                .as_mut()
+                .ok_or_else(|| "auction is not ready".to_string())?;
+            USERS.with_borrow_mut(|u| {
+                let mut user = u.get(&caller).unwrap_or_default();
+                if !user.bids.contains(&bid_id) {
+                    return Err("bid not found for user".to_string());
+                }
+
+                let bid = auction.claim(&BS, bid_id, now_ms)?;
+                user.currency_amount += bid.refund;
+                user.token_amount += bid.tokens_filled;
+                u.insert(caller, user);
+
+                Ok(bid)
+            })
+        })
+    }
+
+    pub fn claim_all(caller: Principal, now_ms: u64) -> Result<Vec<BidInfo>, String> {
+        STATE.with_borrow_mut(|s| {
+            let auction = s
+                .auction
+                .as_mut()
+                .ok_or_else(|| "auction is not ready".to_string())?;
+            USERS.with_borrow_mut(|u| {
+                let mut user = u.get(&caller).unwrap_or_default();
+                if user.bids.is_empty() {
+                    return Ok(vec![]);
+                }
+
+                let mut rt: Vec<BidInfo> = Vec::new();
+                for id in user.bids.clone() {
+                    if let Ok(bid) = auction.claim(&BS, id, now_ms) {
+                        user.currency_amount += bid.refund;
+                        user.token_amount += bid.tokens_filled;
+                        rt.push(bid);
+                    }
+                }
+                u.insert(caller, user);
+
+                Ok(rt)
+            })
+        })
+    }
+
+    pub fn my_bids(caller: Principal) -> Result<Vec<BidInfo>, String> {
+        USERS.with_borrow(|u| {
+            let user = u.get(&caller).unwrap_or_default();
+            BIDS.with_borrow(|b| {
+                let mut rt: Vec<BidInfo> = Vec::with_capacity(user.bids.len());
+                for id in user.bids {
+                    if let Some(bid) = b.get(&id) {
+                        rt.push(bid.into_info(id));
+                    }
+                }
+
+                Ok(rt)
+            })
+        })
     }
 }

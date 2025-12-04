@@ -22,9 +22,6 @@ const ACC_PRECISION: u128 = 1_000_000_000_000_000_000; // Accumulator precision 
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Bid {
-    // Who will receive the tokens filled and currency refunded
-    #[serde(rename = "o")]
-    pub owner: Principal,
     // User's currency amount
     #[serde(rename = "a")]
     pub amount: u128,
@@ -40,7 +37,7 @@ pub struct Bid {
 
     #[serde(rename = "c")]
     pub create_time: u64, // Creation time, allows early entry
-    #[serde(rename = "ot")]
+    #[serde(rename = "o")]
     pub outbid_time: Option<u64>, // Time when the bid was outbid
     #[serde(rename = "os")]
     pub outbid_acc_snapshot: Option<u128>, // Global accumulator snapshot when outbid
@@ -57,7 +54,6 @@ impl Bid {
     pub fn into_info(self, id: u64) -> BidInfo {
         BidInfo {
             id,
-            owner: self.owner,
             amount: self.amount,
             max_price: self.max_price,
             flow_rate: self.flow_rate,
@@ -257,7 +253,7 @@ impl Auction {
 
     /// Get grouped bids information
     // Return: Vec<(price_range_start, total_amount_in_range)>
-    pub fn get_grouped_bids<B: BidStorage>(&self, precision: u128) -> Vec<(u128, u128)> {
+    pub fn get_grouped_bids(&self, precision: u128) -> Vec<(u128, u128)> {
         let mut price_buckets: BTreeMap<u128, u128> = BTreeMap::new();
 
         // Iterate through all active bids
@@ -446,7 +442,6 @@ impl Auction {
     pub fn submit_bid<B: BidStorage>(
         &mut self,
         bids: &B,
-        owner: Principal,
         amount: u128,
         max_price: u128,
         now_ms: u64,
@@ -488,8 +483,12 @@ impl Auction {
         self.update_state(now_ms);
 
         let pp = max_price * self.price_precision;
-        if pp < self.get_max_price_threshold(flow_rate) {
+        let mpt = self.get_max_price_threshold(flow_rate);
+        if pp < mpt {
             return Err("InvalidBidPrice: Price limit below current market".to_string());
+        }
+        if pp >= mpt * 1000 {
+            return Err("InvalidBidPrice: Price limit too high".to_string());
         }
 
         let id = self.next_bid_id;
@@ -501,7 +500,6 @@ impl Auction {
         self.total_amount += amount;
 
         let bid = Bid {
-            owner,
             amount,
             max_price,
             flow_rate,
@@ -635,11 +633,10 @@ mod tests {
         let cfg = get_test_config();
         let mut auction = Auction::new(cfg.clone());
         let storage = MockBidStorage::default();
-        let owner = Principal::anonymous();
         let price_precision = auction.price_precision; // 1e9
 
         // 1. Submit Bid before auction start
-        let bid1 = auction.submit_bid(&storage, owner, 50_000, 500, 1).unwrap();
+        let bid1 = auction.submit_bid(&storage, 50_000, 500, 1).unwrap();
         // Flow rate 1 = 50000 * 1e9 / 10000 = 5 * 1e9
         assert_eq!(bid1.flow_rate, 5 * RATE_PRECISION * price_precision);
         assert_eq!(auction.current_flow_rate, bid1.flow_rate);
@@ -653,9 +650,7 @@ mod tests {
         let err = auction.claim(&storage, bid1.id, 2000).err().unwrap();
         assert!(err.starts_with("NotClaimable:")); // Cannot claim before end
 
-        let bid2 = auction
-            .submit_bid(&storage, owner, 50_000, 500, 6000)
-            .unwrap();
+        let bid2 = auction.submit_bid(&storage, 50_000, 500, 6000).unwrap();
         // Flow rate 2 = 50000 * 1e9 / 5000 = 10 * 1e9
         assert_eq!(bid2.flow_rate, 10 * RATE_PRECISION * price_precision);
         assert_eq!(auction.current_flow_rate, bid1.flow_rate + bid2.flow_rate);
@@ -673,9 +668,7 @@ mod tests {
         assert_eq!(auction.acc_tokens_per_share, bid2.acc_snapshot);
         assert_eq!(auction.is_graduated(), false);
 
-        let bid3 = auction
-            .submit_bid(&storage, owner, 50_000, 500, 9000)
-            .unwrap();
+        let bid3 = auction.submit_bid(&storage, 50_000, 500, 9000).unwrap();
         // Flow rate 3 = 50000 * 1e9 / 2000 = 25 * 1e9
         assert_eq!(bid3.flow_rate, 25 * RATE_PRECISION * price_precision);
 
@@ -768,19 +761,18 @@ mod tests {
         let cfg = get_test_config();
         let mut auction = Auction::new(cfg.clone());
         let storage = MockBidStorage::default();
-        let owner = Principal::anonymous();
 
         // User 1: Low price, early
         let max_price = auction.estimate_max_price(20_000, 1000); // 120
         let bid1 = auction
-            .submit_bid(&storage, owner, 20_000, max_price, 1000)
+            .submit_bid(&storage, 20_000, max_price, 1000)
             .unwrap();
         assert!(bid1.outbid_time.is_none());
 
         // Advance halfway
         let mid_time = 6000; // 5000ms passed
         let bid2 = auction
-            .submit_bid(&storage, owner, 200_000, 1000, mid_time)
+            .submit_bid(&storage, 200_000, 1000, mid_time)
             .unwrap();
 
         // Check if bid1 is outbid
@@ -825,20 +817,13 @@ mod tests {
         let cfg = get_test_config();
         let mut auction = Auction::new(cfg.clone());
         let storage = MockBidStorage::default();
-        let owner = Principal::anonymous();
 
         // User 1: Low price, early
-        let bid1 = auction
-            .submit_bid(&storage, owner, 10_000, 200, 1000)
-            .unwrap();
+        let bid1 = auction.submit_bid(&storage, 10_000, 200, 1000).unwrap();
 
-        let bid2 = auction
-            .submit_bid(&storage, owner, 50_000, 500, 2000)
-            .unwrap();
+        let bid2 = auction.submit_bid(&storage, 50_000, 500, 2000).unwrap();
 
-        let bid3 = auction
-            .submit_bid(&storage, owner, 20_000, 500, 3000)
-            .unwrap();
+        let bid3 = auction.submit_bid(&storage, 20_000, 500, 3000).unwrap();
         let err = auction
             .claim(&storage, bid1.id, cfg.end_time)
             .err()

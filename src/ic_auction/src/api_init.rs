@@ -2,7 +2,7 @@ use candid::{CandidType, Principal};
 use serde::Deserialize;
 use std::time::Duration;
 
-use crate::store;
+use crate::{store, types::AuctionToken};
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub enum CanisterArgs {
@@ -13,24 +13,13 @@ pub enum CanisterArgs {
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InitArgs {
     pub key_name: String,
-    pub token_name: String,
-    pub token_symbol: String,
-    pub token_decimals: u8,
-    pub token_logo: String,
-    pub token_ledger: Principal,
-    pub token_bridge_fee: u128,
-    pub min_threshold_to_bridge: u128,
+    pub currency: AuctionToken,
+    pub token: AuctionToken,
     pub governance_canister: Option<Principal>,
 }
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct UpgradeArgs {
-    pub token_name: Option<String>,
-    pub token_symbol: Option<String>,
-    pub token_logo: Option<String>,
-    pub token_ledger: Option<Principal>,
-    pub token_bridge_fee: Option<u128>,
-    pub min_threshold_to_bridge: Option<u128>,
     pub governance_canister: Option<Principal>,
 }
 
@@ -39,10 +28,8 @@ fn init(args: Option<CanisterArgs>) {
     if let Some(CanisterArgs::Init(args)) = args {
         store::state::with_mut(|s| {
             s.key_name = args.key_name;
-            s.token_name = args.token_name;
-            s.token_symbol = args.token_symbol;
-            s.token_decimals = args.token_decimals;
-            s.token_logo = args.token_logo;
+            s.currency = args.currency;
+            s.token = args.token;
             s.governance_canister = args.governance_canister;
         });
     } else if let Some(CanisterArgs::Upgrade(_)) = args {
@@ -64,16 +51,6 @@ fn post_upgrade(args: Option<CanisterArgs>) {
 
     match args {
         Some(CanisterArgs::Upgrade(args)) => store::state::with_mut(|s| {
-            if let Some(token_name) = args.token_name {
-                s.token_name = token_name;
-            }
-            if let Some(token_symbol) = args.token_symbol {
-                s.token_symbol = token_symbol;
-            }
-            if let Some(token_logo) = args.token_logo {
-                s.token_logo = token_logo;
-            }
-
             if let Some(governance_canister) = args.governance_canister {
                 s.governance_canister = Some(governance_canister);
             }
