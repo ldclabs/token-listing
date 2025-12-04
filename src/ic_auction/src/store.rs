@@ -1,3 +1,4 @@
+use alloy_primitives::{Address, Bytes, Signature, TxHash, U256, hex};
 use candid::{CandidType, Nat, Principal};
 use ciborium::{from_reader, into_writer};
 use ic_http_certification::{
@@ -25,13 +26,21 @@ use std::{
 };
 
 use crate::{
+    cca,
+    ecdsa::{cost_sign_with_ecdsa, derive_public_key, ecdsa_public_key, sign_with_ecdsa},
+    evm::{EvmClient, encode_erc20_transfer},
     helper::{call, convert_amount, format_error},
-    types::PublicKeyOutput,
+    outcall::DefaultHttpOutcall,
+    schnorr::{derive_schnorr_public_key, schnorr_public_key, sign_with_schnorr},
+    svm::{
+        Message, Pubkey, Signature as SvmSignature, SignatureStatus, SvmClient, Transaction,
+        create_associated_token_account_idempotent, get_associated_token_address, instruction,
+        transfer_checked_instruction,
+    },
+    types::{PublicKeyOutput, StateInfo},
 };
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
-
-const MAX_ERROR_ROUNDS: u64 = 42;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct State {
@@ -44,21 +53,14 @@ pub struct State {
     pub token_decimals: u8,
     pub token_logo: String,
     pub token_total_supply: u128,
+    pub key_name: String,
+    pub icp_address: Principal,
+    pub evm_address: Address,
+    pub svm_address: Pubkey,
+    pub ecdsa_public_key: PublicKeyOutput,
+    pub ed25519_public_key: PublicKeyOutput,
     pub governance_canister: Option<Principal>,
-}
-
-#[derive(CandidType, Serialize, Deserialize)]
-pub struct StateInfo {
-    // The currency being raised in the auction
-    pub currency: Principal,
-    // The token being sold in the auction
-    pub token: Principal,
-    pub token_name: String,
-    pub token_symbol: String,
-    pub token_decimals: u8,
-    pub token_logo: String,
-    pub token_total_supply: u128,
-    pub governance_canister: Option<Principal>,
+    pub auction: Option<cca::Auction>,
 }
 
 impl From<&State> for StateInfo {
@@ -87,47 +89,47 @@ impl State {
             token_logo: String::new(),
             token_total_supply: 0,
             governance_canister: None,
+            key_name: "dfx_test_key".to_string(),
+            icp_address: ic_cdk::api::canister_self(),
+            evm_address: [0u8; 20].into(),
+            svm_address: Pubkey::default(), // 11111111111111111111111111111111
+            ecdsa_public_key: PublicKeyOutput::default(),
+            ed25519_public_key: PublicKeyOutput::default(),
+            auction: None,
         }
     }
 }
 
-type Timestamp = u64; // 纳秒
-type Amount = u128; // 余额/代币数量
-
-// 精度常量
-const RATE_PRECISION: u128 = 1_000_000_000_000; // 流速精度 (1e12)
-const PRICE_PRECISION: u128 = 1_000_000_000; // 价格精度 (1e9)
-const ACC_PRECISION: u128 = 1_000_000_000_000_000_000; // 累积器精度 (1e18)
-
 #[derive(Clone, CandidType, Default, Serialize, Deserialize)]
-pub struct UserLogs {
-    pub logs: BTreeSet<u64>,
+pub struct UserBids {
+    pub bids: BTreeSet<u64>,
 }
 
-impl Storable for UserLogs {
+impl Storable for UserBids {
     const BOUND: Bound = Bound::Unbounded;
 
     fn into_bytes(self) -> Vec<u8> {
         let mut buf = vec![];
-        into_writer(&self, &mut buf).expect("failed to encode UserLogs data");
+        into_writer(&self, &mut buf).expect("failed to encode UserBids data");
         buf
     }
 
     fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buf = vec![];
-        into_writer(&self, &mut buf).expect("failed to encode UserLogs data");
+        into_writer(&self, &mut buf).expect("failed to encode UserBids data");
         Cow::Owned(buf)
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode UserLogs data")
+        from_reader(&bytes[..]).expect("failed to decode UserBids data")
     }
 }
 
 const STATE_MEMORY_ID: MemoryId = MemoryId::new(0);
-const USER_LOGS_MEMORY_ID: MemoryId = MemoryId::new(1);
-const BRIDGE_LOGS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(2);
-const BRIDGE_LOGS_DATA_MEMORY_ID: MemoryId = MemoryId::new(3);
+const BIDS_MEMORY_ID: MemoryId = MemoryId::new(1);
+const USER_BIDS_MEMORY_ID: MemoryId = MemoryId::new(2);
+const BRIDGE_LOGS_INDEX_MEMORY_ID: MemoryId = MemoryId::new(3);
+const BRIDGE_LOGS_DATA_MEMORY_ID: MemoryId = MemoryId::new(4);
 
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State::new());
@@ -143,9 +145,15 @@ thread_local! {
         )
     );
 
-    static USER_LOGS: RefCell<StableBTreeMap<Principal, UserLogs, Memory>> = RefCell::new(
+    static BIDS: RefCell<StableBTreeMap<u64, cca::Bid, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with_borrow(|m| m.get(USER_LOGS_MEMORY_ID)),
+            MEMORY_MANAGER.with_borrow(|m| m.get(BIDS_MEMORY_ID)),
+        )
+    );
+
+    static USER_BIDS: RefCell<StableBTreeMap<Principal, UserBids, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with_borrow(|m| m.get(USER_BIDS_MEMORY_ID)),
         )
     );
 }
@@ -168,6 +176,43 @@ pub mod state {
 
     pub static DEFAULT_CERT_ENTRY: Lazy<HttpCertificationTreeEntry> =
         Lazy::new(|| HttpCertificationTreeEntry::new(&*DEFAULT_EXPR_PATH, *DEFAULT_CERTIFICATION));
+
+    pub async fn init_public_key() {
+        let key_name = STATE.with_borrow(|r| r.key_name.clone());
+        match ecdsa_public_key(key_name.clone(), vec![]).await {
+            Ok(root_pk) => {
+                STATE.with_borrow_mut(|s| {
+                    let self_pk =
+                        derive_public_key(&root_pk, vec![s.icp_address.as_slice().to_vec()])
+                            .expect("derive_public_key failed");
+                    s.ecdsa_public_key = root_pk;
+                    s.evm_address = self_pk.to_evm_adress().unwrap();
+                });
+            }
+            Err(err) => {
+                ic_cdk::api::debug_print(format!("failed to retrieve ECDSA public key: {err}"));
+            }
+        }
+
+        match schnorr_public_key(key_name, vec![], None).await {
+            Ok(root_pk) => {
+                STATE.with_borrow_mut(|s| {
+                    let self_pk = derive_schnorr_public_key(
+                        &root_pk,
+                        vec![s.icp_address.as_slice().to_vec()],
+                        None,
+                    )
+                    .expect("derive_schnorr_public_key failed");
+
+                    s.ed25519_public_key = root_pk;
+                    s.svm_address = self_pk.to_svm_pubkey().unwrap();
+                });
+            }
+            Err(err) => {
+                ic_cdk::api::debug_print(format!("failed to retrieve Schnorr public key: {err}"));
+            }
+        }
+    }
 
     pub fn with<R>(f: impl FnOnce(&State) -> R) -> R {
         STATE.with_borrow(f)

@@ -12,6 +12,7 @@ pub enum CanisterArgs {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InitArgs {
+    pub key_name: String,
     pub token_name: String,
     pub token_symbol: String,
     pub token_decimals: u8,
@@ -37,6 +38,7 @@ pub struct UpgradeArgs {
 fn init(args: Option<CanisterArgs>) {
     if let Some(CanisterArgs::Init(args)) = args {
         store::state::with_mut(|s| {
+            s.key_name = args.key_name;
             s.token_name = args.token_name;
             s.token_symbol = args.token_symbol;
             s.token_decimals = args.token_decimals;
@@ -48,6 +50,7 @@ fn init(args: Option<CanisterArgs>) {
     }
 
     store::state::init_http_certified_data();
+    ic_cdk_timers::set_timer(Duration::from_secs(0), store::state::init_public_key());
 }
 
 #[ic_cdk::pre_upgrade]

@@ -1,11 +1,11 @@
 {
   "canisters": {
-    "icp_cca": {
-      "candid": "src/icp_cca/icp_cca.did",
+    "ic_auction": {
+      "candid": "src/ic_auction/ic_auction.did",
       "declarations": {
         "node_compatibility": true
       },
-      "package": "icp_cca",
+      "package": "ic_auction",
       "optimize": "cycles",
       "gzip": true,
       "type": "rust"

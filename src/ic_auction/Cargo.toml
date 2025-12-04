@@ -1,8 +1,8 @@
 [package]
-name = "icp_cca"
+name = "ic_auction"
 description = ""
 publish = false
-repository = "https://github.com/ldclabs/token-listing/tree/main/src/icp_cca"
+repository = "https://github.com/ldclabs/token-listing/tree/main/src/ic_auction"
 version = "0.1.0"
 edition.workspace = true
 keywords.workspace = true
@@ -15,6 +15,11 @@ license.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
+alloy-consensus = { workspace = true }
+alloy-eips = { workspace = true }
+alloy-primitives = { workspace = true }
+alloy-rpc-types-eth = { workspace = true }
+alloy-signer = { workspace = true }
 base64 = { workspace = true }
 bincode = { workspace = true }
 candid = { workspace = true }
@@ -35,5 +40,11 @@ url = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
+solana-program = { workspace = true }
+solana-transaction = { workspace = true, features = ["bincode"] }
+solana-instruction = { workspace = true }
+solana-account-decoder-client-types = { workspace = true }
+solana-system-interface = { workspace = true, features = ["bincode"] }
+spl-associated-token-account-interface = { workspace = true }
 k256 = { workspace = true, features = ["ecdsa"] }
 ic-dummy-getrandom-for-wasm = { workspace = true }

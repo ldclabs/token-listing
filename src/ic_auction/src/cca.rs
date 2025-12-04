@@ -1,3 +1,9 @@
+//! # Continuous Clearing Auction
+//!
+//! This module implements a Continuous Clearing Auction (CCA) mechanism for token sales on the Internet Computer (IC).
+//!
+//! References: https://docs.uniswap.org/contracts/liquidity-launchpad/CCA
+//!
 use candid::{Nat, Principal};
 use ciborium::{from_reader, into_writer};
 use ic_stable_structures::{Storable, storable::Bound};

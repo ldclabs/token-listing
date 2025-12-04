@@ -1,6 +1,9 @@
 use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
+use serde_json::Value;
+
+use crate::{evm::Address, svm::Pubkey};
 
 pub const MAX_TOTAL_SUPPLY: u128 = 1_000_000_000_000_000_000_000_000_000_000; // Maximum total supply (1e30)
 
@@ -8,6 +11,49 @@ pub const MAX_TOTAL_SUPPLY: u128 = 1_000_000_000_000_000_000_000_000_000_000; //
 pub struct PublicKeyOutput {
     pub public_key: ByteBuf,
     pub chain_code: ByteBuf,
+}
+
+impl PublicKeyOutput {
+    pub fn to_svm_pubkey(&self) -> Result<Pubkey, String> {
+        Pubkey::try_from(self.public_key.as_slice())
+            .map_err(|_| "Failed to convert to SVM pubkey".to_string())
+    }
+
+    pub fn to_evm_adress(&self) -> Result<Address, String> {
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        let key = k256::PublicKey::from_sec1_bytes(self.public_key.as_slice())
+            .map_err(|_| "Failed to convert to EVM address".to_string())?;
+        let point = key.to_encoded_point(false);
+        Ok(Address::from_raw_public_key(&point.as_bytes()[1..]))
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct RPCRequest<'a> {
+    pub jsonrpc: &'a str,
+    pub method: &'a str,
+    pub params: &'a [Value],
+    pub id: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RPCResponse<T> {
+    pub result: Option<T>,
+    pub error: Option<Value>,
+}
+
+#[derive(CandidType, Serialize, Deserialize)]
+pub struct StateInfo {
+    // The currency being raised in the auction
+    pub currency: Principal,
+    // The token being sold in the auction
+    pub token: Principal,
+    pub token_name: String,
+    pub token_symbol: String,
+    pub token_decimals: u8,
+    pub token_logo: String,
+    pub token_total_supply: u128,
+    pub governance_canister: Option<Principal>,
 }
 
 /// Auction Information Snapshot
