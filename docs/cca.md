@@ -33,6 +33,7 @@ The clearing price is derived dynamically from the ratio of Demand Flow to Suppl
 $$ P(t) = \frac{F(t)}{R_{supply}(t)} $$
 
 Where the Supply Rate is linear but adaptive:
+
 $$ R_{supply}(t) = \frac{\text{Remaining Supply}}{T_{end} - t} $$
 
 ### 2.3 Token Allocation (The Accumulator)
@@ -41,9 +42,11 @@ To determine how many tokens a bidder receives, we integrate their contribution 
 $$ Q_u = \int_{t_{in}}^{t_{out}} \frac{f_u}{P(t)} dt = f_u \times \int_{t_{in}}^{t_{out}} \frac{1}{P(t)} dt $$
 
 We define the Global Accumulator $\Sigma$:
+
 $$ \Sigma(t) = \int_{0}^{t} \frac{1}{P(\tau)} d\tau $$
 
 Therefore, a user's filled amount is simply:
+
 $$ Q_u = f_u \times (\Sigma(t_{out}) - \Sigma(t_{in})) $$
 
 *This allows for extremely gas-efficient (cycle-efficient) calculations without iterating through history.*
