@@ -4,7 +4,7 @@
 //!
 //! References: https://docs.uniswap.org/contracts/liquidity-launchpad/CCA
 //!
-use candid::{Nat, Principal};
+use candid::Nat;
 use ciborium::{from_reader, into_writer};
 use ic_stable_structures::{Storable, storable::Bound};
 use serde::{Deserialize, Serialize};
