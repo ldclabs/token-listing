@@ -2,7 +2,7 @@ use candid::{CandidType, Principal};
 use serde::Deserialize;
 use std::time::Duration;
 
-use crate::{store, types::AuctionToken};
+use crate::store;
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub enum CanisterArgs {
@@ -13,8 +13,6 @@ pub enum CanisterArgs {
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InitArgs {
     pub key_name: String,
-    pub currency: AuctionToken,
-    pub token: AuctionToken,
     pub governance_canister: Option<Principal>,
 }
 
@@ -28,8 +26,6 @@ fn init(args: Option<CanisterArgs>) {
     if let Some(CanisterArgs::Init(args)) = args {
         store::state::with_mut(|s| {
             s.key_name = args.key_name;
-            s.currency = args.currency;
-            s.token = args.token;
             s.governance_canister = args.governance_canister;
         });
     } else if let Some(CanisterArgs::Upgrade(_)) = args {

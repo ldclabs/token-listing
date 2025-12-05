@@ -1,5 +1,6 @@
+use std::{ops::Add, str::FromStr};
+
 use candid::{CandidType, Principal};
-use ic_auth_types::ByteArrayB64;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use serde_json::Value;
@@ -45,22 +46,63 @@ pub struct RPCResponse<T> {
 
 #[derive(CandidType, Serialize, Deserialize)]
 pub struct StateInfo {
-    // The currency being raised in the auction
-    pub currency: AuctionToken,
     // The token being sold in the auction
     pub token: AuctionToken,
+    // The currency being raised in the auction
+    pub currency: String,
+    // The recipient of the raised Currency from the auction
+    pub funds_recipient: String,
+    // The recipient of any unsold tokens at the end of the auction
+    pub tokens_recipient: String,
     pub key_name: String,
     pub icp_address: Principal,
     pub evm_address: String,
     pub svm_address: String,
+    pub chain_providers: Vec<String>,
     pub governance_canister: Option<Principal>,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum AuctionToken {
-    Icp(Principal),
-    Sol(ByteArrayB64<32>), // Pubkey
-    Evm(ByteArrayB64<20>), // Address
+    Icp(String), // ICP Principal
+    Sol(String), // SOL Pubkey
+    Evm(String), // EVM Address
+}
+
+impl AuctionToken {
+    pub fn validate(&self) -> Result<(), String> {
+        self.validate_address(match self {
+            AuctionToken::Icp(addr) => addr,
+            AuctionToken::Sol(addr) => addr,
+            AuctionToken::Evm(addr) => addr,
+        })
+    }
+
+    pub fn validate_address(&self, address: &str) -> Result<(), String> {
+        match self {
+            AuctionToken::Icp(_) => {
+                Principal::from_text(address)
+                    .map_err(|_| format!("Invalid ICP principal: {address}"))?;
+            }
+            AuctionToken::Sol(_) => {
+                Pubkey::from_str(address).map_err(|_| format!("Invalid SOL pubkey: {address}"))?;
+            }
+            AuctionToken::Evm(_) => {
+                Address::from_str(address)
+                    .map_err(|_| format!("Invalid EVM address: {address}"))?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn equal_chain(&self, other: &AuctionToken) -> bool {
+        match (self, other) {
+            (AuctionToken::Icp(_), AuctionToken::Icp(_)) => true,
+            (AuctionToken::Sol(_), AuctionToken::Sol(_)) => true,
+            (AuctionToken::Evm(_), AuctionToken::Evm(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 /// Auction Information Snapshot

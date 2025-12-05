@@ -666,7 +666,7 @@ mod tests {
             50 * ACC_PRECISION / price_precision
         );
         assert_eq!(auction.acc_tokens_per_share, bid2.acc_snapshot);
-        assert_eq!(auction.is_graduated(), false);
+        assert!(!auction.is_graduated());
 
         let bid3 = auction.submit_bid(&storage, 50_000, 500, 9000).unwrap();
         // Flow rate 3 = 50000 * 1e9 / 2000 = 25 * 1e9
@@ -691,14 +691,14 @@ mod tests {
             80 * ACC_PRECISION / price_precision
         );
         assert_eq!(auction.acc_tokens_per_share, bid3.acc_snapshot);
-        assert_eq!(auction.is_graduated(), false);
+        assert!(!auction.is_graduated());
 
         let err = auction
             .claim(&storage, bid1.id, cfg.end_time - 1)
             .err()
             .unwrap();
         assert!(err.starts_with("NotClaimable:")); // Cannot claim before end
-        assert_eq!(auction.is_graduated(), true);
+        assert!(auction.is_graduated());
         // Acc 3 = Acc 2 + (10999 - 9000) * 1e18 / 266666666667
         assert_eq!(
             auction.acc_tokens_per_share, // 8_749_6249_999
@@ -710,7 +710,7 @@ mod tests {
             .err()
             .unwrap();
         assert!(err.starts_with("NotClaimable:")); // Cannot claim before end
-        assert_eq!(auction.is_graduated(), true);
+        assert!(auction.is_graduated());
         // Acc 4 = Acc 3 +  1 * 1e18 / 266666666667
         assert_eq!(
             auction.acc_tokens_per_share, // 87_499_999_999
@@ -855,6 +855,6 @@ mod tests {
         assert_eq!(info.clearing_price, 100);
         assert_eq!(info.cumulative_demand_raised, 79999);
         assert_eq!(info.cumulative_supply_released, 79999999999);
-        assert_eq!(info.is_graduated, false);
+        assert!(!info.is_graduated);
     }
 }

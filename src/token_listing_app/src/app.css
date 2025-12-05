@@ -1,0 +1,77 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Light mode colors */
+  --color-background: #f7f7f8;
+  --color-foreground: #0a0a0f;
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0f;
+  --color-muted: #6b7280;
+  --color-muted-foreground: #9ca3af;
+  --color-border: #d4d4d8;
+  --color-border-subtle: rgba(0, 0, 0, 0.1);
+  --color-surface: rgba(0, 0, 0, 0.03);
+  --color-surface-hover: rgba(0, 0, 0, 0.05);
+  --color-accent: #0a0a0f;
+  --color-accent-foreground: #ffffff;
+}
+
+@layer base {
+  /* disable chrome cancel button */
+  input[type='search']::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  /* Dark mode theme overrides */
+  html.dark,
+  .dark {
+    --color-background: #050505;
+    --color-foreground: #f5f5f5;
+    --color-card: #0b0b0f;
+    --color-card-foreground: #f5f5f5;
+    --color-muted: #9ca3af;
+    --color-muted-foreground: #6b7280;
+    --color-border: #1f1f24;
+    --color-border-subtle: rgba(255, 255, 255, 0.2);
+    --color-surface: rgba(255, 255, 255, 0.03);
+    --color-surface-hover: rgba(255, 255, 255, 0.05);
+    --color-accent: #ffffff;
+    --color-accent-foreground: #0a0a0f;
+  }
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+body {
+  font-family:
+    'Space Grotesk',
+    'Inter',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  letter-spacing: -0.01em;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+/* Glass morphism border card */
+.glass-border {
+  @apply bg-card border-border-subtle border shadow-xs;
+}
+
+html.dark .glass-border,
+.dark .glass-border {
+  background: rgba(255, 255, 255, 0.02);
+}

@@ -1,42 +1,23 @@
-use alloy_primitives::{Address, Bytes, Signature, TxHash, U256, hex};
-use candid::{CandidType, Nat, Principal};
+use alloy_primitives::Address;
+use candid::{CandidType, Principal};
 use ciborium::{from_reader, into_writer};
 use ic_http_certification::{
     HttpCertification, HttpCertificationPath, HttpCertificationTree, HttpCertificationTreeEntry,
     cel::{DefaultCelBuilder, create_cel_expr},
 };
 use ic_stable_structures::{
-    DefaultMemoryImpl, StableBTreeMap, StableCell, StableLog, Storable,
+    DefaultMemoryImpl, StableBTreeMap, StableCell, Storable,
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
     storable::Bound,
 };
-use icrc_ledger_types::{
-    icrc1::{account::Account, transfer::TransferArg},
-    icrc2::transfer_from::{TransferFromArgs, TransferFromError},
-};
-use num_traits::cast::ToPrimitive;
 use serde::{Deserialize, Serialize};
-use serde_bytes::ByteArray;
-use std::{
-    borrow::Cow,
-    cell::RefCell,
-    cmp,
-    collections::{BTreeSet, HashMap, HashSet, VecDeque},
-    time::Duration,
-};
+use std::{borrow::Cow, cell::RefCell, collections::BTreeSet};
 
 use crate::{
     cca,
-    ecdsa::{cost_sign_with_ecdsa, derive_public_key, ecdsa_public_key, sign_with_ecdsa},
-    evm::{EvmClient, encode_erc20_transfer},
-    helper::{call, convert_amount, format_error},
-    outcall::DefaultHttpOutcall,
-    schnorr::{derive_schnorr_public_key, schnorr_public_key, sign_with_schnorr},
-    svm::{
-        Message, Pubkey, Signature as SvmSignature, SignatureStatus, SvmClient, Transaction,
-        create_associated_token_account_idempotent, get_associated_token_address, instruction,
-        transfer_checked_instruction,
-    },
+    ecdsa::{derive_public_key, ecdsa_public_key},
+    schnorr::{derive_schnorr_public_key, schnorr_public_key},
+    svm::Pubkey,
     types::{AuctionInfo, AuctionToken, BidInfo, PublicKeyOutput, StateInfo},
 };
 
@@ -44,10 +25,14 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct State {
-    // The currency being raised in the auction
-    pub currency: AuctionToken,
     // The token being sold in the auction
     pub token: AuctionToken,
+    // The currency being raised in the auction
+    pub currency: String,
+    // The recipient of the raised Currency from the auction
+    pub funds_recipient: String,
+    // The recipient of any unsold tokens at the end of the auction
+    pub tokens_recipient: String,
     // pub token_name: String,
     // pub token_symbol: String,
     // pub token_decimals: u8,
@@ -57,6 +42,7 @@ pub struct State {
     pub icp_address: Principal,
     pub evm_address: Address,
     pub svm_address: Pubkey,
+    pub chain_providers: Vec<String>,
     pub ecdsa_public_key: PublicKeyOutput,
     pub ed25519_public_key: PublicKeyOutput,
     pub governance_canister: Option<Principal>,
@@ -66,12 +52,15 @@ pub struct State {
 impl From<&State> for StateInfo {
     fn from(s: &State) -> Self {
         Self {
-            currency: s.currency.clone(),
             token: s.token.clone(),
+            currency: s.currency.clone(),
+            funds_recipient: s.funds_recipient.clone(),
+            tokens_recipient: s.tokens_recipient.clone(),
             key_name: s.key_name.clone(),
             icp_address: s.icp_address,
             evm_address: s.evm_address.to_string(),
             svm_address: s.svm_address.to_string(),
+            chain_providers: s.chain_providers.clone(),
             governance_canister: s.governance_canister,
         }
     }
@@ -80,13 +69,16 @@ impl From<&State> for StateInfo {
 impl State {
     fn new() -> Self {
         Self {
-            currency: AuctionToken::Icp(Principal::anonymous()),
-            token: AuctionToken::Icp(Principal::anonymous()),
+            token: AuctionToken::Icp(Principal::anonymous().to_string()),
+            currency: Principal::anonymous().to_string(),
+            funds_recipient: "".to_string(),
+            tokens_recipient: "".to_string(),
             governance_canister: None,
             key_name: "dfx_test_key".to_string(),
             icp_address: ic_cdk::api::canister_self(),
             evm_address: [0u8; 20].into(),
             svm_address: Pubkey::default(), // 11111111111111111111111111111111
+            chain_providers: Vec::new(),
             ecdsa_public_key: PublicKeyOutput::default(),
             ed25519_public_key: PublicKeyOutput::default(),
             auction: None,
@@ -171,7 +163,6 @@ impl cca::BidStorage for BidStorage {
 static BS: BidStorage = BidStorage;
 
 pub mod state {
-    use std::str::FromStr;
 
     use super::*;
 
@@ -270,8 +261,7 @@ pub mod state {
     }
 
     pub fn info() -> StateInfo {
-        let info = STATE.with_borrow(|s| StateInfo::from(s));
-        info
+        STATE.with_borrow(|s| StateInfo::from(s))
     }
 
     pub fn evm_address(user: &Principal) -> Address {

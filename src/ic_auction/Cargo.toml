@@ -1,6 +1,6 @@
 [package]
 name = "ic_auction"
-description = ""
+description = "Continuous Clearing Auction (CCA) on ICP"
 publish = false
 repository = "https://github.com/ldclabs/token-listing/tree/main/src/ic_auction"
 version = "0.1.0"

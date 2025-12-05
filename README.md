@@ -1,6 +1,6 @@
-# Tokenlist.ing (WIP)
+# TokenList.ing (WIP)
 
-Tokenlist.ing is a comprehensive multi-chain token infrastructure built on the Internet Computer (ICP). Designed to serve EVM and Solana ecosystems, it provides permanent on-chain metadata storage to eliminate centralization risks, alongside a suite of tools for token minting and DAO governance. Launching first is our Continuous Clearing Auction (CCA) Launchpad, a next-generation protocol for fair price discovery and community distribution.
+TokenList.ing is a comprehensive multi-chain token infrastructure built on the Internet Computer (ICP). Designed to serve EVM and Solana ecosystems, it provides permanent on-chain metadata storage to eliminate centralization risks, alongside a suite of tools for token minting and DAO governance. Launching first is our Continuous Clearing Auction (CCA) Launchpad, a next-generation protocol for fair price discovery and community distribution.
 
 ## About Us
 
