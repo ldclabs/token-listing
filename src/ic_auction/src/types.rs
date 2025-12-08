@@ -1,9 +1,9 @@
-use std::str::FromStr;
-
 use candid::{CandidType, Principal};
+use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use serde_json::Value;
+use std::str::FromStr;
 
 use crate::{evm::Address, svm::Pubkey};
 
@@ -50,8 +50,12 @@ pub struct StateInfo {
     pub chain: Chain,
     // The currency being raised in the auction
     pub currency: String,
+    pub currency_decimals: u8,
+    pub currency_program_id: Option<String>,
     // The token being sold in the auction
     pub token: String,
+    pub token_decimals: u8,
+    pub token_program_id: Option<String>,
     // The recipient of the raised Currency from the auction
     pub funds_recipient: String,
     // The recipient of any unsold tokens at the end of the auction
@@ -66,24 +70,24 @@ pub struct StateInfo {
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Chain {
-    Icp,         // ICP Principal
-    Sol,         // SOL Pubkey
-    Evm(String), // EVM Address
+    Icp,
+    Sol,
+    Evm(u64),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ChainAddress {
-    Icp(Principal), // ICP Principal
-    Sol(Pubkey),    // SOL Pubkey
-    Evm(Address),   // EVM Address
+    Icp(Account), // ICP Account
+    Sol(Pubkey),  // SOL Pubkey
+    Evm(Address), // EVM Address
 }
 
 impl Chain {
     pub fn parse_address(&self, address: &str) -> Result<ChainAddress, String> {
         match self {
-            Chain::Icp => Principal::from_text(address)
+            Chain::Icp => Account::from_str(address)
                 .map(ChainAddress::Icp)
-                .map_err(|_| format!("Invalid ICP principal: {address}")),
+                .map_err(|_| format!("Invalid ICP Account: {address}")),
             Chain::Sol => Pubkey::from_str(address)
                 .map(ChainAddress::Sol)
                 .map_err(|_| format!("Invalid SOL pubkey: {address}")),
@@ -109,21 +113,17 @@ impl ChainAddress {
         match self {
             ChainAddress::Icp(_) => Chain::Icp,
             ChainAddress::Sol(_) => Chain::Sol,
-            ChainAddress::Evm(_) => Chain::Evm("".to_string()), // EVM doesn't have a specific chain name
+            ChainAddress::Evm(_) => Chain::Evm(0), // EVM doesn't have a specific chain name
         }
     }
+}
 
-    pub fn as_slice(&self) -> &[u8] {
-        match self {
-            ChainAddress::Icp(addr) => addr.as_slice(),
-            ChainAddress::Sol(addr) => addr.as_array(),
-            ChainAddress::Evm(addr) => addr.as_ref(),
-        }
-    }
-
-    pub fn to_vec(&self) -> Vec<u8> {
-        self.as_slice().to_vec()
-    }
+#[derive(CandidType, Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct TokenInput {
+    pub token: String,
+    pub decimals: u8,
+    pub recipient: String,
+    pub program_id: Option<String>,
 }
 
 #[derive(CandidType, Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -263,4 +263,24 @@ pub struct BidInfo {
     pub tokens_filled: u128, // Amount of tokens filled
     pub refund: u128,        // Amount of currency refunded
     pub claim_time: u64,     // Claim/Settlement time
+}
+
+#[derive(CandidType, Clone, Serialize, Deserialize)]
+pub struct DepositTxInfo {
+    pub txid: String,
+    pub user: Principal,
+    pub sender: String,
+    pub amount: u128,
+    pub timestamp: u64,
+}
+
+#[derive(CandidType, Clone, Serialize, Deserialize)]
+pub struct WithdrawTxInfo {
+    pub id: u64,
+    pub kind: u8, // 0: currency, 1: token
+    pub user: Principal,
+    pub recipient: String,
+    pub amount: u128,
+    pub txid: String,
+    pub timestamp: u64,
 }

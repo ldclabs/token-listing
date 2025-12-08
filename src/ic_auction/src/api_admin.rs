@@ -3,60 +3,79 @@ use url::Url;
 use crate::{helper::pretty_format, store, types};
 
 #[ic_cdk::update(guard = "is_controller")]
-fn admin_set_token(token: String, tokens_recipient: String) -> Result<(), String> {
+fn admin_set_token(input: types::TokenInput) -> Result<(), String> {
     store::state::with_mut(|s| {
         if s.auction.is_some() {
             return Err("cannot change token when an auction is ongoing".to_string());
         }
-        s.chain.parse_address(&token)?;
-        s.chain.parse_address(&tokens_recipient)?;
-        s.token = token;
-        s.tokens_recipient = tokens_recipient;
+        if matches!(s.chain, types::Chain::Sol) && input.program_id.is_none() {
+            return Err("program_id is required for Solana tokens".to_string());
+        }
+        s.chain.parse_address(&input.token)?;
+        s.chain.parse_address(&input.recipient)?;
+        s.token = input.token;
+        s.token_program_id = input.program_id;
+        s.token_decimals = input.decimals;
+        s.tokens_recipient = input.recipient;
         Ok(())
     })
 }
 
 #[ic_cdk::update]
-fn validate_admin_set_token(token: String, tokens_recipient: String) -> Result<String, String> {
+fn validate_admin_set_token(input: types::TokenInput) -> Result<String, String> {
     store::state::with(|s| {
         if s.auction.is_some() {
             return Err("cannot change token when an auction is ongoing".to_string());
         }
-        s.chain.parse_address(&token)?;
-        s.chain.parse_address(&tokens_recipient)?;
+        if matches!(s.chain, types::Chain::Sol) && input.program_id.is_none() {
+            return Err("program_id is required for Solana tokens".to_string());
+        }
+        s.chain.parse_address(&input.token)?;
+        s.chain.parse_address(&input.recipient)?;
         Ok(())
     })?;
-    pretty_format(&(token, tokens_recipient))
+    pretty_format(&(input,))
 }
 
 #[ic_cdk::update(guard = "is_controller")]
-fn admin_set_currency(currency: String, funds_recipient: String) -> Result<(), String> {
+fn admin_set_currency(input: types::TokenInput) -> Result<(), String> {
     store::state::with_mut(|s| {
         if s.auction.is_some() {
             return Err("cannot change currency when an auction is ongoing".to_string());
         }
-        s.chain.parse_address(&currency)?;
-        s.chain.parse_address(&funds_recipient)?;
-        s.currency = currency;
-        s.funds_recipient = funds_recipient;
+        if matches!(s.chain, types::Chain::Sol)
+            && input.token != "11111111111111111111111111111111"
+            && input.program_id.is_none()
+        {
+            return Err("program_id is required for Solana tokens".to_string());
+        }
+        s.chain.parse_address(&input.token)?;
+        s.chain.parse_address(&input.recipient)?;
+        s.currency = input.token;
+        s.currency_program_id = input.program_id;
+        s.currency_decimals = input.decimals;
+        s.funds_recipient = input.recipient;
         Ok(())
     })
 }
 
 #[ic_cdk::update]
-fn validate_admin_set_currency(
-    currency: String,
-    funds_recipient: String,
-) -> Result<String, String> {
+fn validate_admin_set_currency(input: types::TokenInput) -> Result<String, String> {
     store::state::with(|s| {
         if s.auction.is_some() {
             return Err("cannot change currency when an auction is ongoing".to_string());
         }
-        s.chain.parse_address(&currency)?;
-        s.chain.parse_address(&funds_recipient)?;
+        if matches!(s.chain, types::Chain::Sol)
+            && input.token != "11111111111111111111111111111111"
+            && input.program_id.is_none()
+        {
+            return Err("program_id is required for Solana tokens".to_string());
+        }
+        s.chain.parse_address(&input.token)?;
+        s.chain.parse_address(&input.recipient)?;
         Ok(())
     })?;
-    pretty_format(&(currency, funds_recipient))
+    pretty_format(&(input,))
 }
 
 #[ic_cdk::update(guard = "is_controller")]

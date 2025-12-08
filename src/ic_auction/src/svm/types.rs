@@ -7,7 +7,7 @@ pub use solana_account_decoder_client_types::{
     token::{TokenAccountType, UiTokenAmount},
 };
 pub use solana_program::{hash::Hash, pubkey::Pubkey};
-pub use solana_transaction::{Message, Signature, Transaction};
+pub use solana_transaction::{Message, Transaction};
 pub use solana_transaction_status_client_types::EncodedTransactionWithStatusMeta;
 
 use crate::types::TransferChecked;

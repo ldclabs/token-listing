@@ -1,5 +1,7 @@
-use alloy_primitives::Address;
-use candid::{CandidType, Principal};
+use alloy_consensus::{SignableTransaction, Signed, TxEip1559};
+use alloy_eips::eip2718::Encodable2718;
+use alloy_primitives::{Address, Bytes, Signature, TxHash, U256, hex};
+use candid::{CandidType, Nat, Principal};
 use ciborium::{from_reader, into_writer};
 use ic_auth_types::{ByteArrayB64, ByteBufB64};
 use ic_http_certification::{
@@ -11,26 +13,33 @@ use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
     storable::Bound,
 };
+use icrc_ledger_types::{
+    icrc1::{account::Account, transfer::TransferArg},
+    icrc2::transfer_from::TransferFromError,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{BTreeSet, HashMap, HashSet},
+    str::FromStr,
 };
 
 use crate::{
     cca,
-    ecdsa::{derive_public_key, ecdsa_public_key},
-    evm::{EvmClient, TxHash},
-    helper::get_icrc_transfer,
+    ecdsa::{derive_public_key, ecdsa_public_key, sign_with_ecdsa},
+    evm::{EvmClient, encode_erc20_transfer},
+    helper::{call, format_error, get_icrc_transfer},
     outcall::DefaultHttpOutcall,
-    schnorr::{derive_schnorr_public_key, schnorr_public_key},
+    schnorr::{derive_schnorr_public_key, schnorr_public_key, sign_with_schnorr},
     svm::{
-        Pubkey, SvmClient,
-        get_transfer_checked,
+        Message, Pubkey, SvmClient, Transaction, create_associated_token_account_idempotent,
+        get_associated_token_address, get_transfer_checked, instruction,
+        transfer_checked_instruction,
     },
     types::{
-        AuctionInfo, BidInfo, Chain, ChainAddress, PublicKeyOutput, StateInfo, TransferChecked,
+        AuctionInfo, BidInfo, Chain, PublicKeyOutput, StateInfo, TransferChecked,
+        WithdrawTxInfo,
     },
 };
 
@@ -42,8 +51,16 @@ pub struct State {
     pub chain: Chain,
     // The currency being raised in the auction
     pub currency: String,
+    // Currency decimals
+    pub currency_decimals: u8,
+    // Currency program ID (Solana SPL token only)
+    pub currency_program_id: Option<String>,
     // The token being sold in the auction
     pub token: String,
+    // Token decimals
+    pub token_decimals: u8,
+    // Token program ID (Solana SPL token only)
+    pub token_program_id: Option<String>,
     // The recipient of the raised Currency from the auction
     pub funds_recipient: String,
     // The recipient of any unsold tokens at the end of the auction
@@ -56,7 +73,7 @@ pub struct State {
     pub key_name: String,
     pub icp_address: Principal,
     pub evm_address: String,
-    pub sol_address: String,
+    pub sol_address: Pubkey,
     pub chain_providers: Vec<String>,
     pub ecdsa_public_key: PublicKeyOutput,
     pub ed25519_public_key: PublicKeyOutput,
@@ -64,6 +81,8 @@ pub struct State {
     pub governance_canister: Option<Principal>,
     pub bidders: HashSet<Principal>,
     pub pending_deposits: HashMap<Principal, u64>,
+    // (gas_updated_at, gas_price, max_priority_fee_per_gas)
+    pub evm_latest_gas: (u64, u128, u128),
     pub auction: Option<cca::Auction>,
 }
 
@@ -72,13 +91,17 @@ impl From<&State> for StateInfo {
         Self {
             chain: s.chain.clone(),
             currency: s.currency.clone(),
+            currency_decimals: s.currency_decimals,
+            currency_program_id: s.currency_program_id.clone(),
             token: s.token.clone(),
+            token_decimals: s.token_decimals,
+            token_program_id: s.token_program_id.clone(),
             funds_recipient: s.funds_recipient.clone(),
             tokens_recipient: s.tokens_recipient.clone(),
             key_name: s.key_name.clone(),
             icp_address: s.icp_address,
             evm_address: s.evm_address.clone(),
-            sol_address: s.sol_address.clone(),
+            sol_address: s.sol_address.to_string(),
             chain_providers: s.chain_providers.clone(),
             governance_canister: s.governance_canister,
         }
@@ -90,20 +113,25 @@ impl State {
         Self {
             chain: Chain::Icp,
             currency: "".to_string(),
+            currency_decimals: 0,
+            currency_program_id: None,
             token: "".to_string(),
+            token_decimals: 0,
+            token_program_id: None,
             funds_recipient: "".to_string(),
             tokens_recipient: "".to_string(),
             governance_canister: None,
             key_name: "dfx_test_key".to_string(),
             icp_address: ic_cdk::api::canister_self(),
             evm_address: "".to_string(),
-            sol_address: Pubkey::default().to_string(), // 11111111111111111111111111111111
+            sol_address: Pubkey::default(), // 11111111111111111111111111111111
             chain_providers: Vec::new(),
             ecdsa_public_key: PublicKeyOutput::default(),
             ed25519_public_key: PublicKeyOutput::default(),
             nonce_iv: ByteArrayB64::default(),
             bidders: HashSet::new(),
             pending_deposits: HashMap::new(),
+            evm_latest_gas: (0, 0, 0),
             auction: None,
         }
     }
@@ -152,7 +180,7 @@ pub struct DepositTx {
     #[serde(rename = "u")]
     pub user: Principal,
     #[serde(rename = "s")]
-    pub sender: ByteBufB64,
+    pub sender: String,
     #[serde(rename = "a")]
     pub amount: u128,
     #[serde(rename = "t")]
@@ -186,13 +214,28 @@ pub struct WithdrawTx {
     #[serde(rename = "u")]
     pub user: Principal,
     #[serde(rename = "r")]
-    pub recipient: ByteBufB64,
+    pub recipient: String,
     #[serde(rename = "a")]
     pub amount: u128,
     #[serde(rename = "i")]
-    pub txid: ByteBufB64,
+    pub txid: String,
     #[serde(rename = "t")]
     pub timestamp: u64,
+}
+
+// todo
+impl WithdrawTx {
+    pub fn into_info(self, id: u64) -> WithdrawTxInfo {
+        WithdrawTxInfo {
+            id,
+            kind: self.kind,
+            user: self.user,
+            recipient: self.recipient,
+            amount: self.amount,
+            txid: self.txid,
+            timestamp: self.timestamp,
+        }
+    }
 }
 
 impl Storable for WithdrawTx {
@@ -277,6 +320,7 @@ impl cca::BidStorage for BidStorage {
 }
 
 static BS: BidStorage = BidStorage;
+static SOL_ADDRESS: &str = "11111111111111111111111111111111";
 
 pub mod state {
 
@@ -333,7 +377,7 @@ pub mod state {
                     .expect("derive_schnorr_public_key failed");
 
                     s.ed25519_public_key = root_pk;
-                    s.sol_address = self_pk.to_sol_pubkey().unwrap().to_string();
+                    s.sol_address = self_pk.to_sol_pubkey().unwrap();
                 });
             }
             Err(err) => {
@@ -446,16 +490,28 @@ pub mod state {
             Ok(())
         })?;
 
-        let addr = STATE.with_borrow_mut(|s| {
-            let addr = s.chain.parse_address(&sender)?;
+        let chain = STATE.with_borrow_mut(|s| {
+            match &s.auction {
+                Some(auction) => {
+                    if now_ms + auction.cfg.min_bid_duration >= auction.cfg.end_time {
+                        return Err("auction is ending soon, deposits are not allowed".to_string());
+                    }
+                }
+                None => {
+                    return Err("auction is not ready".to_string());
+                }
+            }
+
+            s.chain.parse_address(&sender)?;
             if let Some(ts) = s.pending_deposits.get(&caller)
-                && *ts + 20 * 1000 >= now_ms {
-                    return Err("pending deposit already exists".to_string());
-                };
+                && *ts + 20 * 1000 >= now_ms
+            {
+                return Err("pending deposit already exists".to_string());
+            };
 
             // prevent DDoS attacks by limiting pending deposits
             s.pending_deposits.insert(caller, now_ms);
-            Ok(addr)
+            Ok(s.chain.clone())
         })?;
 
         let mut tx = DEPOSITS.with_borrow_mut(|d| {
@@ -464,7 +520,7 @@ pub mod state {
             }
             let tx = DepositTx {
                 user: caller,
-                sender: addr.to_vec().into(),
+                sender: sender.clone(),
                 amount: 0,
                 timestamp: now_ms,
             };
@@ -472,14 +528,10 @@ pub mod state {
             Ok(tx)
         })?;
 
-        let tx_status = match addr {
-            ChainAddress::Sol(addr) => {
-                check_sol_deposit_currency(caller, addr, txid.clone(), now_ms).await
-            }
-            ChainAddress::Icp(addr) => check_icp_deposit_currency(caller, addr, txid.clone()).await,
-            ChainAddress::Evm(addr) => {
-                check_evm_deposit_currency(caller, addr, txid.clone(), now_ms).await
-            }
+        let tx_status = match chain {
+            Chain::Sol => check_sol_deposit_currency(caller, sender, txid.clone(), now_ms).await,
+            Chain::Icp => check_icp_deposit_currency(caller, sender, txid.clone()).await,
+            Chain::Evm(_) => check_evm_deposit_currency(caller, sender, txid.clone(), now_ms).await,
         };
 
         match tx_status {
@@ -508,9 +560,171 @@ pub mod state {
         }
     }
 
+    pub async fn withdraw_currency(
+        caller: Principal,
+        recipient: String,
+        now_ms: u64,
+    ) -> Result<WithdrawTxInfo, String> {
+        let (chain, token, decimals, program_id) = STATE.with_borrow_mut(|s| {
+            match &s.auction {
+                Some(auction) => {
+                    if now_ms <= auction.cfg.end_time {
+                        return Err(
+                            "auction is not ended yet, withdrawals are not allowed".to_string()
+                        );
+                    }
+                }
+                None => {
+                    return Err("auction is not ready".to_string());
+                }
+            }
+
+            s.chain.parse_address(&recipient)?;
+
+            Ok((
+                s.chain.clone(),
+                s.currency.clone(),
+                s.currency_decimals,
+                s.currency_program_id.clone(),
+            ))
+        })?;
+
+        let amount = USERS.with_borrow_mut(|u| {
+            let mut info = u.get(&caller).unwrap_or_default();
+            if !info.bound_addresses.contains(&recipient) {
+                return Err("recipient address is not bound to user".to_string());
+            }
+            let amount = info.currency_amount;
+            if amount == 0 {
+                return Err("insufficient balance".to_string());
+            }
+            info.currency_amount = 0;
+            u.insert(caller, info);
+            Ok(amount)
+        })?;
+
+        let tx_status = match chain {
+            Chain::Sol => {
+                withdraw_sol_token(&token, program_id, decimals, &recipient, amount, now_ms).await
+            }
+            Chain::Icp => withdraw_icp_token(&token, &recipient, amount).await,
+            Chain::Evm(chain_id) => {
+                withdraw_evm_token(&token, &recipient, chain_id, amount, now_ms).await
+            }
+        };
+
+        match tx_status {
+            Ok(txid) => {
+                let tx = WithdrawTx {
+                    kind: 0,
+                    user: caller,
+                    recipient,
+                    amount,
+                    txid,
+                    timestamp: now_ms,
+                };
+                let id = WITHDRAWS
+                    .with_borrow_mut(|w| w.append(&tx))
+                    .expect("append WithdrawTx failed");
+
+                Ok(tx.into_info(id))
+            }
+
+            Err(err) => {
+                USERS.with_borrow_mut(|u| {
+                    let mut info = u.get(&caller).unwrap_or_default();
+                    info.currency_amount = amount;
+                    u.insert(caller, info);
+                });
+                Err(err)
+            }
+        }
+    }
+
+    pub async fn withdraw_token(
+        caller: Principal,
+        recipient: String,
+        now_ms: u64,
+    ) -> Result<WithdrawTxInfo, String> {
+        let (chain, token, decimals, program_id) = STATE.with_borrow_mut(|s| {
+            match &s.auction {
+                Some(auction) => {
+                    if now_ms <= auction.cfg.end_time {
+                        return Err(
+                            "auction is not ended yet, withdrawals are not allowed".to_string()
+                        );
+                    }
+                }
+                None => {
+                    return Err("auction is not ready".to_string());
+                }
+            }
+
+            s.chain.parse_address(&recipient)?;
+
+            Ok((
+                s.chain.clone(),
+                s.token.clone(),
+                s.token_decimals,
+                s.token_program_id.clone(),
+            ))
+        })?;
+
+        let amount = USERS.with_borrow_mut(|u| {
+            let mut info = u.get(&caller).unwrap_or_default();
+            if !info.bound_addresses.contains(&recipient) {
+                return Err("recipient address is not bound to user".to_string());
+            }
+            let amount = info.token_amount;
+            if amount == 0 {
+                return Err("insufficient balance".to_string());
+            }
+            info.token_amount = 0;
+            u.insert(caller, info);
+            Ok(amount)
+        })?;
+
+        let tx_status = match chain {
+            Chain::Sol => {
+                withdraw_sol_token(&token, program_id, decimals, &recipient, amount, now_ms).await
+            }
+            Chain::Icp => withdraw_icp_token(&token, &recipient, amount).await,
+            Chain::Evm(chain_id) => {
+                withdraw_evm_token(&token, &recipient, chain_id, amount, now_ms).await
+            }
+        };
+
+        match tx_status {
+            Ok(txid) => {
+                let tx = WithdrawTx {
+                    kind: 1,
+                    user: caller,
+                    recipient,
+                    amount,
+                    txid,
+                    timestamp: now_ms,
+                };
+                let id = WITHDRAWS
+                    .with_borrow_mut(|w| w.append(&tx))
+                    .expect("append WithdrawTx failed");
+
+                Ok(tx.into_info(id))
+            }
+
+            Err(err) => {
+                USERS.with_borrow_mut(|u| {
+                    let mut info = u.get(&caller).unwrap_or_default();
+                    info.token_amount = amount;
+                    u.insert(caller, info);
+                });
+                Err(err)
+            }
+        }
+    }
+
     async fn check_sol_deposit_currency(
         caller: Principal,
-        sender: Pubkey,
+        sender: String,
         txid: String, // 64 bytes in base58: transaction signature
         now_ms: u64,
     ) -> Result<TransferChecked, String> {
@@ -524,10 +738,10 @@ pub mod state {
             s.pending_deposits.remove(&caller);
 
             let tx_status = get_transfer_checked(tx_status, &s.currency)?;
-            if tx_status.from != sender.to_string() {
+            if tx_status.from != sender {
                 return Err("transaction sender does not match sender".to_string());
             }
-            if tx_status.to != s.sol_address {
+            if tx_status.to != s.sol_address.to_string() {
                 return Err("transaction recipient does not match auction contract".to_string());
             }
             Ok(tx_status)
@@ -536,7 +750,7 @@ pub mod state {
 
     async fn check_icp_deposit_currency(
         caller: Principal,
-        sender: Principal,
+        sender: String,
         txid: String, // u64: ICRC Ledger block index
     ) -> Result<TransferChecked, String> {
         let block_index = txid
@@ -552,7 +766,7 @@ pub mod state {
         STATE.with_borrow_mut(|s| {
             s.pending_deposits.remove(&caller);
 
-            if tx_status.from != sender.to_string() {
+            if tx_status.from != sender {
                 return Err("transaction sender does not match sender".to_string());
             }
             if tx_status.to != s.icp_address.to_string() {
@@ -564,7 +778,7 @@ pub mod state {
 
     async fn check_evm_deposit_currency(
         caller: Principal,
-        sender: Address,
+        sender: String,
         txid: String, // 32 bytes in hex: transaction hash
         now_ms: u64,
     ) -> Result<TransferChecked, String> {
@@ -600,7 +814,6 @@ pub mod state {
 
             // Find the Transfer event log
             // Topic0 for Transfer(address,address,uint256) is keccak256("Transfer(address,address,uint256)")
-            // 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
             let transfer_topic = alloy_primitives::B256::from_hex(
                 "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
             )
@@ -629,7 +842,7 @@ pub mod state {
             let amount = alloy_primitives::U256::from_be_slice(&log.data().data);
             let amount_u128 = u128::try_from(amount).map_err(|_| "Amount too large".to_string())?;
 
-            if from_addr != sender {
+            if from_addr.to_string() != sender {
                 return Err("transaction sender does not match sender".to_string());
             }
 
@@ -642,11 +855,101 @@ pub mod state {
 
             Ok(TransferChecked {
                 token: s.currency.clone(),
-                from: sender.to_string(),
+                from: sender,
                 to: s.evm_address.clone(),
                 amount: amount_u128,
             })
         })
+    }
+
+    async fn withdraw_sol_token(
+        token: &str,
+        token_program_id: Option<String>,
+        decimals: u8,
+        recipient: &str,
+        amount: u128,
+        now_ms: u64,
+    ) -> Result<String, String> {
+        let to_addr =
+            Pubkey::from_str(recipient).map_err(|_| "Invalid recipient address".to_string())?;
+        let (client, signed_tx) = if token == SOL_ADDRESS {
+            build_sol_transfer_tx(&to_addr, amount as u64, now_ms).await?
+        } else {
+            let token_program_id =
+                token_program_id.ok_or("Token program ID is required".to_string())?;
+            build_spl_transfer_tx(
+                &to_addr,
+                &Pubkey::from_str(token).map_err(|_| "Invalid token address".to_string())?,
+                &Pubkey::from_str(&token_program_id.to_string())
+                    .map_err(|_| "Invalid token program ID".to_string())?,
+                decimals,
+                amount,
+                now_ms,
+            )
+            .await?
+        };
+        let txid = signed_tx.signatures[0].to_string();
+        let data = bincode::serialize(&signed_tx).map_err(|err| format!("SOL: {err}"))?;
+
+        let _ = client
+            .send_transaction(now_ms, data.into(), true)
+            .await
+            .map_err(|err| format!("SOL: {err}"))?;
+        Ok(txid)
+    }
+
+    async fn withdraw_icp_token(
+        token: &str,
+        recipient: &str,
+        amount: u128,
+    ) -> Result<String, String> {
+        let ledger = Principal::from_text(token)
+            .map_err(|_| format!("Invalid token principal: {}", token))?;
+        let res: Result<Nat, TransferFromError> = call(
+            ledger,
+            "icrc1_transfer",
+            (TransferArg {
+                from_subaccount: None,
+                to: Account::from_str(recipient)
+                    .map_err(|_| "Invalid recipient address".to_string())?,
+                fee: None,
+                created_at_time: None,
+                memo: None,
+                amount: amount.into(),
+            },),
+            0,
+        )
+        .await?;
+        let res =
+            res.map_err(|err| format!("ICP: failed to transfer token to user, error: {:?}", err))?;
+        Ok(res.0.to_string())
+    }
+
+    async fn withdraw_evm_token(
+        token: &str,
+        recipient: &str,
+        chain_id: u64,
+        amount: u128,
+        now_ms: u64,
+    ) -> Result<String, String> {
+        let to_addr =
+            Address::from_str(recipient).map_err(|_| "Invalid recipient address".to_string())?;
+        let (client, signed_tx) = build_erc20_transfer_tx(
+            &to_addr,
+            Address::from_str(token).map_err(|_| "Invalid token address".to_string())?,
+            chain_id,
+            amount,
+            now_ms,
+        )
+        .await?;
+
+        let txid = signed_tx.hash().to_string();
+        let data = signed_tx.encoded_2718();
+        let _ = client
+            .send_raw_transaction(now_ms, Bytes::from(data).to_string())
+            .await
+            .map_err(format_error)?;
+        Ok(txid)
     }
 
     pub fn auction_info(now_ms: u64) -> Option<AuctionInfo> {
@@ -770,4 +1073,199 @@ pub mod state {
             })
         })
     }
+
+    async fn build_spl_transfer_tx(
+        to_addr: &Pubkey,
+        token: &Pubkey,
+        token_program_id: &Pubkey,
+        decimals: u8,
+        amount: u128,
+        now_ms: u64,
+    ) -> Result<(SvmClient<DefaultHttpOutcall>, Transaction), String> {
+        let (key_name, from, from_addr, ixs) = STATE.with_borrow(|s| {
+            let amount: u64 = amount
+                .try_into()
+                .map_err(|_| format!("amount is too large: {}", amount))?;
+            let from_pk = derive_schnorr_public_key(
+                &s.ed25519_public_key,
+                vec![s.icp_address.as_slice().to_vec()],
+                None,
+            )
+            .map_err(|e| format!("derive_schnorr_public_key failed: {e}"))?;
+            let from_addr = from_pk.to_sol_pubkey()?;
+            if &from_addr == to_addr {
+                return Err("from and to cannot be the same".to_string());
+            }
+
+            let from_pubkey = get_associated_token_address(&from_addr, token, token_program_id);
+            let to_pubkey = get_associated_token_address(to_addr, token, token_program_id);
+            let ix0 = create_associated_token_account_idempotent(
+                &from_addr,
+                to_addr,
+                token,
+                token_program_id,
+            );
+            let ix = transfer_checked_instruction(
+                token_program_id,
+                &from_pubkey,
+                token,
+                &to_pubkey,
+                &from_addr,
+                &[],
+                amount,
+                decimals,
+            );
+
+            Ok::<_, String>((s.key_name.clone(), s.icp_address, from_addr, vec![ix0, ix]))
+        })?;
+
+        let client = sol_client();
+        let block = client
+            .get_latest_blockhash(now_ms)
+            .await
+            .map_err(|err| format!("SOL: failed to get latest blockhash, error: {}", err))?;
+
+        let message = Message::new_with_blockhash(&ixs, Some(&from_addr), &block);
+        let msg = bincode::serialize(&message).map_err(|err| format!("SOL: {err}"))?;
+        let sig = sign_with_schnorr(key_name, vec![from.as_slice().to_vec()], msg, None).await?;
+        let signature: [u8; 64] = sig.try_into().map_err(|_| "invalid signature length")?;
+        let transaction = Transaction {
+            message,
+            signatures: vec![signature.into()],
+        };
+
+        Ok((client, transaction))
+    }
+
+    async fn build_sol_transfer_tx(
+        to_addr: &Pubkey,
+        amount: u64,
+        now_ms: u64,
+    ) -> Result<(SvmClient<DefaultHttpOutcall>, Transaction), String> {
+        let (key_name, from, from_addr, ixs) = STATE.with_borrow(|s| {
+            let from_pk = derive_schnorr_public_key(
+                &s.ed25519_public_key,
+                vec![s.icp_address.as_slice().to_vec()],
+                None,
+            )
+            .map_err(|_e| "derive_schnorr_public_key failed".to_string())?;
+            let from_addr = from_pk.to_sol_pubkey()?;
+            if &from_addr == to_addr {
+                return Err("from and to cannot be the same".to_string());
+            }
+
+            let ix = instruction::transfer(&from_addr, to_addr, amount);
+            Ok::<_, String>((s.key_name.clone(), s.icp_address, from_addr, vec![ix]))
+        })?;
+
+        let client = sol_client();
+        let block = client
+            .get_latest_blockhash(now_ms)
+            .await
+            .map_err(|err| format!("failed to get latest blockhash, error: {}", err))?;
+
+        let message = Message::new_with_blockhash(&ixs, Some(&from_addr), &block);
+        let msg = bincode::serialize(&message).map_err(|err| format!("SOL: {err}"))?;
+        let sig = sign_with_schnorr(key_name, vec![from.as_slice().to_vec()], msg, None).await?;
+        let signature: [u8; 64] = sig.try_into().map_err(|_| "invalid signature length")?;
+        let transaction = Transaction {
+            message,
+            signatures: vec![signature.into()],
+        };
+
+        Ok((client, transaction))
+    }
+
+    pub async fn build_erc20_transfer_tx(
+        to_addr: &Address,
+        token: Address,
+        chain_id: u64,
+        amount: u128,
+        now_ms: u64,
+    ) -> Result<(EvmClient<DefaultHttpOutcall>, Signed<TxEip1559>), String> {
+        let (key_name, from, from_pk, mut tx, gas_updated_at) = STATE.with_borrow(|s| {
+            let from_pk =
+                derive_public_key(&s.ecdsa_public_key, vec![s.icp_address.as_slice().to_vec()])
+                    .map_err(|_e| "derive_public_key failed".to_string())?;
+
+            let input = encode_erc20_transfer(to_addr, amount);
+            let (gas_updated_at, gas_price, max_priority_fee_per_gas) = s.evm_latest_gas;
+            let max_priority_fee_per_gas = max_priority_fee_per_gas + max_priority_fee_per_gas / 5;
+            Ok::<_, String>((
+                s.key_name.clone(),
+                s.icp_address,
+                from_pk,
+                TxEip1559 {
+                    chain_id,
+                    nonce: 0u64,
+                    gas_limit: 84_000u64, // sample: ~53,696
+                    max_fee_per_gas: gas_price * 2 + max_priority_fee_per_gas,
+                    max_priority_fee_per_gas,
+                    to: token.into(),
+                    input: input.into(),
+                    ..Default::default()
+                },
+                gas_updated_at,
+            ))
+        })?;
+
+        let from_addr = from_pk.to_evm_adress()?;
+        if &from_addr == to_addr {
+            return Err("from and to cannot be the same".to_string());
+        }
+
+        let client = evm_client();
+        if gas_updated_at + 120_000 >= now_ms {
+            let nonce = client.get_transaction_count(now_ms, &from_addr).await?;
+            tx.nonce = nonce;
+        } else {
+            let (nonce, gas_price, max_priority_fee_per_gas) = futures::future::try_join3(
+                client.get_transaction_count(now_ms, &from_addr),
+                client.gas_price(now_ms),
+                client.max_priority_fee_per_gas(now_ms),
+            )
+            .await?;
+            tx.nonce = nonce;
+            tx.max_priority_fee_per_gas = max_priority_fee_per_gas + max_priority_fee_per_gas / 5;
+            tx.max_fee_per_gas = gas_price * 2 + tx.max_priority_fee_per_gas;
+            STATE.with_borrow_mut(|s| {
+                s.evm_latest_gas = (now_ms, gas_price, max_priority_fee_per_gas);
+            })
+        }
+
+        let msg_hash = tx.signature_hash();
+        let sig =
+            sign_with_ecdsa(key_name, vec![from.as_slice().to_vec()], msg_hash.to_vec()).await?;
+        let signature = Signature::new(
+            U256::from_be_slice(&sig[0..32]),  // r
+            U256::from_be_slice(&sig[32..64]), // s
+            y_parity(msg_hash.as_slice(), &sig, from_pk.public_key.as_slice())?,
+        );
+
+        let signed_tx = tx.into_signed(signature);
+        Ok((client, signed_tx))
+    }
+}
+
+fn y_parity(prehash: &[u8], sig: &[u8], pubkey: &[u8]) -> Result<bool, String> {
+    use alloy_signer::k256::ecdsa::{RecoveryId, Signature, VerifyingKey};
+
+    let orig_key = VerifyingKey::from_sec1_bytes(pubkey).map_err(format_error)?;
+    let signature = Signature::try_from(sig).map_err(format_error)?;
+    for parity in [0u8, 1] {
+        let recid = RecoveryId::try_from(parity).map_err(format_error)?;
+        let recovered_key = match VerifyingKey::recover_from_prehash(prehash, &signature, recid) {
+            Ok(k) => k,
+            Err(_) => continue, // 尝试另一 parity
+        };
+        if recovered_key == orig_key {
+            return Ok(parity == 1);
+        }
+    }
+
+    Err(format!(
+        "failed to recover the parity bit from a signature; sig: {}, pubkey: {}",
+        hex::encode(sig),
+        hex::encode(pubkey)
+    ))
 }

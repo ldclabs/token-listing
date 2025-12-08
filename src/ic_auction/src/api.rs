@@ -82,13 +82,17 @@ async fn deposit_currency(input: types::DepositInput) -> Result<u128, String> {
 // Withdraw currency from the auction contract
 // Returns the transaction id of the withdrawal
 #[ic_cdk::update]
-async fn withdraw_currency(input: types::WithdrawInput) -> Result<String, String> {
-    todo!()
+async fn withdraw_currency(input: types::WithdrawInput) -> Result<types::WithdrawTxInfo, String> {
+    let caller = msg_caller()?;
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    store::state::withdraw_currency(caller, input.recipient, now_ms).await
 }
 
 // Withdraw token from the auction contract
 // Returns the transaction id of the withdrawal
 #[ic_cdk::update]
-async fn withdraw_token(input: types::WithdrawInput) -> Result<String, String> {
-    todo!()
+async fn withdraw_token(input: types::WithdrawInput) -> Result<types::WithdrawTxInfo, String> {
+    let caller = msg_caller()?;
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    store::state::withdraw_token(caller, input.recipient, now_ms).await
 }

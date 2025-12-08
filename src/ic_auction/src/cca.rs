@@ -125,7 +125,7 @@ impl PartialOrd for BidOrder {
 // Main struct: Auction State
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Auction {
-    cfg: AuctionConfig,
+    pub cfg: AuctionConfig,
     // 10 ** token_decimals
     one_token: u128,
     // Floor price per token, in currency atomic units
