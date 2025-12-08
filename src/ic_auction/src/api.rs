@@ -30,10 +30,10 @@ fn evm_address(user: Option<Principal>) -> Result<String, String> {
 }
 
 #[ic_cdk::query]
-fn svm_address(user: Option<Principal>) -> Result<String, String> {
+fn sol_address(user: Option<Principal>) -> Result<String, String> {
     let user = user.unwrap_or_else(ic_cdk::api::msg_caller);
     check_auth(&user)?;
-    let addr = store::state::svm_address(&user);
+    let addr = store::state::sol_address(&user);
     Ok(addr.to_string())
 }
 
@@ -70,17 +70,25 @@ fn claim_all() -> Result<Vec<types::BidInfo>, String> {
     store::state::claim_all(caller, now_ms)
 }
 
+// Deposit currency into the auction contract
+// Returns the user account balance after deposit
 #[ic_cdk::update]
-async fn deposit_currency() -> Result<(), String> {
+async fn deposit_currency(input: types::DepositInput) -> Result<u128, String> {
+    let caller = msg_caller()?;
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    store::state::deposit_currency(caller, input.sender, input.txid, now_ms).await
+}
+
+// Withdraw currency from the auction contract
+// Returns the transaction id of the withdrawal
+#[ic_cdk::update]
+async fn withdraw_currency(input: types::WithdrawInput) -> Result<String, String> {
     todo!()
 }
 
+// Withdraw token from the auction contract
+// Returns the transaction id of the withdrawal
 #[ic_cdk::update]
-async fn withdraw_currency() -> Result<(), String> {
-    todo!()
-}
-
-#[ic_cdk::update]
-async fn withdraw_token() -> Result<(), String> {
+async fn withdraw_token(input: types::WithdrawInput) -> Result<String, String> {
     todo!()
 }

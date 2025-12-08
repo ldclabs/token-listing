@@ -2,7 +2,7 @@ use candid::{CandidType, Principal};
 use serde::Deserialize;
 use std::time::Duration;
 
-use crate::store;
+use crate::{store, types::Chain};
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub enum CanisterArgs {
@@ -12,6 +12,7 @@ pub enum CanisterArgs {
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InitArgs {
+    pub chain: Chain,
     pub key_name: String,
     pub governance_canister: Option<Principal>,
 }
@@ -25,6 +26,7 @@ pub struct UpgradeArgs {
 fn init(args: Option<CanisterArgs>) {
     if let Some(CanisterArgs::Init(args)) = args {
         store::state::with_mut(|s| {
+            s.chain = args.chain;
             s.key_name = args.key_name;
             s.governance_canister = args.governance_canister;
         });

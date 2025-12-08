@@ -228,6 +228,7 @@ impl Auction {
             cumulative_demand_raised: self.cumulative_demand_raised / self.price_precision,
             cumulative_supply_released: self.cumulative_supply_released,
             is_graduated: self.is_graduated(),
+            bidders_count: 0,
         };
 
         if now_ms < self.cfg.end_time && now_ms > self.last_update_time {

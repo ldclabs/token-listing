@@ -22,6 +22,7 @@ alloy-rpc-types-eth = { workspace = true }
 alloy-signer = { workspace = true }
 base64 = { workspace = true }
 bincode = { workspace = true }
+bs58 = { workspace = true }
 candid = { workspace = true }
 ciborium = { workspace = true }
 futures = { workspace = true }
@@ -43,7 +44,12 @@ serde_json = { workspace = true }
 solana-program = { workspace = true }
 solana-transaction = { workspace = true, features = ["bincode"] }
 solana-instruction = { workspace = true }
-solana-account-decoder-client-types = { workspace = true }
+solana-account-decoder-client-types = { workspace = true, features = [
+  "agave-unstable-api",
+] }
+solana-transaction-status-client-types = { workspace = true, features = [
+  "agave-unstable-api",
+] }
 solana-system-interface = { workspace = true, features = ["bincode"] }
 spl-associated-token-account-interface = { workspace = true }
 k256 = { workspace = true, features = ["ecdsa"] }

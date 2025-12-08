@@ -14,9 +14,9 @@ test:
 
 # cargo install ic-wasm
 build-wasm:
-	cargo build --release --target wasm32-unknown-unknown --package icp_ccca
+	cargo build --release --target wasm32-unknown-unknown --package ic_auction
 
 # cargo install candid-extractor
 build-did:
-	candid-extractor target/wasm32-unknown-unknown/release/icp_ccca.wasm > src/icp_ccca/icp_ccca.did
+	candid-extractor target/wasm32-unknown-unknown/release/ic_auction.wasm > src/ic_auction/ic_auction.did
 	dfx generate

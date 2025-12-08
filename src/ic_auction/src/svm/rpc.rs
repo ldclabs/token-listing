@@ -81,6 +81,7 @@ impl<H: HttpOutcall> SvmClient<H> {
         .await
     }
 
+    #[allow(dead_code)]
     pub async fn get_signature_statuses(
         &self,
         now_ms: u64,
@@ -111,7 +112,7 @@ impl<H: HttpOutcall> SvmClient<H> {
         signature: &str,
         encoding: Option<&str>,
         max_supported_transaction_version: Option<u8>,
-    ) -> Result<Option<Value>, String> {
+    ) -> Result<Option<EncodedTransactionWithStatusMeta>, String> {
         let mut config = Map::new();
         self.insert_commitment(&mut config);
         config.insert(

@@ -1,0 +1,77 @@
+type AuctionConfig = record {
+  min_amount : nat;
+  end_time : nat64;
+  start_time : nat64;
+  token_decimals : nat8;
+  required_currency_raised : nat;
+  max_amount : nat;
+  total_supply : nat;
+  min_bid_duration : nat64;
+};
+type AuctionInfo = record {
+  cumulative_demand_raised : nat;
+  total_amount : nat;
+  total_tokens_filled : nat;
+  timestamp : nat64;
+  clearing_price : nat;
+  total_refunded : nat;
+  auction : AuctionConfig;
+  is_graduated : bool;
+  cumulative_supply_released : nat;
+};
+type AuctionToken = variant { Evm : text; Icp : text; Sol : text };
+type BidInfo = record {
+  id : nat64;
+  tokens_filled : nat;
+  outbid_time : opt nat64;
+  acc_snapshot : nat;
+  create_time : nat64;
+  claim_time : nat64;
+  outbid_acc_snapshot : opt nat;
+  max_price : nat;
+  flow_rate : nat;
+  amount : nat;
+  refund : nat;
+};
+type CanisterArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type InitArgs = record { governance_canister : opt principal; key_name : text };
+type Result = variant { Ok; Err : text };
+type Result_1 = variant { Ok : BidInfo; Err : text };
+type Result_2 = variant { Ok : vec BidInfo; Err : text };
+type Result_3 = variant { Ok : text; Err : text };
+type Result_4 = variant { Ok : StateInfo; Err : text };
+type StateInfo = record {
+  token : AuctionToken;
+  evm_address : text;
+  svm_address : text;
+  governance_canister : opt principal;
+  icp_address : principal;
+  chain_providers : vec text;
+  funds_recipient : text;
+  tokens_recipient : text;
+  currency : text;
+  key_name : text;
+};
+type UpgradeArgs = record { governance_canister : opt principal };
+service : (opt CanisterArgs) -> {
+  admin_set_auction : (AuctionConfig) -> (Result);
+  admin_set_currency : (text, text) -> (Result);
+  admin_set_providers : (vec text) -> (Result);
+  admin_set_token : (AuctionToken, text) -> (Result);
+  auction_info : () -> (opt AuctionInfo) query;
+  claim : (nat64) -> (Result_1);
+  claim_all : () -> (Result_2);
+  deposit_currency : () -> (Result);
+  estimate_max_price : (nat) -> (nat) query;
+  evm_address : (opt principal) -> (Result_3) query;
+  get_grouped_bids : (opt nat64) -> (vec record { nat; nat }) query;
+  info : () -> (Result_4) query;
+  my_bids : () -> (Result_2) query;
+  submit_bid : (nat, nat) -> (Result_1);
+  svm_address : (opt principal) -> (Result_3) query;
+  validate_admin_set_currency : (text, text) -> (Result_3);
+  validate_admin_set_providers : (vec text) -> (Result_3);
+  validate_admin_set_token : (AuctionToken, text) -> (Result_3);
+  withdraw_currency : () -> (Result);
+  withdraw_token : () -> (Result);
+}

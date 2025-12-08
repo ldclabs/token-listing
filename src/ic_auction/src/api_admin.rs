@@ -1,18 +1,15 @@
-use alloy_primitives::Address;
-use candid::Principal;
-use std::collections::BTreeSet;
 use url::Url;
 
 use crate::{helper::pretty_format, store, types};
 
 #[ic_cdk::update(guard = "is_controller")]
-fn admin_set_token(token: types::AuctionToken, tokens_recipient: String) -> Result<(), String> {
-    token.validate()?;
-    token.validate_address(&tokens_recipient)?;
+fn admin_set_token(token: String, tokens_recipient: String) -> Result<(), String> {
     store::state::with_mut(|s| {
         if s.auction.is_some() {
             return Err("cannot change token when an auction is ongoing".to_string());
         }
+        s.chain.parse_address(&token)?;
+        s.chain.parse_address(&tokens_recipient)?;
         s.token = token;
         s.tokens_recipient = tokens_recipient;
         Ok(())
@@ -20,12 +17,15 @@ fn admin_set_token(token: types::AuctionToken, tokens_recipient: String) -> Resu
 }
 
 #[ic_cdk::update]
-fn validate_admin_set_token(
-    token: types::AuctionToken,
-    tokens_recipient: String,
-) -> Result<String, String> {
-    token.validate()?;
-    token.validate_address(&tokens_recipient)?;
+fn validate_admin_set_token(token: String, tokens_recipient: String) -> Result<String, String> {
+    store::state::with(|s| {
+        if s.auction.is_some() {
+            return Err("cannot change token when an auction is ongoing".to_string());
+        }
+        s.chain.parse_address(&token)?;
+        s.chain.parse_address(&tokens_recipient)?;
+        Ok(())
+    })?;
     pretty_format(&(token, tokens_recipient))
 }
 
@@ -35,8 +35,8 @@ fn admin_set_currency(currency: String, funds_recipient: String) -> Result<(), S
         if s.auction.is_some() {
             return Err("cannot change currency when an auction is ongoing".to_string());
         }
-        s.token.validate_address(&currency)?;
-        s.token.validate_address(&funds_recipient)?;
+        s.chain.parse_address(&currency)?;
+        s.chain.parse_address(&funds_recipient)?;
         s.currency = currency;
         s.funds_recipient = funds_recipient;
         Ok(())
@@ -52,8 +52,8 @@ fn validate_admin_set_currency(
         if s.auction.is_some() {
             return Err("cannot change currency when an auction is ongoing".to_string());
         }
-        s.token.validate_address(&currency)?;
-        s.token.validate_address(&funds_recipient)?;
+        s.chain.parse_address(&currency)?;
+        s.chain.parse_address(&funds_recipient)?;
         Ok(())
     })?;
     pretty_format(&(currency, funds_recipient))

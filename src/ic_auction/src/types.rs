@@ -1,4 +1,4 @@
-use std::{ops::Add, str::FromStr};
+use std::str::FromStr;
 
 use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
@@ -16,9 +16,9 @@ pub struct PublicKeyOutput {
 }
 
 impl PublicKeyOutput {
-    pub fn to_svm_pubkey(&self) -> Result<Pubkey, String> {
+    pub fn to_sol_pubkey(&self) -> Result<Pubkey, String> {
         Pubkey::try_from(self.public_key.as_slice())
-            .map_err(|_| "Failed to convert to SVM pubkey".to_string())
+            .map_err(|_| "Failed to convert to SOL pubkey".to_string())
     }
 
     pub fn to_evm_adress(&self) -> Result<Address, String> {
@@ -46,10 +46,12 @@ pub struct RPCResponse<T> {
 
 #[derive(CandidType, Serialize, Deserialize)]
 pub struct StateInfo {
-    // The token being sold in the auction
-    pub token: AuctionToken,
+    // The blockchain this auction is running for
+    pub chain: Chain,
     // The currency being raised in the auction
     pub currency: String,
+    // The token being sold in the auction
+    pub token: String,
     // The recipient of the raised Currency from the auction
     pub funds_recipient: String,
     // The recipient of any unsold tokens at the end of the auction
@@ -57,52 +59,90 @@ pub struct StateInfo {
     pub key_name: String,
     pub icp_address: Principal,
     pub evm_address: String,
-    pub svm_address: String,
+    pub sol_address: String,
     pub chain_providers: Vec<String>,
     pub governance_canister: Option<Principal>,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum AuctionToken {
-    Icp(String), // ICP Principal
-    Sol(String), // SOL Pubkey
+pub enum Chain {
+    Icp,         // ICP Principal
+    Sol,         // SOL Pubkey
     Evm(String), // EVM Address
 }
 
-impl AuctionToken {
-    pub fn validate(&self) -> Result<(), String> {
-        self.validate_address(match self {
-            AuctionToken::Icp(addr) => addr,
-            AuctionToken::Sol(addr) => addr,
-            AuctionToken::Evm(addr) => addr,
-        })
-    }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ChainAddress {
+    Icp(Principal), // ICP Principal
+    Sol(Pubkey),    // SOL Pubkey
+    Evm(Address),   // EVM Address
+}
 
-    pub fn validate_address(&self, address: &str) -> Result<(), String> {
+impl Chain {
+    pub fn parse_address(&self, address: &str) -> Result<ChainAddress, String> {
         match self {
-            AuctionToken::Icp(_) => {
-                Principal::from_text(address)
-                    .map_err(|_| format!("Invalid ICP principal: {address}"))?;
-            }
-            AuctionToken::Sol(_) => {
-                Pubkey::from_str(address).map_err(|_| format!("Invalid SOL pubkey: {address}"))?;
-            }
-            AuctionToken::Evm(_) => {
-                Address::from_str(address)
-                    .map_err(|_| format!("Invalid EVM address: {address}"))?;
-            }
+            Chain::Icp => Principal::from_text(address)
+                .map(ChainAddress::Icp)
+                .map_err(|_| format!("Invalid ICP principal: {address}")),
+            Chain::Sol => Pubkey::from_str(address)
+                .map(ChainAddress::Sol)
+                .map_err(|_| format!("Invalid SOL pubkey: {address}")),
+            Chain::Evm(_) => Address::from_str(address)
+                .map(ChainAddress::Evm)
+                .map_err(|_| format!("Invalid EVM address: {address}")),
         }
-        Ok(())
+    }
+}
+
+impl std::fmt::Display for ChainAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChainAddress::Icp(addr) => addr.fmt(f),
+            ChainAddress::Sol(addr) => addr.fmt(f),
+            ChainAddress::Evm(addr) => addr.fmt(f),
+        }
+    }
+}
+
+impl ChainAddress {
+    pub fn chain(&self) -> Chain {
+        match self {
+            ChainAddress::Icp(_) => Chain::Icp,
+            ChainAddress::Sol(_) => Chain::Sol,
+            ChainAddress::Evm(_) => Chain::Evm("".to_string()), // EVM doesn't have a specific chain name
+        }
     }
 
-    pub fn equal_chain(&self, other: &AuctionToken) -> bool {
-        match (self, other) {
-            (AuctionToken::Icp(_), AuctionToken::Icp(_)) => true,
-            (AuctionToken::Sol(_), AuctionToken::Sol(_)) => true,
-            (AuctionToken::Evm(_), AuctionToken::Evm(_)) => true,
-            _ => false,
+    pub fn as_slice(&self) -> &[u8] {
+        match self {
+            ChainAddress::Icp(addr) => addr.as_slice(),
+            ChainAddress::Sol(addr) => addr.as_array(),
+            ChainAddress::Evm(addr) => addr.as_ref(),
         }
     }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.as_slice().to_vec()
+    }
+}
+
+#[derive(CandidType, Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct DepositInput {
+    pub sender: String,
+    pub txid: String,
+}
+
+#[derive(CandidType, Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct WithdrawInput {
+    pub recipient: String,
+}
+
+#[derive(CandidType, Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct TransferChecked {
+    pub token: String,
+    pub from: String,
+    pub to: String,
+    pub amount: u128,
 }
 
 /// Auction Information Snapshot
@@ -126,6 +166,8 @@ pub struct AuctionInfo {
     pub cumulative_supply_released: u128,
     // Whether the auction has graduated
     pub is_graduated: bool,
+    // Number of unique bidders
+    pub bidders_count: u64,
 }
 
 /// Auction Configuration
