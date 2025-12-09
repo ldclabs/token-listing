@@ -44,9 +44,30 @@ fn my_bids() -> Result<Vec<types::BidInfo>, String> {
 }
 
 #[ic_cdk::query]
+fn my_deposits() -> Result<Vec<types::DepositTxInfo>, String> {
+    let caller = msg_caller()?;
+    store::state::my_deposits(caller)
+}
+
+#[ic_cdk::query]
+fn my_withdraws() -> Result<Vec<types::WithdrawTxInfo>, String> {
+    let caller = msg_caller()?;
+    store::state::my_withdraws(caller)
+}
+
+#[ic_cdk::query]
 fn estimate_max_price(amount: u128) -> u128 {
     let now_ms = ic_cdk::api::time() / 1_000_000;
     store::state::estimate_max_price(amount, now_ms)
+}
+
+#[ic_cdk::update]
+fn bind_address(address: String) -> Result<(), String> {
+    let caller = msg_caller()?;
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    store::state::bind_address(caller, address, now_ms)?;
+
+    todo!();
 }
 
 #[ic_cdk::update]

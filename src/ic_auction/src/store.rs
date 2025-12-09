@@ -1,9 +1,9 @@
 use alloy_consensus::{SignableTransaction, Signed, TxEip1559};
 use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{Address, Bytes, Signature, TxHash, U256, hex};
-use candid::{CandidType, Nat, Principal};
+use candid::{CandidType, Principal};
 use ciborium::{from_reader, into_writer};
-use ic_auth_types::{ByteArrayB64, ByteBufB64};
+use ic_auth_types::ByteArrayB64;
 use ic_http_certification::{
     HttpCertification, HttpCertificationPath, HttpCertificationTree, HttpCertificationTreeEntry,
     cel::{DefaultCelBuilder, create_cel_expr},
@@ -19,7 +19,6 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{BTreeSet, HashMap, HashSet},
-    ops::Add,
     str::FromStr,
 };
 
@@ -37,7 +36,8 @@ use crate::{
         transfer_checked_instruction,
     },
     types::{
-        AuctionInfo, BidInfo, Chain, PublicKeyOutput, StateInfo, TransferChecked, WithdrawTxInfo,
+        AuctionConfig, AuctionInfo, BidInfo, Chain, DepositTxInfo, PublicKeyOutput, StateInfo,
+        TransferChecked, WithdrawTxInfo,
     },
 };
 
@@ -45,18 +45,28 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct State {
+    pub name: String,
+    pub description: String,
+    pub url: String,
+    pub persons_excluded: Vec<String>,
     // The blockchain this auction is running for
     pub chain: Chain,
     // The currency being raised in the auction
     pub currency: String,
     // Currency decimals
     pub currency_decimals: u8,
+    pub currency_name: String,
+    pub currency_symbol: String,
+    pub currency_logo_url: String,
     // Currency program ID (Solana SPL token only)
     pub currency_program_id: Option<String>,
     // The token being sold in the auction
     pub token: String,
     // Token decimals
     pub token_decimals: u8,
+    pub token_name: String,
+    pub token_symbol: String,
+    pub token_logo_url: String,
     // Token program ID (Solana SPL token only)
     pub token_program_id: Option<String>,
     // The recipient of the raised Currency from the auction
@@ -77,6 +87,7 @@ pub struct State {
     // (gas_updated_at, gas_price, max_priority_fee_per_gas)
     pub evm_latest_gas: (u64, u128, u128),
     pub auction_finalized: bool,
+    pub auction_config: Option<AuctionConfig>,
     pub auction: Option<cca::Auction>,
 }
 
@@ -84,11 +95,21 @@ impl From<&State> for StateInfo {
     fn from(s: &State) -> Self {
         Self {
             chain: s.chain.clone(),
+            name: s.name.clone(),
+            description: s.description.clone(),
+            url: s.url.clone(),
+            persons_excluded: s.persons_excluded.clone(),
             currency: s.currency.clone(),
             currency_decimals: s.currency_decimals,
+            currency_name: s.currency_name.clone(),
+            currency_symbol: s.currency_symbol.clone(),
+            currency_logo_url: s.currency_logo_url.clone(),
             currency_program_id: s.currency_program_id.clone(),
             token: s.token.clone(),
             token_decimals: s.token_decimals,
+            token_name: s.token_name.clone(),
+            token_symbol: s.token_symbol.clone(),
+            token_logo_url: s.token_logo_url.clone(),
             token_program_id: s.token_program_id.clone(),
             funds_recipient: s.funds_recipient.clone(),
             tokens_recipient: s.tokens_recipient.clone(),
@@ -99,6 +120,7 @@ impl From<&State> for StateInfo {
             chain_providers: s.chain_providers.clone(),
             governance_canister: s.governance_canister,
             auction_finalized: s.auction_finalized,
+            auction_config: s.auction_config.clone(),
         }
     }
 }
@@ -107,11 +129,21 @@ impl State {
     fn new() -> Self {
         Self {
             chain: Chain::Icp,
+            name: "".to_string(),
+            description: "".to_string(),
+            url: "".to_string(),
+            persons_excluded: Vec::new(),
             currency: "".to_string(),
             currency_decimals: 0,
+            currency_name: "".to_string(),
+            currency_symbol: "".to_string(),
+            currency_logo_url: "".to_string(),
             currency_program_id: None,
             token: "".to_string(),
             token_decimals: 0,
+            token_name: "".to_string(),
+            token_symbol: "".to_string(),
+            token_logo_url: "".to_string(),
             token_program_id: None,
             funds_recipient: "".to_string(),
             tokens_recipient: "".to_string(),
@@ -128,6 +160,7 @@ impl State {
             pending_deposits: HashMap::new(),
             evm_latest_gas: (0, 0, 0),
             auction_finalized: false,
+            auction_config: None,
             auction: None,
         }
     }
@@ -144,11 +177,13 @@ pub struct UserState {
     #[serde(rename = "a")]
     pub bound_addresses: BTreeSet<String>,
     #[serde(rename = "d")]
-    pub deposits: Vec<ByteBufB64>,
+    pub deposits: Vec<String>,
     #[serde(rename = "w")]
     pub withdraws: Vec<u64>,
-    #[serde(rename = "p")]
-    pub pending_tx: Option<String>,
+    #[serde(rename = "at")]
+    pub agreed_terms: bool,
+    #[serde(rename = "ts")]
+    pub timestamp: u64,
 }
 
 impl Storable for UserState {
@@ -449,25 +484,288 @@ pub mod state {
         })
     }
 
-    fn evm_client() -> EvmClient<DefaultHttpOutcall> {
-        STATE.with_borrow(|s| {
-            EvmClient::new(
-                s.chain_providers.clone(),
-                11,
-                None,
-                DefaultHttpOutcall::new(s.icp_address),
-            )
+    pub async fn set_auction(cfg: AuctionConfig) -> Result<(), String> {
+        STATE.with_borrow_mut(|s| {
+            if s.auction.is_some() {
+                return Err("auction is already initialized".to_string());
+            }
+            s.auction_config = Some(cfg);
+            Ok(())
         })
     }
 
-    fn sol_client() -> SvmClient<DefaultHttpOutcall> {
+    pub async fn init_auction(now_ms: u64) -> Result<(), String> {
+        let (chain, cfg, icp_address, sol_address, evm_address, token, decimals, token_program_id) =
+            STATE.with_borrow(|s| {
+                if s.auction.is_some() {
+                    return Err("auction is already initialized".to_string());
+                }
+
+                let auction_config = match &s.auction_config {
+                    Some(cfg) => cfg,
+                    None => return Err("auction configuration is not set".to_string()),
+                };
+
+                if now_ms >= auction_config.start_time {
+                    return Err("auction start time must be in the future".to_string());
+                }
+
+                Ok((
+                    s.chain.clone(),
+                    auction_config.clone(),
+                    s.icp_address,
+                    s.sol_address,
+                    s.evm_address,
+                    s.token.clone(),
+                    s.token_decimals,
+                    s.token_program_id.clone(),
+                ))
+            })?;
+
+        let amount = match chain {
+            Chain::Sol => {
+                let token_addr = Pubkey::from_str(&token)
+                    .map_err(|_| "invalid Solana token address".to_string())?;
+                let program_id = token_program_id
+                    .as_ref()
+                    .ok_or("missing Solana token program ID".to_string())?;
+                let program_id = Pubkey::from_str(program_id)
+                    .map_err(|_| "invalid Solana token program ID".to_string())?;
+                spl_balance_of(&sol_address, &token_addr, &program_id, now_ms).await?
+            }
+            Chain::Icp => {
+                let ledger = Principal::from_text(&token)
+                    .map_err(|_| "invalid ICP ledger principal".to_string())?;
+                icp::balance_of(ledger, icp_address.into()).await?
+            }
+            Chain::Evm(_) => {
+                let token_addr = Address::from_str(&token)
+                    .map_err(|_| "invalid EVM token address".to_string())?;
+                erc20_balance_of(&evm_address, &token_addr, now_ms).await?
+            }
+        };
+
+        if cfg.token_decimals != decimals {
+            return Err("token decimals do not match the auction configuration".to_string());
+        }
+
+        let min_lp_amount = (cfg.total_supply as f64 * 0.2) as u128;
+        if cfg.total_supply + min_lp_amount > amount {
+            return Err("insufficient token balance for the auction".to_string());
+        }
+
+        STATE.with_borrow_mut(|s| {
+            if s.auction.is_some() {
+                return Err("auction is already initialized".to_string());
+            }
+
+            s.auction = Some(cca::Auction::new(cfg)?);
+            Ok(())
+        })
+    }
+
+    pub async fn finalize_auction(now_ms: u64) -> Result<(), String> {
+        let is_graduated = STATE.with_borrow(|s| {
+            if s.auction_finalized {
+                return Err("auction is already finalized".to_string());
+            }
+
+            match &s.auction {
+                None => Err("auction is not initialized".to_string()),
+                Some(auction) => {
+                    if !auction.is_ended(now_ms) {
+                        return Err("auction is not ended yet".to_string());
+                    }
+                    Ok(auction.is_graduated())
+                }
+            }
+        })?;
+
+        if is_graduated {
+            // graduated auction finalization logic
+            todo!("graduated auction finalization logic here");
+        }
+
+        STATE.with_borrow_mut(|s| {
+            s.auction_finalized = true;
+            Ok(())
+        })
+    }
+
+    pub fn auction_info(now_ms: u64) -> Option<AuctionInfo> {
         STATE.with_borrow(|s| {
-            SvmClient::new(
-                s.chain_providers.clone(),
-                None,
-                None,
-                DefaultHttpOutcall::new(s.icp_address),
-            )
+            s.auction.as_ref().map(|a| {
+                let mut info = a.get_info(now_ms);
+                info.bidders_count = s.bidders.len() as u64;
+                info
+            })
+        })
+    }
+
+    pub fn get_grouped_bids(precision: u128) -> Vec<(u128, u128)> {
+        STATE.with_borrow(|s| {
+            if let Some(auction) = &s.auction {
+                auction.get_grouped_bids(precision)
+            } else {
+                vec![]
+            }
+        })
+    }
+
+    pub fn estimate_max_price(amount: u128, now_ms: u64) -> u128 {
+        STATE.with_borrow(|s| {
+            if let Some(auction) = &s.auction {
+                auction.estimate_max_price(amount, now_ms)
+            } else {
+                0
+            }
+        })
+    }
+
+    pub fn submit_bid(
+        caller: Principal,
+        amount: u128,
+        max_price: u128,
+        now_ms: u64,
+    ) -> Result<BidInfo, String> {
+        STATE.with_borrow_mut(|s| {
+            let auction = s
+                .auction
+                .as_mut()
+                .ok_or_else(|| "auction is not ready".to_string())?;
+            USERS.with_borrow_mut(|u| {
+                let mut user = u.get(&caller).unwrap_or_default();
+                if user.currency_amount < amount {
+                    return Err("insufficient currency balance".to_string());
+                }
+                let bid = auction.submit_bid(&BS, amount, max_price, now_ms)?;
+                user.currency_amount -= amount;
+                user.bids.insert(bid.id);
+                u.insert(caller, user);
+                s.bidders.insert(caller);
+
+                Ok(bid)
+            })
+        })
+    }
+
+    pub fn claim(caller: Principal, bid_id: u64, now_ms: u64) -> Result<BidInfo, String> {
+        STATE.with_borrow_mut(|s| {
+            let auction = s
+                .auction
+                .as_mut()
+                .ok_or_else(|| "auction is not ready".to_string())?;
+            USERS.with_borrow_mut(|u| {
+                let mut user = u.get(&caller).unwrap_or_default();
+                if !user.bids.contains(&bid_id) {
+                    return Err("bid not found for user".to_string());
+                }
+
+                let bid = auction.claim(&BS, bid_id, now_ms)?;
+                user.currency_amount += bid.refund;
+                user.token_amount += bid.tokens_filled;
+                u.insert(caller, user);
+
+                Ok(bid)
+            })
+        })
+    }
+
+    pub fn claim_all(caller: Principal, now_ms: u64) -> Result<Vec<BidInfo>, String> {
+        STATE.with_borrow_mut(|s| {
+            let auction = s
+                .auction
+                .as_mut()
+                .ok_or_else(|| "auction is not ready".to_string())?;
+            USERS.with_borrow_mut(|u| {
+                let mut user = u.get(&caller).unwrap_or_default();
+                if user.bids.is_empty() {
+                    return Ok(vec![]);
+                }
+
+                let mut rt: Vec<BidInfo> = Vec::new();
+                for id in user.bids.clone() {
+                    if let Ok(bid) = auction.claim(&BS, id, now_ms) {
+                        user.currency_amount += bid.refund;
+                        user.token_amount += bid.tokens_filled;
+                        rt.push(bid);
+                    }
+                }
+                u.insert(caller, user);
+
+                Ok(rt)
+            })
+        })
+    }
+
+    pub fn my_bids(caller: Principal) -> Result<Vec<BidInfo>, String> {
+        USERS.with_borrow(|u| {
+            let user = u.get(&caller).unwrap_or_default();
+            BIDS.with_borrow(|b| {
+                let mut rt: Vec<BidInfo> = Vec::with_capacity(user.bids.len());
+                for id in user.bids {
+                    if let Some(bid) = b.get(&id) {
+                        rt.push(bid.into_info(id));
+                    }
+                }
+
+                Ok(rt)
+            })
+        })
+    }
+
+    pub fn my_deposits(caller: Principal) -> Result<Vec<DepositTxInfo>, String> {
+        let txs = USERS.with_borrow(|u| {
+            let user = u.get(&caller).unwrap_or_default();
+            user.deposits.clone()
+        });
+        DEPOSITS.with_borrow(|d| {
+            let mut rt: Vec<DepositTxInfo> = Vec::new();
+            for txid in txs {
+                if let Some(tx) = d.get(&txid) {
+                    rt.push(DepositTxInfo {
+                        txid: txid.clone(),
+                        user: tx.user,
+                        sender: tx.sender.clone(),
+                        amount: tx.amount,
+                        timestamp: tx.timestamp,
+                    });
+                }
+            }
+            Ok(rt)
+        })
+    }
+
+    pub fn my_withdraws(caller: Principal) -> Result<Vec<WithdrawTxInfo>, String> {
+        let tx_ids = USERS.with_borrow(|u| {
+            let user = u.get(&caller).unwrap_or_default();
+            user.withdraws.clone()
+        });
+        WITHDRAWS.with_borrow(|w| {
+            let mut rt: Vec<WithdrawTxInfo> = Vec::new();
+            for id in tx_ids {
+                if let Some(tx) = w.get(id) {
+                    rt.push(tx.into_info(id));
+                }
+            }
+            Ok(rt)
+        })
+    }
+
+    pub fn bind_address(caller: Principal, address: String, now_ms: u64) -> Result<(), String> {
+        STATE.with_borrow(|s| {
+            s.chain.parse_address(&address)?;
+            USERS.with_borrow_mut(|u| {
+                let mut info = u.get(&caller).unwrap_or_default();
+                if !info.agreed_terms {
+                    info.timestamp = now_ms;
+                    info.agreed_terms = true;
+                }
+                if info.bound_addresses.insert(address) {
+                    u.insert(caller, info);
+                }
+                Ok(())
+            })
         })
     }
 
@@ -502,7 +800,9 @@ pub mod state {
             if let Some(ts) = s.pending_deposits.get(&caller)
                 && *ts + 20 * 1000 >= now_ms
             {
-                return Err("pending deposit already exists".to_string());
+                return Err(
+                    "pending deposit already exists, please wait before trying again".to_string(),
+                );
             };
 
             // prevent DDoS attacks by limiting pending deposits
@@ -535,6 +835,7 @@ pub mod state {
                 let total_amount = USERS.with_borrow_mut(|u| {
                     let mut user = u.get(&caller).unwrap_or_default();
                     user.currency_amount += tx_status.amount;
+                    user.deposits.push(txid.clone());
                     let total_amount = user.currency_amount;
                     u.insert(caller, user);
                     total_amount
@@ -622,7 +923,11 @@ pub mod state {
                 let id = WITHDRAWS
                     .with_borrow_mut(|w| w.append(&tx))
                     .expect("append WithdrawTx failed");
-
+                USERS.with_borrow_mut(|u| {
+                    let mut info = u.get(&caller).unwrap_or_default();
+                    info.withdraws.push(id);
+                    u.insert(caller, info);
+                });
                 Ok(tx.into_info(id))
             }
 
@@ -703,7 +1008,11 @@ pub mod state {
                 let id = WITHDRAWS
                     .with_borrow_mut(|w| w.append(&tx))
                     .expect("append WithdrawTx failed");
-
+                USERS.with_borrow_mut(|u| {
+                    let mut info = u.get(&caller).unwrap_or_default();
+                    info.withdraws.push(id);
+                    u.insert(caller, info);
+                });
                 Ok(tx.into_info(id))
             }
 
@@ -736,8 +1045,8 @@ pub mod state {
             Ok((
                 s.chain.clone(),
                 s.icp_address,
-                s.sol_address.clone(),
-                s.evm_address.clone(),
+                s.sol_address,
+                s.evm_address,
                 s.tokens_recipient.clone(),
                 s.token.clone(),
                 s.token_decimals,
@@ -806,7 +1115,11 @@ pub mod state {
         let id = WITHDRAWS
             .with_borrow_mut(|w| w.append(&tx))
             .expect("append WithdrawTx failed");
-
+        USERS.with_borrow_mut(|u| {
+            let mut info = u.get(&icp_address).unwrap_or_default();
+            info.withdraws.push(id);
+            u.insert(icp_address, info);
+        });
         Ok(tx.into_info(id))
     }
 
@@ -825,11 +1138,15 @@ pub mod state {
                 return Err("cannot sweep currency before auction is finalized".to_string());
             }
 
+            if !s.auction.as_ref().is_some_and(|a| a.is_graduated()) {
+                return Err("cannot sweep currency before auction is graduated".to_string());
+            }
+
             Ok((
                 s.chain.clone(),
                 s.icp_address,
-                s.sol_address.clone(),
-                s.evm_address.clone(),
+                s.sol_address,
+                s.evm_address,
                 s.funds_recipient.clone(),
                 s.currency.clone(),
                 s.currency_decimals,
@@ -905,8 +1222,34 @@ pub mod state {
         let id = WITHDRAWS
             .with_borrow_mut(|w| w.append(&tx))
             .expect("append WithdrawTx failed");
-
+        USERS.with_borrow_mut(|u| {
+            let mut info = u.get(&icp_address).unwrap_or_default();
+            info.withdraws.push(id);
+            u.insert(icp_address, info);
+        });
         Ok(tx.into_info(id))
+    }
+
+    fn evm_client() -> EvmClient<DefaultHttpOutcall> {
+        STATE.with_borrow(|s| {
+            EvmClient::new(
+                s.chain_providers.clone(),
+                11,
+                None,
+                DefaultHttpOutcall::new(s.icp_address),
+            )
+        })
+    }
+
+    fn sol_client() -> SvmClient<DefaultHttpOutcall> {
+        STATE.with_borrow(|s| {
+            SvmClient::new(
+                s.chain_providers.clone(),
+                None,
+                None,
+                DefaultHttpOutcall::new(s.icp_address),
+            )
+        })
     }
 
     async fn check_sol_deposit_currency(
@@ -1120,128 +1463,6 @@ pub mod state {
         Ok(txid)
     }
 
-    pub fn auction_info(now_ms: u64) -> Option<AuctionInfo> {
-        STATE.with_borrow(|s| {
-            s.auction.as_ref().map(|a| {
-                let mut info = a.get_info(now_ms);
-                info.bidders_count = s.bidders.len() as u64;
-                info
-            })
-        })
-    }
-
-    pub fn get_grouped_bids(precision: u128) -> Vec<(u128, u128)> {
-        STATE.with_borrow(|s| {
-            if let Some(auction) = &s.auction {
-                auction.get_grouped_bids(precision)
-            } else {
-                vec![]
-            }
-        })
-    }
-
-    pub fn estimate_max_price(amount: u128, now_ms: u64) -> u128 {
-        STATE.with_borrow(|s| {
-            if let Some(auction) = &s.auction {
-                auction.estimate_max_price(amount, now_ms)
-            } else {
-                0
-            }
-        })
-    }
-
-    pub fn submit_bid(
-        caller: Principal,
-        amount: u128,
-        max_price: u128,
-        now_ms: u64,
-    ) -> Result<BidInfo, String> {
-        STATE.with_borrow_mut(|s| {
-            let auction = s
-                .auction
-                .as_mut()
-                .ok_or_else(|| "auction is not ready".to_string())?;
-            USERS.with_borrow_mut(|u| {
-                let mut user = u.get(&caller).unwrap_or_default();
-                if user.currency_amount < amount {
-                    return Err("insufficient currency balance".to_string());
-                }
-                let bid = auction.submit_bid(&BS, amount, max_price, now_ms)?;
-                user.currency_amount -= amount;
-                user.bids.insert(bid.id);
-                u.insert(caller, user);
-                s.bidders.insert(caller);
-
-                Ok(bid)
-            })
-        })
-    }
-
-    pub fn claim(caller: Principal, bid_id: u64, now_ms: u64) -> Result<BidInfo, String> {
-        STATE.with_borrow_mut(|s| {
-            let auction = s
-                .auction
-                .as_mut()
-                .ok_or_else(|| "auction is not ready".to_string())?;
-            USERS.with_borrow_mut(|u| {
-                let mut user = u.get(&caller).unwrap_or_default();
-                if !user.bids.contains(&bid_id) {
-                    return Err("bid not found for user".to_string());
-                }
-
-                let bid = auction.claim(&BS, bid_id, now_ms)?;
-                user.currency_amount += bid.refund;
-                user.token_amount += bid.tokens_filled;
-                u.insert(caller, user);
-
-                Ok(bid)
-            })
-        })
-    }
-
-    pub fn claim_all(caller: Principal, now_ms: u64) -> Result<Vec<BidInfo>, String> {
-        STATE.with_borrow_mut(|s| {
-            let auction = s
-                .auction
-                .as_mut()
-                .ok_or_else(|| "auction is not ready".to_string())?;
-            USERS.with_borrow_mut(|u| {
-                let mut user = u.get(&caller).unwrap_or_default();
-                if user.bids.is_empty() {
-                    return Ok(vec![]);
-                }
-
-                let mut rt: Vec<BidInfo> = Vec::new();
-                for id in user.bids.clone() {
-                    if let Ok(bid) = auction.claim(&BS, id, now_ms) {
-                        user.currency_amount += bid.refund;
-                        user.token_amount += bid.tokens_filled;
-                        rt.push(bid);
-                    }
-                }
-                u.insert(caller, user);
-
-                Ok(rt)
-            })
-        })
-    }
-
-    pub fn my_bids(caller: Principal) -> Result<Vec<BidInfo>, String> {
-        USERS.with_borrow(|u| {
-            let user = u.get(&caller).unwrap_or_default();
-            BIDS.with_borrow(|b| {
-                let mut rt: Vec<BidInfo> = Vec::with_capacity(user.bids.len());
-                for id in user.bids {
-                    if let Some(bid) = b.get(&id) {
-                        rt.push(bid.into_info(id));
-                    }
-                }
-
-                Ok(rt)
-            })
-        })
-    }
-
     async fn spl_balance_of(
         addr: &Pubkey,
         token: &Pubkey,
@@ -1381,7 +1602,7 @@ pub mod state {
         Ok((client, transaction))
     }
 
-    pub async fn build_erc20_transfer_tx(
+    async fn build_erc20_transfer_tx(
         to_addr: &Address,
         token: Address,
         chain_id: u64,

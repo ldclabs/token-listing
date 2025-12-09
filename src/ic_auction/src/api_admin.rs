@@ -3,6 +3,32 @@ use url::Url;
 use crate::{helper::pretty_format, store, types};
 
 #[ic_cdk::update(guard = "is_controller")]
+fn admin_set_project(input: types::ProjectInput) -> Result<(), String> {
+    store::state::with_mut(|s| {
+        if s.auction.is_some() {
+            return Err("cannot change token when an auction is ongoing".to_string());
+        }
+
+        s.name = input.name;
+        s.description = input.description;
+        s.url = input.url;
+        s.persons_excluded = input.persons_excluded;
+        Ok(())
+    })
+}
+
+#[ic_cdk::update]
+fn validate_admin_set_project(input: types::ProjectInput) -> Result<String, String> {
+    store::state::with(|s| {
+        if s.auction.is_some() {
+            return Err("cannot change token when an auction is ongoing".to_string());
+        }
+        Ok(())
+    })?;
+    pretty_format(&(input,))
+}
+
+#[ic_cdk::update(guard = "is_controller")]
 fn admin_set_token(input: types::TokenInput) -> Result<(), String> {
     store::state::with_mut(|s| {
         if s.auction.is_some() {
@@ -14,6 +40,9 @@ fn admin_set_token(input: types::TokenInput) -> Result<(), String> {
         s.chain.parse_address(&input.token)?;
         s.chain.parse_address(&input.recipient)?;
         s.token = input.token;
+        s.token_name = input.name;
+        s.token_symbol = input.symbol;
+        s.token_logo_url = input.logo_url;
         s.token_program_id = input.program_id;
         s.token_decimals = input.decimals;
         s.tokens_recipient = input.recipient;
@@ -52,6 +81,9 @@ fn admin_set_currency(input: types::TokenInput) -> Result<(), String> {
         s.chain.parse_address(&input.token)?;
         s.chain.parse_address(&input.recipient)?;
         s.currency = input.token;
+        s.currency_name = input.name;
+        s.currency_symbol = input.symbol;
+        s.currency_logo_url = input.logo_url;
         s.currency_program_id = input.program_id;
         s.currency_decimals = input.decimals;
         s.funds_recipient = input.recipient;
@@ -108,15 +140,22 @@ fn validate_admin_set_providers(providers: Vec<String>) -> Result<String, String
 }
 
 #[ic_cdk::update(guard = "is_controller")]
-fn admin_init_auction(auction: types::AuctionConfig) -> Result<(), String> {
-    todo!()
+async fn admin_set_auction(auction: types::AuctionConfig) -> Result<(), String> {
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    auction.validate(now_ms)?;
+    store::state::set_auction(auction).await
+}
+
+#[ic_cdk::update(guard = "is_controller")]
+async fn admin_init_auction() -> Result<(), String> {
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    store::state::init_auction(now_ms).await
 }
 
 #[ic_cdk::update(guard = "is_controller")]
 async fn admin_finalize_auction() -> Result<(), String> {
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    // store::state::finalize_auction(caller, now_ms).await
-    todo!()
+    store::state::finalize_auction(now_ms).await
 }
 
 #[ic_cdk::update(guard = "is_controller")]

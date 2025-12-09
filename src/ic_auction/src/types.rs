@@ -46,15 +46,25 @@ pub struct RPCResponse<T> {
 
 #[derive(CandidType, Serialize, Deserialize)]
 pub struct StateInfo {
+    pub name: String,
+    pub description: String,
+    pub url: String,
+    pub persons_excluded: Vec<String>,
     // The blockchain this auction is running for
     pub chain: Chain,
     // The currency being raised in the auction
     pub currency: String,
     pub currency_decimals: u8,
+    pub currency_name: String,
+    pub currency_symbol: String,
+    pub currency_logo_url: String,
     pub currency_program_id: Option<String>,
     // The token being sold in the auction
     pub token: String,
     pub token_decimals: u8,
+    pub token_name: String,
+    pub token_symbol: String,
+    pub token_logo_url: String,
     pub token_program_id: Option<String>,
     // The recipient of the raised Currency from the auction
     pub funds_recipient: String,
@@ -66,6 +76,7 @@ pub struct StateInfo {
     pub sol_address: String,
     pub chain_providers: Vec<String>,
     pub governance_canister: Option<Principal>,
+    pub auction_config: Option<AuctionConfig>,
     pub auction_finalized: bool,
 }
 
@@ -120,9 +131,20 @@ impl ChainAddress {
 }
 
 #[derive(CandidType, Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ProjectInput {
+    pub name: String,
+    pub description: String,
+    pub url: String,
+    pub persons_excluded: Vec<String>,
+}
+
+#[derive(CandidType, Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct TokenInput {
     pub token: String,
     pub decimals: u8,
+    pub name: String,
+    pub symbol: String,
+    pub logo_url: String,
     pub recipient: String,
     pub program_id: Option<String>,
 }
@@ -149,8 +171,6 @@ pub struct TransferChecked {
 /// Auction Information Snapshot
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
 pub struct AuctionInfo {
-    // Static auction configuration
-    pub auction: AuctionConfig,
     // Current timestamp in milliseconds
     pub timestamp: u64,
     // Current clearing price
@@ -210,37 +230,39 @@ pub struct AuctionConfig {
 }
 
 impl AuctionConfig {
-    pub fn check(&self) {
-        if self.start_time + self.min_bid_duration >= self.end_time {
-            panic!("Invalid auction time range");
+    pub fn validate(&self, now_ms: u64) -> Result<(), String> {
+        if self.start_time <= now_ms {
+            return Err("Auction start time cannot be in the past".to_string());
         }
-        if self.min_bid_duration < 1_00 {
-            panic!("Minimum bid duration too short");
+        if self.start_time + self.min_bid_duration >= self.end_time {
+            return Err("Invalid auction time range".to_string());
+        }
+        if self.min_bid_duration < 1000 {
+            return Err("Minimum bid duration too short".to_string());
         }
         if self.token_decimals > 18 {
-            panic!("Token decimals too high");
+            return Err("Token decimals too high".to_string());
         }
         let one_token = 10u128.pow(self.token_decimals as u32);
         if self.total_supply < one_token {
-            panic!("Total supply too low");
+            return Err("Total supply too low".to_string());
         }
         if self.total_supply > MAX_TOTAL_SUPPLY {
-            panic!("Total supply exceeds maximum allowed");
+            return Err("Total supply exceeds maximum allowed".to_string());
         }
-        if self.total_supply <= 1 {
-            panic!("Total supply too low for the auction duration");
-        }
+
         if self.min_amount == 0 {
-            panic!("Minimum bid amount must be greater than zero");
+            return Err("Minimum bid amount must be greater than zero".to_string());
         }
         if self.min_amount >= self.max_amount {
-            panic!("Invalid bid amount range");
+            return Err("Invalid bid amount range".to_string());
         }
         if self.required_currency_raised as f64 / (self.total_supply as f64 / one_token as f64)
             < 1.0
         {
-            panic!("Required currency raised too low");
+            return Err("Required currency raised too low".to_string());
         }
+        Ok(())
     }
 }
 

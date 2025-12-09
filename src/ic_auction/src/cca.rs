@@ -171,20 +171,26 @@ pub struct Auction {
 // =============================================================================
 
 impl Auction {
-    pub fn new(cfg: AuctionConfig) -> Self {
-        cfg.check();
-
+    pub fn new(cfg: AuctionConfig) -> Result<Self, String> {
         let supply_rate = Nat::from(cfg.total_supply) * Nat::from(RATE_PRECISION)
             / Nat::from(cfg.end_time - cfg.start_time);
-        let supply_rate: u128 = supply_rate.0.try_into().expect("Supply rate overflow");
+        let supply_rate: u128 = supply_rate
+            .0
+            .try_into()
+            .map_err(|_| "Supply rate overflow".to_string())?;
         if supply_rate == 0 {
-            panic!("Supply rate too low for the auction duration");
+            return Err("Supply rate too low for the auction duration".to_string());
         }
         let one_token = 10u128.pow(cfg.token_decimals as u32);
-
         let floor_price = Nat::from(cfg.required_currency_raised) * Nat::from(one_token)
             / Nat::from(cfg.total_supply);
-        let floor_price: u128 = floor_price.0.try_into().expect("Floor price overflow");
+        let floor_price: u128 = floor_price
+            .0
+            .try_into()
+            .map_err(|_| "Floor price overflow".to_string())?;
+        if floor_price == 0 {
+            return Err("Floor price too low".to_string());
+        }
 
         // Determine price precision based on floor price
         let price_precision = if floor_price >= 1_000_000_000 {
@@ -197,7 +203,7 @@ impl Auction {
             1_000_000_000
         };
         let floor_price = floor_price * price_precision;
-        Self {
+        Ok(Self {
             cfg: cfg.clone(),
             one_token,
             floor_price,
@@ -213,13 +219,12 @@ impl Auction {
             acc_tokens_per_share: 0,
             outbid_heap: BinaryHeap::new(),
             next_bid_id: 1,
-        }
+        })
     }
 
     pub fn get_info(&self, now_ms: u64) -> AuctionInfo {
         let clearing_price = self.get_clearing_price();
         let mut info = AuctionInfo {
-            auction: self.cfg.clone(),
             timestamp: now_ms,
             clearing_price: clearing_price / self.price_precision,
             total_amount: self.total_amount,
@@ -269,6 +274,10 @@ impl Auction {
 
     pub fn is_graduated(&self) -> bool {
         self.cumulative_demand_raised >= self.cfg.required_currency_raised * self.price_precision
+    }
+
+    pub fn is_ended(&self, now_ms: u64) -> bool {
+        now_ms > self.cfg.end_time
     }
 
     /// Calculate current "Clearing Price": Currency Atomic Units per One Token
@@ -632,7 +641,7 @@ mod tests {
     #[test]
     fn test_basic_auction_flow() {
         let cfg = get_test_config();
-        let mut auction = Auction::new(cfg.clone());
+        let mut auction = Auction::new(cfg.clone()).unwrap();
         let storage = MockBidStorage::default();
         let price_precision = auction.price_precision; // 1e9
 
@@ -760,7 +769,7 @@ mod tests {
     #[test]
     fn test_outbid_logic() {
         let cfg = get_test_config();
-        let mut auction = Auction::new(cfg.clone());
+        let mut auction = Auction::new(cfg.clone()).unwrap();
         let storage = MockBidStorage::default();
 
         // User 1: Low price, early
@@ -816,7 +825,7 @@ mod tests {
     #[test]
     fn test_auction_failure() {
         let cfg = get_test_config();
-        let mut auction = Auction::new(cfg.clone());
+        let mut auction = Auction::new(cfg.clone()).unwrap();
         let storage = MockBidStorage::default();
 
         // User 1: Low price, early
