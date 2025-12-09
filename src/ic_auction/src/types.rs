@@ -66,6 +66,7 @@ pub struct StateInfo {
     pub sol_address: String,
     pub chain_providers: Vec<String>,
     pub governance_canister: Option<Principal>,
+    pub auction_finalized: bool,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]

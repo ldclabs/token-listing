@@ -85,16 +85,16 @@ impl<H: HttpOutcall> EvmClient<H> {
         hex_to_u64(&res)
     }
 
-    // pub async fn get_balance(&self, now_ms: u64, address: &Address) -> Result<u128, String> {
-    //     let res: String = self
-    //         .call(
-    //             format!("eth_getBalance-{}", now_ms),
-    //             "eth_getBalance",
-    //             &[address.to_string().into(), "finalized".into()],
-    //         )
-    //         .await?;
-    //     hex_to_u128(&res)
-    // }
+    pub async fn get_balance(&self, now_ms: u64, address: &Address) -> Result<u128, String> {
+        let res: String = self
+            .call(
+                format!("eth_getBalance-{}", now_ms),
+                "eth_getBalance",
+                &[address.to_string().into(), "finalized".into()],
+            )
+            .await?;
+        hex_to_u128(&res)
+    }
 
     pub async fn get_transaction_receipt(
         &self,
@@ -165,6 +165,15 @@ impl<H: HttpOutcall> EvmClient<H> {
             .await?;
         let v = decode_abi_uint(&res)?;
         u8::try_from(v).map_err(|_| "decimals overflow u8".to_string())
+    }
+
+    pub async fn erc20_balance(
+        &self,
+        now_ms: u64,
+        contract: &Address,
+        address: &Address,
+    ) -> Result<u128, String> {
+        todo!("implement erc20_balance");
     }
 
     pub async fn call<T: DeserializeOwned>(

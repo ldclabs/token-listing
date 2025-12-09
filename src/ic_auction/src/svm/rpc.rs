@@ -85,7 +85,7 @@ impl<H: HttpOutcall> SvmClient<H> {
     pub async fn get_signature_statuses(
         &self,
         now_ms: u64,
-        signature: &str,
+        signature: String,
     ) -> Result<Option<SignatureStatus>, String> {
         let params = vec![
             Value::Array(vec![signature.into()]),
@@ -109,7 +109,7 @@ impl<H: HttpOutcall> SvmClient<H> {
     pub async fn get_transaction(
         &self,
         now_ms: u64,
-        signature: &str,
+        signature: String,
         encoding: Option<&str>,
         max_supported_transaction_version: Option<u8>,
     ) -> Result<Option<EncodedTransactionWithStatusMeta>, String> {
@@ -127,14 +127,9 @@ impl<H: HttpOutcall> SvmClient<H> {
             );
         }
 
-        let params = vec![Value::String(signature.to_string()), Value::Object(config)];
-
-        self.call(
-            format!("getTransaction-{now_ms}-{signature}"),
-            "getTransaction",
-            params.as_slice(),
-        )
-        .await
+        let id = format!("getTransaction-{now_ms}-{signature}");
+        let params = vec![Value::String(signature), Value::Object(config)];
+        self.call(id, "getTransaction", params.as_slice()).await
     }
 
     pub async fn send_transaction(
@@ -194,50 +189,42 @@ impl<H: HttpOutcall> SvmClient<H> {
     pub async fn get_account_info(
         &self,
         now_ms: u64,
-        pubkey: &str,
+        pubkey: String,
     ) -> Result<Option<UiAccount>, String> {
         let mut config = Map::new();
         self.insert_commitment(&mut config);
         config.insert("encoding".to_string(), "jsonParsed".into());
 
+        let id = format!("getAccountInfo-{now_ms}-{pubkey}");
         let params = if config.is_empty() {
-            vec![Value::String(pubkey.to_string())]
+            vec![Value::String(pubkey)]
         } else {
-            vec![Value::String(pubkey.to_string()), Value::Object(config)]
+            vec![Value::String(pubkey), Value::Object(config)]
         };
 
-        let res: RpcContextValue<Option<UiAccount>> = self
-            .call(
-                format!("getAccountInfo-{now_ms}-{pubkey}"),
-                "getAccountInfo",
-                params.as_slice(),
-            )
-            .await?;
+        let res: RpcContextValue<Option<UiAccount>> =
+            self.call(id, "getAccountInfo", params.as_slice()).await?;
 
         Ok(res.value)
     }
 
-    #[allow(dead_code)]
     pub async fn get_token_account_balance(
         &self,
         now_ms: u64,
-        pubkey: &str,
+        pubkey: String,
     ) -> Result<UiTokenAmount, String> {
         let mut config = Map::new();
         self.insert_commitment(&mut config);
+        let id = format!("getTokenAccountBalance-{now_ms}-{pubkey}");
 
         let params = if config.is_empty() {
-            vec![Value::String(pubkey.to_string())]
+            vec![Value::String(pubkey)]
         } else {
-            vec![Value::String(pubkey.to_string()), Value::Object(config)]
+            vec![Value::String(pubkey), Value::Object(config)]
         };
 
         let res: RpcContextValue<UiTokenAmount> = self
-            .call(
-                format!("getTokenAccountBalance-{now_ms}-{pubkey}"),
-                "getTokenAccountBalance",
-                params.as_slice(),
-            )
+            .call(id, "getTokenAccountBalance", params.as_slice())
             .await?;
 
         Ok(res.value)
@@ -453,8 +440,13 @@ mod tests {
         }))]);
 
         let client = SvmClient::new(vec!["https://sol".to_string()], None, None, mock);
-        let tx =
-            futures::executor::block_on(client.get_transaction(1_000, "sig", None, None)).unwrap();
+        let tx = futures::executor::block_on(client.get_transaction(
+            1_000,
+            "sig".to_string(),
+            None,
+            None,
+        ))
+        .unwrap();
 
         assert!(tx.is_none());
     }
@@ -476,9 +468,10 @@ mod tests {
         }))]);
 
         let client = SvmClient::new(vec!["https://sol".to_string()], None, None, mock);
-        let balance =
-            futures::executor::block_on(client.get_token_account_balance(1_111, "TokenPubkey"))
-                .unwrap();
+        let balance = futures::executor::block_on(
+            client.get_token_account_balance(1_111, "TokenPubkey".to_string()),
+        )
+        .unwrap();
 
         assert_eq!(balance.amount, "12345");
         assert_eq!(balance.decimals, 6);

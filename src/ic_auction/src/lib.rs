@@ -7,6 +7,7 @@ mod cca;
 mod ecdsa;
 mod evm;
 mod helper;
+mod icp;
 mod outcall;
 mod schnorr;
 mod store;

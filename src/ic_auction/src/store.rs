@@ -13,15 +13,13 @@ use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
     storable::Bound,
 };
-use icrc_ledger_types::{
-    icrc1::{account::Account, transfer::TransferArg},
-    icrc2::transfer_from::TransferFromError,
-};
+use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{BTreeSet, HashMap, HashSet},
+    ops::Add,
     str::FromStr,
 };
 
@@ -29,7 +27,8 @@ use crate::{
     cca,
     ecdsa::{derive_public_key, ecdsa_public_key, sign_with_ecdsa},
     evm::{EvmClient, encode_erc20_transfer},
-    helper::{call, format_error, get_icrc_transfer},
+    helper::format_error,
+    icp,
     outcall::DefaultHttpOutcall,
     schnorr::{derive_schnorr_public_key, schnorr_public_key, sign_with_schnorr},
     svm::{
@@ -38,8 +37,7 @@ use crate::{
         transfer_checked_instruction,
     },
     types::{
-        AuctionInfo, BidInfo, Chain, PublicKeyOutput, StateInfo, TransferChecked,
-        WithdrawTxInfo,
+        AuctionInfo, BidInfo, Chain, PublicKeyOutput, StateInfo, TransferChecked, WithdrawTxInfo,
     },
 };
 
@@ -65,14 +63,9 @@ pub struct State {
     pub funds_recipient: String,
     // The recipient of any unsold tokens at the end of the auction
     pub tokens_recipient: String,
-    // pub token_name: String,
-    // pub token_symbol: String,
-    // pub token_decimals: u8,
-    // pub token_logo: String,
-    // pub token_total_supply: u128,
     pub key_name: String,
     pub icp_address: Principal,
-    pub evm_address: String,
+    pub evm_address: Address,
     pub sol_address: Pubkey,
     pub chain_providers: Vec<String>,
     pub ecdsa_public_key: PublicKeyOutput,
@@ -83,6 +76,7 @@ pub struct State {
     pub pending_deposits: HashMap<Principal, u64>,
     // (gas_updated_at, gas_price, max_priority_fee_per_gas)
     pub evm_latest_gas: (u64, u128, u128),
+    pub auction_finalized: bool,
     pub auction: Option<cca::Auction>,
 }
 
@@ -100,10 +94,11 @@ impl From<&State> for StateInfo {
             tokens_recipient: s.tokens_recipient.clone(),
             key_name: s.key_name.clone(),
             icp_address: s.icp_address,
-            evm_address: s.evm_address.clone(),
+            evm_address: s.evm_address.to_string(),
             sol_address: s.sol_address.to_string(),
             chain_providers: s.chain_providers.clone(),
             governance_canister: s.governance_canister,
+            auction_finalized: s.auction_finalized,
         }
     }
 }
@@ -123,7 +118,7 @@ impl State {
             governance_canister: None,
             key_name: "dfx_test_key".to_string(),
             icp_address: ic_cdk::api::canister_self(),
-            evm_address: "".to_string(),
+            evm_address: Address::default(),
             sol_address: Pubkey::default(), // 11111111111111111111111111111111
             chain_providers: Vec::new(),
             ecdsa_public_key: PublicKeyOutput::default(),
@@ -132,6 +127,7 @@ impl State {
             bidders: HashSet::new(),
             pending_deposits: HashMap::new(),
             evm_latest_gas: (0, 0, 0),
+            auction_finalized: false,
             auction: None,
         }
     }
@@ -358,7 +354,7 @@ pub mod state {
                         derive_public_key(&root_pk, vec![s.icp_address.as_slice().to_vec()])
                             .expect("derive_public_key failed");
                     s.ecdsa_public_key = root_pk;
-                    s.evm_address = self_pk.to_evm_adress().unwrap().to_string();
+                    s.evm_address = self_pk.to_evm_adress().unwrap();
                 });
             }
             Err(err) => {
@@ -722,6 +718,197 @@ pub mod state {
         }
     }
 
+    pub async fn sweep_token(now_ms: u64) -> Result<WithdrawTxInfo, String> {
+        let (
+            chain,
+            icp_address,
+            sol_address,
+            evm_address,
+            recipient,
+            token,
+            decimals,
+            token_program_id,
+        ) = STATE.with_borrow_mut(|s| {
+            if !s.auction_finalized {
+                return Err("cannot sweep tokens before auction is finalized".to_string());
+            }
+
+            Ok((
+                s.chain.clone(),
+                s.icp_address,
+                s.sol_address.clone(),
+                s.evm_address.clone(),
+                s.tokens_recipient.clone(),
+                s.token.clone(),
+                s.token_decimals,
+                s.token_program_id.clone(),
+            ))
+        })?;
+
+        let (amount, txid) = match chain {
+            Chain::Sol => {
+                let token_addr = Pubkey::from_str(&token)
+                    .map_err(|_| "invalid Solana token address".to_string())?;
+                let program_id = token_program_id
+                    .as_ref()
+                    .ok_or("missing Solana token program ID".to_string())?;
+                let program_id = Pubkey::from_str(program_id)
+                    .map_err(|_| "invalid Solana token program ID".to_string())?;
+                let amount = spl_balance_of(&sol_address, &token_addr, &program_id, now_ms).await?;
+                if amount == 0 {
+                    return Err("no tokens to sweep".to_string());
+                }
+
+                let txid = withdraw_sol_token(
+                    &token,
+                    token_program_id,
+                    decimals,
+                    &recipient,
+                    amount,
+                    now_ms,
+                )
+                .await?;
+                (amount, txid)
+            }
+            Chain::Icp => {
+                let ledger = Principal::from_text(&token)
+                    .map_err(|_| "invalid ICP ledger principal".to_string())?;
+                let to = Account::from_str(&recipient)
+                    .map_err(|_| "invalid ICP account format".to_string())?;
+                let amount = icp::balance_of(ledger, icp_address.into()).await?;
+                if amount == 0 {
+                    return Err("no tokens to sweep".to_string());
+                }
+                let txid = icp::transfer(ledger, to, amount).await?;
+                (amount, txid)
+            }
+            Chain::Evm(chain_id) => {
+                let token_addr = Address::from_str(&token)
+                    .map_err(|_| "invalid EVM token address".to_string())?;
+                let amount = erc20_balance_of(&evm_address, &token_addr, now_ms).await?;
+                if amount == 0 {
+                    return Err("no tokens to sweep".to_string());
+                }
+
+                let txid = withdraw_evm_token(&token, &recipient, chain_id, amount, now_ms).await?;
+                (amount, txid)
+            }
+        };
+
+        let tx = WithdrawTx {
+            kind: 1,
+            user: icp_address,
+            recipient,
+            amount,
+            txid,
+            timestamp: now_ms,
+        };
+        let id = WITHDRAWS
+            .with_borrow_mut(|w| w.append(&tx))
+            .expect("append WithdrawTx failed");
+
+        Ok(tx.into_info(id))
+    }
+
+    pub async fn sweep_currency(now_ms: u64) -> Result<WithdrawTxInfo, String> {
+        let (
+            chain,
+            icp_address,
+            sol_address,
+            evm_address,
+            recipient,
+            currency,
+            decimals,
+            currency_program_id,
+        ) = STATE.with_borrow_mut(|s| {
+            if !s.auction_finalized {
+                return Err("cannot sweep currency before auction is finalized".to_string());
+            }
+
+            Ok((
+                s.chain.clone(),
+                s.icp_address,
+                s.sol_address.clone(),
+                s.evm_address.clone(),
+                s.funds_recipient.clone(),
+                s.currency.clone(),
+                s.currency_decimals,
+                s.currency_program_id.clone(),
+            ))
+        })?;
+
+        let (amount, txid) = match chain {
+            Chain::Sol => {
+                let currency_addr = Pubkey::from_str(&currency)
+                    .map_err(|_| "invalid Solana token address".to_string())?;
+
+                let amount = if currency == SOL_ADDRESS {
+                    sol_balance_of(&sol_address, now_ms).await?
+                } else {
+                    let program_id = currency_program_id
+                        .as_ref()
+                        .ok_or("missing Solana token program ID".to_string())?;
+                    let program_id = Pubkey::from_str(program_id)
+                        .map_err(|_| "invalid Solana token program ID".to_string())?;
+                    spl_balance_of(&sol_address, &currency_addr, &program_id, now_ms).await?
+                };
+
+                if amount == 0 {
+                    return Err("no tokens to sweep".to_string());
+                }
+
+                let txid = withdraw_sol_token(
+                    &currency,
+                    currency_program_id,
+                    decimals,
+                    &recipient,
+                    amount,
+                    now_ms,
+                )
+                .await?;
+                (amount, txid)
+            }
+            Chain::Icp => {
+                let ledger = Principal::from_text(&currency)
+                    .map_err(|_| "invalid ICP ledger principal".to_string())?;
+                let to = Account::from_str(&recipient)
+                    .map_err(|_| "invalid ICP account format".to_string())?;
+                let amount = icp::balance_of(ledger, icp_address.into()).await?;
+                if amount == 0 {
+                    return Err("no tokens to sweep".to_string());
+                }
+                let txid = icp::transfer(ledger, to, amount).await?;
+                (amount, txid)
+            }
+            Chain::Evm(chain_id) => {
+                let token_addr = Address::from_str(&currency)
+                    .map_err(|_| "invalid EVM token address".to_string())?;
+                let amount = erc20_balance_of(&evm_address, &token_addr, now_ms).await?;
+                if amount == 0 {
+                    return Err("no tokens to sweep".to_string());
+                }
+
+                let txid =
+                    withdraw_evm_token(&currency, &recipient, chain_id, amount, now_ms).await?;
+                (amount, txid)
+            }
+        };
+
+        let tx = WithdrawTx {
+            kind: 0,
+            user: icp_address,
+            recipient,
+            amount,
+            txid,
+            timestamp: now_ms,
+        };
+        let id = WITHDRAWS
+            .with_borrow_mut(|w| w.append(&tx))
+            .expect("append WithdrawTx failed");
+
+        Ok(tx.into_info(id))
+    }
+
     async fn check_sol_deposit_currency(
         caller: Principal,
         sender: String,
@@ -730,7 +917,7 @@ pub mod state {
     ) -> Result<TransferChecked, String> {
         let client = sol_client();
         let tx_status = client
-            .get_transaction(now_ms, &txid, Some("base64"), None)
+            .get_transaction(now_ms, txid, Some("base64"), None)
             .await?
             .ok_or("transaction not found".to_string())?;
 
@@ -762,7 +949,7 @@ pub mod state {
                 .map_err(|_| format!("Invalid currency principal: {}", s.currency))
         })?;
 
-        let tx_status = get_icrc_transfer(ledger_id, block_index).await?;
+        let tx_status = icp::verify_transfer_token(ledger_id, block_index).await?;
         STATE.with_borrow_mut(|s| {
             s.pending_deposits.remove(&caller);
 
@@ -845,18 +1032,14 @@ pub mod state {
             if from_addr.to_string() != sender {
                 return Err("transaction sender does not match sender".to_string());
             }
-
-            let self_evm_addr = Address::parse_checksummed(&s.evm_address, None)
-                .map_err(|_| "Invalid self EVM address".to_string())?;
-
-            if to_addr != self_evm_addr {
+            if to_addr != s.evm_address {
                 return Err("transaction recipient does not match auction contract".to_string());
             }
 
             Ok(TransferChecked {
                 token: s.currency.clone(),
                 from: sender,
-                to: s.evm_address.clone(),
+                to: s.evm_address.to_string(),
                 amount: amount_u128,
             })
         })
@@ -905,24 +1088,9 @@ pub mod state {
     ) -> Result<String, String> {
         let ledger = Principal::from_text(token)
             .map_err(|_| format!("Invalid token principal: {}", token))?;
-        let res: Result<Nat, TransferFromError> = call(
-            ledger,
-            "icrc1_transfer",
-            (TransferArg {
-                from_subaccount: None,
-                to: Account::from_str(recipient)
-                    .map_err(|_| "Invalid recipient address".to_string())?,
-                fee: None,
-                created_at_time: None,
-                memo: None,
-                amount: amount.into(),
-            },),
-            0,
-        )
-        .await?;
-        let res =
-            res.map_err(|err| format!("ICP: failed to transfer token to user, error: {:?}", err))?;
-        Ok(res.0.to_string())
+        let to =
+            Account::from_str(recipient).map_err(|_| "Invalid recipient address".to_string())?;
+        icp::transfer(ledger, to, amount).await
     }
 
     async fn withdraw_evm_token(
@@ -1072,6 +1240,43 @@ pub mod state {
                 Ok(rt)
             })
         })
+    }
+
+    async fn spl_balance_of(
+        addr: &Pubkey,
+        token: &Pubkey,
+        token_program_id: &Pubkey,
+        now_ms: u64,
+    ) -> Result<u128, String> {
+        let client = sol_client();
+        let ata = get_associated_token_address(addr, token, token_program_id);
+        let account_data = client
+            .get_token_account_balance(now_ms, ata.to_string())
+            .await?;
+
+        let balance: u128 = account_data
+            .amount
+            .parse()
+            .map_err(|_| "failed to parse SPL token balance".to_string())?;
+
+        Ok(balance)
+    }
+
+    async fn sol_balance_of(addr: &Pubkey, now_ms: u64) -> Result<u128, String> {
+        let client = sol_client();
+        let account_data = client.get_account_info(now_ms, addr.to_string()).await?;
+        let account_data = account_data.ok_or("account not found".to_string())?;
+        Ok(account_data.lamports as u128)
+    }
+
+    async fn erc20_balance_of(
+        addr: &Address,
+        token: &Address,
+        now_ms: u64,
+    ) -> Result<u128, String> {
+        let client = evm_client();
+        let balance = client.erc20_balance(now_ms, token, addr).await?;
+        Ok(balance)
     }
 
     async fn build_spl_transfer_tx(

@@ -108,8 +108,32 @@ fn validate_admin_set_providers(providers: Vec<String>) -> Result<String, String
 }
 
 #[ic_cdk::update(guard = "is_controller")]
-fn admin_set_auction(auction: types::AuctionConfig) -> Result<(), String> {
+fn admin_init_auction(auction: types::AuctionConfig) -> Result<(), String> {
     todo!()
+}
+
+#[ic_cdk::update(guard = "is_controller")]
+async fn admin_finalize_auction() -> Result<(), String> {
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    // store::state::finalize_auction(caller, now_ms).await
+    todo!()
+}
+
+#[ic_cdk::update(guard = "is_controller")]
+async fn admin_sweep_currency() -> Result<types::WithdrawTxInfo, String> {
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    store::state::sweep_currency(now_ms).await
+}
+
+#[ic_cdk::update(guard = "is_controller")]
+async fn admin_sweep_token() -> Result<types::WithdrawTxInfo, String> {
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    store::state::sweep_token(now_ms).await
+}
+
+#[ic_cdk::update]
+fn validate_empty_input() -> Result<String, String> {
+    pretty_format(&())
 }
 
 fn is_controller() -> Result<(), String> {
