@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
     cell::RefCell,
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     str::FromStr,
 };
 
@@ -32,12 +32,12 @@ use crate::{
     schnorr::{derive_schnorr_public_key, schnorr_public_key, sign_with_schnorr},
     svm::{
         Message, Pubkey, SvmClient, Transaction, create_associated_token_account_idempotent,
-        get_associated_token_address, get_transfer_checked, instruction,
+        get_associated_token_address, get_transfer_checked, instruction, raydium,
         transfer_checked_instruction,
     },
     types::{
-        AuctionConfig, AuctionInfo, BidInfo, Chain, DepositTxInfo, PublicKeyOutput, StateInfo,
-        TransferChecked, WithdrawTxInfo,
+        AuctionConfig, AuctionInfo, BidInfo, Chain, DepositTxInfo, FinalizeInput, FinalizeOutput,
+        PublicKeyOutput, StateInfo, TransferChecked, WithdrawTxInfo,
     },
 };
 
@@ -82,8 +82,10 @@ pub struct State {
     pub ed25519_public_key: PublicKeyOutput,
     pub nonce_iv: ByteArrayB64<32>,
     pub governance_canister: Option<Principal>,
-    pub bidders: HashSet<Principal>,
     pub pending_deposits: HashMap<Principal, u64>,
+    pub total_deposited_currency: u128,
+    pub total_withdrawn_currency: u128,
+    pub total_withdrawn_token: u128,
     // (gas_updated_at, gas_price, max_priority_fee_per_gas)
     pub evm_latest_gas: (u64, u128, u128),
     pub auction_finalized: bool,
@@ -118,6 +120,10 @@ impl From<&State> for StateInfo {
             evm_address: s.evm_address.to_string(),
             sol_address: s.sol_address.to_string(),
             chain_providers: s.chain_providers.clone(),
+            total_deposited_currency: s.total_deposited_currency,
+            total_withdrawn_currency: s.total_withdrawn_currency,
+            total_withdrawn_token: s.total_withdrawn_token,
+            total_bidders: USERS.with_borrow(|u| u.len()),
             governance_canister: s.governance_canister,
             auction_finalized: s.auction_finalized,
             auction_config: s.auction_config.clone(),
@@ -156,8 +162,10 @@ impl State {
             ecdsa_public_key: PublicKeyOutput::default(),
             ed25519_public_key: PublicKeyOutput::default(),
             nonce_iv: ByteArrayB64::default(),
-            bidders: HashSet::new(),
             pending_deposits: HashMap::new(),
+            total_deposited_currency: 0,
+            total_withdrawn_currency: 0,
+            total_withdrawn_token: 0,
             evm_latest_gas: (0, 0, 0),
             auction_finalized: false,
             auction_config: None,
@@ -352,6 +360,7 @@ impl cca::BidStorage for BidStorage {
 
 static BS: BidStorage = BidStorage;
 static SOL_ADDRESS: &str = "11111111111111111111111111111111";
+// Wrapping SOL: So11111111111111111111111111111111111111112
 
 pub mod state {
 
@@ -425,6 +434,7 @@ pub mod state {
         STATE.with_borrow_mut(f)
     }
 
+    #[allow(unused)]
     pub fn http_tree_with<R>(f: impl FnOnce(&HttpCertificationTree) -> R) -> R {
         HTTP_TREE.with(|r| f(&r.borrow()))
     }
@@ -549,8 +559,7 @@ pub mod state {
             return Err("token decimals do not match the auction configuration".to_string());
         }
 
-        let min_lp_amount = (cfg.total_supply as f64 * 0.2) as u128;
-        if cfg.total_supply + min_lp_amount > amount {
+        if cfg.total_supply + cfg.liquidity_pool_amount > amount {
             return Err("insufficient token balance for the auction".to_string());
         }
 
@@ -564,8 +573,11 @@ pub mod state {
         })
     }
 
-    pub async fn finalize_auction(now_ms: u64) -> Result<(), String> {
-        let is_graduated = STATE.with_borrow(|s| {
+    pub async fn finalize_auction(
+        input: FinalizeInput,
+        now_ms: u64,
+    ) -> Result<Option<FinalizeOutput>, String> {
+        let (is_graduated, chain) = STATE.with_borrow(|s| {
             if s.auction_finalized {
                 return Err("auction is already finalized".to_string());
             }
@@ -576,19 +588,47 @@ pub mod state {
                     if !auction.is_ended(now_ms) {
                         return Err("auction is not ended yet".to_string());
                     }
-                    Ok(auction.is_graduated())
+                    Ok((auction.is_graduated(), s.chain.clone()))
                 }
             }
         })?;
 
-        if is_graduated {
+        let rt = if is_graduated {
             // graduated auction finalization logic
-            todo!("graduated auction finalization logic here");
-        }
+            match chain {
+                Chain::Sol => {
+                    if input.pool_kind != "sol_raydium" {
+                        return Err("invalid pool kind for Solana auction".to_string());
+                    }
+                    let (pool, txid) = create_sol_raydium_pool(now_ms).await?;
+                    Some(FinalizeOutput {
+                        pool_id: pool.to_string(),
+                        txid,
+                    })
+                }
+                Chain::Icp => {
+                    if input.pool_kind != "icp_kong" {
+                        return Err("invalid pool kind for ICP auction".to_string());
+                    }
+                    let (pool, txid) = create_icp_kong_pool().await?;
+                    Some(FinalizeOutput {
+                        pool_id: pool.to_string(),
+                        txid: txid.to_string(),
+                    })
+                }
+                Chain::Evm(_) => {
+                    return Err(
+                        "EVM graduated auction finalization not implemented yet".to_string()
+                    );
+                }
+            }
+        } else {
+            None
+        };
 
         STATE.with_borrow_mut(|s| {
             s.auction_finalized = true;
-            Ok(())
+            Ok(rt)
         })
     }
 
@@ -596,7 +636,7 @@ pub mod state {
         STATE.with_borrow(|s| {
             s.auction.as_ref().map(|a| {
                 let mut info = a.get_info(now_ms);
-                info.bidders_count = s.bidders.len() as u64;
+                info.bidders_count = USERS.with_borrow(|u| u.len());
                 info
             })
         })
@@ -642,7 +682,6 @@ pub mod state {
                 user.currency_amount -= amount;
                 user.bids.insert(bid.id);
                 u.insert(caller, user);
-                s.bidders.insert(caller);
 
                 Ok(bid)
             })
@@ -752,6 +791,7 @@ pub mod state {
         })
     }
 
+    #[allow(unused)]
     pub fn bind_address(caller: Principal, address: String, now_ms: u64) -> Result<(), String> {
         STATE.with_borrow(|s| {
             s.chain.parse_address(&address)?;
@@ -787,7 +827,7 @@ pub mod state {
         let chain = STATE.with_borrow_mut(|s| {
             match &s.auction {
                 Some(auction) => {
-                    if now_ms + auction.cfg.min_bid_duration >= auction.cfg.end_time {
+                    if !auction.is_biddable(now_ms) {
                         return Err("auction is ending soon, deposits are not allowed".to_string());
                     }
                 }
@@ -832,6 +872,11 @@ pub mod state {
 
         match tx_status {
             Ok(tx_status) => {
+                STATE.with_borrow_mut(|s| {
+                    s.pending_deposits.remove(&caller);
+                    s.total_deposited_currency += tx_status.amount;
+                });
+
                 let total_amount = USERS.with_borrow_mut(|u| {
                     let mut user = u.get(&caller).unwrap_or_default();
                     user.currency_amount += tx_status.amount;
@@ -865,7 +910,7 @@ pub mod state {
         let (chain, token, decimals, program_id) = STATE.with_borrow_mut(|s| {
             match &s.auction {
                 Some(auction) => {
-                    if now_ms <= auction.cfg.end_time {
+                    if !auction.is_ended(now_ms) {
                         return Err(
                             "auction is not ended yet, withdrawals are not allowed".to_string()
                         );
@@ -923,6 +968,9 @@ pub mod state {
                 let id = WITHDRAWS
                     .with_borrow_mut(|w| w.append(&tx))
                     .expect("append WithdrawTx failed");
+                STATE.with_borrow_mut(|s| {
+                    s.total_withdrawn_currency += amount;
+                });
                 USERS.with_borrow_mut(|u| {
                     let mut info = u.get(&caller).unwrap_or_default();
                     info.withdraws.push(id);
@@ -950,7 +998,7 @@ pub mod state {
         let (chain, token, decimals, program_id) = STATE.with_borrow_mut(|s| {
             match &s.auction {
                 Some(auction) => {
-                    if now_ms <= auction.cfg.end_time {
+                    if !auction.is_ended(now_ms) {
                         return Err(
                             "auction is not ended yet, withdrawals are not allowed".to_string()
                         );
@@ -1008,6 +1056,9 @@ pub mod state {
                 let id = WITHDRAWS
                     .with_borrow_mut(|w| w.append(&tx))
                     .expect("append WithdrawTx failed");
+                STATE.with_borrow_mut(|s| {
+                    s.total_withdrawn_token += amount;
+                });
                 USERS.with_borrow_mut(|u| {
                     let mut info = u.get(&caller).unwrap_or_default();
                     info.withdraws.push(id);
@@ -1040,6 +1091,21 @@ pub mod state {
         ) = STATE.with_borrow_mut(|s| {
             if !s.auction_finalized {
                 return Err("cannot sweep tokens before auction is finalized".to_string());
+            }
+
+            match &s.auction {
+                Some(auction) => {
+                    if s.total_withdrawn_token + 10u128.pow(s.token_decimals as u32)
+                        < auction.tokens_sold()
+                    {
+                        return Err(
+                            "cannot sweep tokens before all sold tokens are withdrawn".to_string()
+                        );
+                    }
+                }
+                None => {
+                    return Err("invalid auction state".to_string());
+                }
             }
 
             Ok((
@@ -1088,7 +1154,7 @@ pub mod state {
                 if amount == 0 {
                     return Err("no tokens to sweep".to_string());
                 }
-                let txid = icp::transfer(ledger, to, amount).await?;
+                let txid = icp::transfer(ledger, to, amount.into()).await?;
                 (amount, txid)
             }
             Chain::Evm(chain_id) => {
@@ -1140,6 +1206,24 @@ pub mod state {
 
             if !s.auction.as_ref().is_some_and(|a| a.is_graduated()) {
                 return Err("cannot sweep currency before auction is graduated".to_string());
+            }
+
+            match &s.auction {
+                Some(auction) => {
+                    if s.total_withdrawn_currency
+                        + auction.currency_raised()
+                        + 10u128.pow(s.currency_decimals as u32)
+                        < s.total_deposited_currency
+                    {
+                        return Err(
+                            "cannot sweep currency before all refund currency is withdrawn"
+                                .to_string(),
+                        );
+                    }
+                }
+                None => {
+                    return Err("invalid auction state".to_string());
+                }
             }
 
             Ok((
@@ -1194,7 +1278,7 @@ pub mod state {
                 if amount == 0 {
                     return Err("no tokens to sweep".to_string());
                 }
-                let txid = icp::transfer(ledger, to, amount).await?;
+                let txid = icp::transfer(ledger, to, amount.into()).await?;
                 (amount, txid)
             }
             Chain::Evm(chain_id) => {
@@ -1433,7 +1517,7 @@ pub mod state {
             .map_err(|_| format!("Invalid token principal: {}", token))?;
         let to =
             Account::from_str(recipient).map_err(|_| "Invalid recipient address".to_string())?;
-        icp::transfer(ledger, to, amount).await
+        icp::transfer(ledger, to, amount.into()).await
     }
 
     async fn withdraw_evm_token(
@@ -1498,6 +1582,155 @@ pub mod state {
         let client = evm_client();
         let balance = client.erc20_balance(now_ms, token, addr).await?;
         Ok(balance)
+    }
+
+    async fn create_sol_raydium_pool(now_ms: u64) -> Result<(Pubkey, String), String> {
+        let (key_name, icp_address, sol_address, pool_id, ixs) = STATE.with_borrow(|s| {
+            let currency_pk = Pubkey::from_str(&s.currency).map_err(|_| "Invalid currency mint")?;
+            let currency_program = Pubkey::from_str(s.currency_program_id.as_ref().unwrap())
+                .map_err(|_| "Invalid currency program ID")?;
+            let token_pk = Pubkey::from_str(&s.token).map_err(|_| "Invalid token mint")?;
+            let token_program = Pubkey::from_str(s.token_program_id.as_ref().unwrap())
+                .map_err(|_| "Invalid token program ID")?;
+            let currency_amount = s.auction.as_ref().map_or(0, |a| a.currency_raised());
+            let token_amount = s
+                .auction_config
+                .as_ref()
+                .map_or(0, |c| c.liquidity_pool_amount);
+            if currency_amount == 0 || token_amount == 0 {
+                return Err("currency or token amount is zero".to_string());
+            }
+
+            // 3. 排序 Token (Raydium CPMM 要求 Token0 < Token1)
+            let (token_0, token_1, amount_0, amount_1, token0_program, token1_program) =
+                if currency_pk < token_pk {
+                    (
+                        currency_pk,
+                        token_pk,
+                        currency_amount as u64,
+                        token_amount as u64,
+                        currency_program,
+                        token_program,
+                    )
+                } else {
+                    (
+                        token_pk,
+                        currency_pk,
+                        token_amount as u64,
+                        currency_amount as u64,
+                        token_program,
+                        currency_program,
+                    )
+                };
+
+            let creator_token_0_account =
+                get_associated_token_address(&s.sol_address, &token_0, &token0_program);
+            let creator_token_1_account =
+                get_associated_token_address(&s.sol_address, &token_1, &token1_program);
+
+            let (ix0, amm_config) = raydium::build_create_amm_config_ix(
+                s.sol_address,
+                0,
+                2500,   // trade_fee_rate: 2500 / 1,000,000 = 0.0025 = 0.25%
+                120000, // protocol_fee_rate: 120000 / 1,000,000 = 0.12 = 12%, 实际协议收入 = 0.25% * 12% = 0.03%, LP 收入 = 0.25% - 0.03% = 0.22%
+                0,
+                10_000_000, // 创建池子的费用，防垃圾攻击 0.01 SOL = 10,000,000 Lamports
+                0,
+            );
+
+            let (ix1, ids) = raydium::build_initialize_pool_ix(
+                s.sol_address,
+                amm_config,
+                token_0,
+                token_1,
+                token0_program,
+                token1_program,
+                creator_token_0_account,
+                creator_token_1_account,
+                s.sol_address,
+                amount_0,
+                amount_1,
+                0, // convert ms to seconds
+                None,
+            );
+
+            Ok::<_, String>((
+                s.key_name.clone(),
+                s.icp_address,
+                s.sol_address,
+                ids.pool_id,
+                vec![ix0, ix1],
+            ))
+        })?;
+
+        let client = sol_client();
+        let block = client
+            .get_latest_blockhash(now_ms)
+            .await
+            .map_err(|err| format!("SOL: failed to get latest blockhash, error: {}", err))?;
+
+        let message = Message::new_with_blockhash(&ixs, Some(&sol_address), &block);
+        let msg = bincode::serialize(&message).map_err(|err| format!("SOL: {err}"))?;
+        let sig =
+            sign_with_schnorr(key_name, vec![icp_address.as_slice().to_vec()], msg, None).await?;
+        let signature: [u8; 64] = sig.try_into().map_err(|_| "invalid signature length")?;
+        let transaction = Transaction {
+            message,
+            signatures: vec![signature.into()],
+        };
+
+        let txid = transaction.signatures[0].to_string();
+        let data = bincode::serialize(&transaction).map_err(|err| format!("SOL: {err}"))?;
+
+        let _ = client
+            .send_transaction(now_ms, data.into(), true)
+            .await
+            .map_err(|err| format!("SOL: {err}"))?;
+
+        Ok((pool_id, txid))
+    }
+
+    async fn create_icp_kong_pool() -> Result<(u32, u64), String> {
+        let args = STATE.with_borrow(|s| {
+            let currency_amount = s.auction.as_ref().map_or(0, |a| a.currency_raised());
+            let token_amount = s
+                .auction_config
+                .as_ref()
+                .map_or(0, |c| c.liquidity_pool_amount);
+            if currency_amount == 0 || token_amount == 0 {
+                return Err("currency or token amount is zero".to_string());
+            }
+
+            let args = icp::kong::AddPoolArgs {
+                token_0: s.currency.clone(),
+                amount_0: currency_amount.into(),
+                tx_id_0: None,
+                token_1: s.token.clone(),
+                amount_1: token_amount.into(),
+                tx_id_1: None,
+                lp_fee_bps: Some(25), // 0.25%
+            };
+
+            Ok(args)
+        })?;
+
+        let spender = Account::from(icp::kong::canister());
+        let _ = futures::future::try_join(
+            icp::approve(
+                Principal::from_str(&args.token_0).unwrap(),
+                spender,
+                args.amount_0.clone(),
+            ),
+            icp::approve(
+                Principal::from_str(&args.token_1).unwrap(),
+                spender,
+                args.amount_1.clone(),
+            ),
+        )
+        .await?;
+
+        let (pool_id, txid) = icp::kong::add_pool(args).await?;
+        Ok((pool_id, txid))
     }
 
     async fn build_spl_transfer_tx(

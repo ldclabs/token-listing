@@ -61,14 +61,13 @@ fn estimate_max_price(amount: u128) -> u128 {
     store::state::estimate_max_price(amount, now_ms)
 }
 
-#[ic_cdk::update]
-fn bind_address(address: String) -> Result<(), String> {
-    let caller = msg_caller()?;
-    let now_ms = ic_cdk::api::time() / 1_000_000;
-    store::state::bind_address(caller, address, now_ms)?;
-
-    todo!();
-}
+// #[ic_cdk::update]
+// fn bind_address(input: BindAddressInput) -> Result<(), String> {
+//     let caller = msg_caller()?;
+//     let now_ms = ic_cdk::api::time() / 1_000_000;
+//     todo!("verification");
+//     store::state::bind_address(caller, input.address, now_ms)?;
+// }
 
 #[ic_cdk::update]
 fn submit_bid(amount: u128, max_price: u128) -> Result<types::BidInfo, String> {

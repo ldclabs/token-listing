@@ -75,6 +75,10 @@ pub struct StateInfo {
     pub evm_address: String,
     pub sol_address: String,
     pub chain_providers: Vec<String>,
+    pub total_deposited_currency: u128,
+    pub total_withdrawn_currency: u128,
+    pub total_withdrawn_token: u128,
+    pub total_bidders: u64,
     pub governance_canister: Option<Principal>,
     pub auction_config: Option<AuctionConfig>,
     pub auction_finalized: bool,
@@ -116,16 +120,6 @@ impl std::fmt::Display for ChainAddress {
             ChainAddress::Icp(addr) => addr.fmt(f),
             ChainAddress::Sol(addr) => addr.fmt(f),
             ChainAddress::Evm(addr) => addr.fmt(f),
-        }
-    }
-}
-
-impl ChainAddress {
-    pub fn chain(&self) -> Chain {
-        match self {
-            ChainAddress::Icp(_) => Chain::Icp,
-            ChainAddress::Sol(_) => Chain::Sol,
-            ChainAddress::Evm(_) => Chain::Evm(0), // EVM doesn't have a specific chain name
         }
     }
 }
@@ -205,6 +199,7 @@ pub struct AuctionInfo {
 ///     min_bid_duration: 300000,          // 5 minutes
 ///     token_decimals: 9,
 ///     total_supply: 100_000_000_000_000_000,
+///     liquidity_pool_amount: 80_000_000_000_000_000, // 80% of total supply
 ///     min_amount: 100_000_000,
 ///     max_amount: 10_000_000_000,
 ///     required_currency_raised: 500_000_000_000,
@@ -221,6 +216,8 @@ pub struct AuctionConfig {
     pub token_decimals: u8,
     // Total supply to be released linearly, in token atomic units
     pub total_supply: u128,
+    // Amount of tokens to be added to the liquidity pool, in token atomic units
+    pub liquidity_pool_amount: u128,
     // Minimum bid amount per transaction, in currency atomic units
     pub min_amount: u128,
     // Maximum bid amount per transaction, in currency atomic units
@@ -249,6 +246,16 @@ impl AuctionConfig {
         }
         if self.total_supply > MAX_TOTAL_SUPPLY {
             return Err("Total supply exceeds maximum allowed".to_string());
+        }
+
+        if self.liquidity_pool_amount > self.total_supply {
+            return Err("Liquidity pool amount cannot exceed total auction supply".to_string());
+        }
+
+        if self.liquidity_pool_amount * 10 < self.total_supply {
+            return Err(
+                "Liquidity pool amount must be at least 10% of total auction supply".to_string(),
+            );
         }
 
         if self.min_amount == 0 {
@@ -306,4 +313,15 @@ pub struct WithdrawTxInfo {
     pub amount: u128,
     pub txid: String,
     pub timestamp: u64,
+}
+
+#[derive(CandidType, Clone, Serialize, Deserialize)]
+pub struct FinalizeInput {
+    pub pool_kind: String, // "icp_kong" or "sol_raydium"
+}
+
+#[derive(CandidType, Clone, Serialize, Deserialize)]
+pub struct FinalizeOutput {
+    pub pool_id: String,
+    pub txid: String,
 }

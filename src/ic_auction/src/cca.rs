@@ -125,7 +125,7 @@ impl PartialOrd for BidOrder {
 // Main struct: Auction State
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Auction {
-    pub cfg: AuctionConfig,
+    cfg: AuctionConfig,
     // 10 ** token_decimals
     one_token: u128,
     // Floor price per token, in currency atomic units
@@ -278,6 +278,26 @@ impl Auction {
 
     pub fn is_ended(&self, now_ms: u64) -> bool {
         now_ms > self.cfg.end_time
+    }
+
+    pub fn is_biddable(&self, now_ms: u64) -> bool {
+        now_ms + self.cfg.min_bid_duration < self.cfg.end_time
+    }
+
+    pub fn currency_raised(&self) -> u128 {
+        if self.is_graduated() {
+            self.cumulative_demand_raised / self.price_precision
+        } else {
+            0
+        }
+    }
+
+    pub fn tokens_sold(&self) -> u128 {
+        if self.is_graduated() {
+            self.cumulative_supply_released
+        } else {
+            0
+        }
     }
 
     /// Calculate current "Clearing Price": Currency Atomic Units per One Token
@@ -631,7 +651,8 @@ mod tests {
             end_time: 11000, // 10s duration
             min_bid_duration: 100,
             token_decimals: 8,
-            total_supply: 1000 * 100_000_000, // 1000 tokens
+            total_supply: 1000 * 100_000_000,   // 1000 tokens
+            liquidity_pool_amount: 100_000_000, // 100 tokens
             min_amount: 1000,
             max_amount: 1_000_000_000,
             required_currency_raised: 100_000,

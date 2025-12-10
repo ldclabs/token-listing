@@ -2,6 +2,7 @@ use candid::{Nat, Principal};
 use icrc_ledger_types::{
     icrc::generic_value::{ICRC3Value, Value},
     icrc1::{account::Account, transfer::TransferArg},
+    icrc2::approve::{ApproveArgs, ApproveError},
     icrc2::transfer_from::TransferFromError,
     icrc3::blocks::{GetBlocksRequest, GetBlocksResult},
 };
@@ -17,7 +18,7 @@ pub async fn balance_of(ledger: Principal, account: Account) -> Result<u128, Str
 }
 
 // return block index
-pub async fn transfer(ledger: Principal, to: Account, amount: u128) -> Result<String, String> {
+pub async fn transfer(ledger: Principal, to: Account, amount: Nat) -> Result<String, String> {
     let res: Result<Nat, TransferFromError> = call(
         ledger,
         "icrc1_transfer",
@@ -27,12 +28,33 @@ pub async fn transfer(ledger: Principal, to: Account, amount: u128) -> Result<St
             fee: None,
             created_at_time: None,
             memo: None,
-            amount: amount.into(),
+            amount,
         },),
         0,
     )
     .await?;
     let res = res.map_err(|err| format!("ICP: failed to transfer token, error: {:?}", err))?;
+    Ok(res.0.to_string())
+}
+
+pub async fn approve(ledger: Principal, spender: Account, amount: Nat) -> Result<String, String> {
+    let res: Result<Nat, ApproveError> = call(
+        ledger,
+        "icrc2_approve",
+        (ApproveArgs {
+            from_subaccount: None,
+            spender,
+            amount,
+            expected_allowance: Some(0u64.into()),
+            expires_at: None,
+            fee: None,
+            memo: None,
+            created_at_time: None,
+        },),
+        0,
+    )
+    .await?;
+    let res = res.map_err(|err| format!("ICP: failed to approve token, error: {:?}", err))?;
     Ok(res.0.to_string())
 }
 

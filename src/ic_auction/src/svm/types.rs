@@ -36,6 +36,7 @@ pub struct SignatureStatus {
 }
 
 impl SignatureStatus {
+    #[allow(unused)]
     pub fn is_finalized(&self) -> bool {
         self.confirmation_status
             .as_deref()
@@ -43,11 +44,13 @@ impl SignatureStatus {
             .unwrap_or(false)
     }
 
+    #[allow(unused)]
     pub fn is_error(&self) -> bool {
         self.err.is_some()
     }
 }
 
+#[allow(unused)]
 pub fn get_token_account(val: UiAccount) -> Result<TokenAccountType, String> {
     match val.data {
         UiAccountData::Json(parsed_account) => {
@@ -115,14 +118,15 @@ pub fn get_transfer_checked(
     }
 
     if let (Some(from), Some(to)) = (from, to)
-        && amount > 0 {
-            return Ok(TransferChecked {
-                token: token.to_string(),
-                from,
-                to,
-                amount,
-            });
-        }
+        && amount > 0
+    {
+        return Ok(TransferChecked {
+            token: token.to_string(),
+            from,
+            to,
+            amount,
+        });
+    }
 
     Err("No transfer checked found in the transaction".to_string())
 }

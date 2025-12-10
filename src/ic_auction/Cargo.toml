@@ -21,6 +21,7 @@ alloy-primitives = { workspace = true }
 alloy-rpc-types-eth = { workspace = true }
 alloy-signer = { workspace = true }
 bincode = { workspace = true }
+borsh = { workspace = true }
 candid = { workspace = true }
 ciborium = { workspace = true }
 futures = { workspace = true }
@@ -50,5 +51,6 @@ solana-transaction-status-client-types = { workspace = true, features = [
 ] }
 solana-system-interface = { workspace = true, features = ["bincode"] }
 spl-associated-token-account-interface = { workspace = true }
+sha2 = { workspace = true }
 k256 = { workspace = true, features = ["ecdsa"] }
 ic-dummy-getrandom-for-wasm = { workspace = true }

@@ -5,17 +5,15 @@ use crate::helper::call_raw;
 
 // https://github.com/KongSwap/kong/blob/main/src/kong_backend/src/add_pool/add_pool.rs
 
-pub async fn add_pool(args: AddPoolArgs) -> Result<u32, String> {
-    let res = call_raw(
-        Principal::from_text("2ipq2-uqaaa-aaaar-qailq-cai").unwrap(),
-        "add_pool",
-        (args,),
-        0,
-    )
-    .await?;
+pub fn canister() -> Principal {
+    Principal::from_text("2ipq2-uqaaa-aaaar-qailq-cai").unwrap()
+}
+
+pub async fn add_pool(args: AddPoolArgs) -> Result<(u32, u64), String> {
+    let res = call_raw(canister(), "add_pool", (args,), 0).await?;
     let rt = res.candid::<AddPoolReply>();
     // ignore error parsing details, just return pool_id or 0
-    Ok(rt.map(|r| r.pool_id).unwrap_or_default())
+    Ok(rt.map(|r| (r.pool_id, r.tx_id)).unwrap_or_default())
 }
 
 #[derive(CandidType, Debug, Clone, Serialize, Deserialize)]

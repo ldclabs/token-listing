@@ -12,6 +12,7 @@ use crate::{
 
 pub use alloy_primitives::{Address, TxHash};
 
+#[allow(unused)]
 pub struct EvmClient<T: HttpOutcall> {
     pub providers: Vec<String>,
     pub max_confirmations: u64,
@@ -34,6 +35,8 @@ impl<H: HttpOutcall> EvmClient<H> {
             outcall,
         }
     }
+
+    #[allow(unused)]
     pub async fn chain_id(&self, now_ms: u64) -> Result<u64, String> {
         let res: String = self
             .call(format!("eth_chainId-{}", now_ms), "eth_chainId", &[])
@@ -59,6 +62,7 @@ impl<H: HttpOutcall> EvmClient<H> {
         hex_to_u128(&res)
     }
 
+    #[allow(unused)]
     pub async fn block_number(&self, now_ms: u64) -> Result<u64, String> {
         let res: String = self
             .call(
@@ -85,6 +89,7 @@ impl<H: HttpOutcall> EvmClient<H> {
         hex_to_u64(&res)
     }
 
+    #[allow(unused)]
     pub async fn get_balance(&self, now_ms: u64, address: &Address) -> Result<u128, String> {
         let res: String = self
             .call(
@@ -151,7 +156,7 @@ impl<H: HttpOutcall> EvmClient<H> {
     //     decode_abi_string(&res)
     // }
 
-    #[allow(dead_code)]
+    #[allow(unused)]
     pub async fn erc20_symbol(&self, now_ms: u64, contract: &Address) -> Result<String, String> {
         let res = self
             .call_contract(now_ms, contract, "0x95d89b41".to_string())
@@ -159,6 +164,7 @@ impl<H: HttpOutcall> EvmClient<H> {
         decode_abi_string(&res)
     }
 
+    #[allow(unused)]
     pub async fn erc20_decimals(&self, now_ms: u64, contract: &Address) -> Result<u8, String> {
         let res = self
             .call_contract(now_ms, contract, "0x313ce567".to_string())
@@ -173,7 +179,14 @@ impl<H: HttpOutcall> EvmClient<H> {
         contract: &Address,
         address: &Address,
     ) -> Result<u128, String> {
-        todo!("implement erc20_balance");
+        let addr_hex = address.to_string();
+        let addr_hex = addr_hex.strip_prefix("0x").unwrap_or(&addr_hex);
+        // balanceOf(address): 70a08231
+        let call_data = format!("0x70a08231000000000000000000000000{}", addr_hex);
+
+        let res = self.call_contract(now_ms, contract, call_data).await?;
+        let v = decode_abi_uint(&res)?;
+        u128::try_from(v).map_err(|_| "balance overflow u128".to_string())
     }
 
     pub async fn call<T: DeserializeOwned>(

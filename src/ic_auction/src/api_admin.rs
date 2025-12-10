@@ -153,9 +153,11 @@ async fn admin_init_auction() -> Result<(), String> {
 }
 
 #[ic_cdk::update(guard = "is_controller")]
-async fn admin_finalize_auction() -> Result<(), String> {
+async fn admin_finalize_auction(
+    input: types::FinalizeInput,
+) -> Result<Option<types::FinalizeOutput>, String> {
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    store::state::finalize_auction(now_ms).await
+    store::state::finalize_auction(input, now_ms).await
 }
 
 #[ic_cdk::update(guard = "is_controller")]

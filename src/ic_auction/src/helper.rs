@@ -26,6 +26,7 @@ pub fn check_auth(user: &Principal) -> Result<(), String> {
     }
 }
 
+#[allow(unused)]
 pub fn validate_principals(principals: &BTreeSet<Principal>) -> Result<(), String> {
     if principals.is_empty() {
         return Err("principals cannot be empty".to_string());
@@ -91,4 +92,12 @@ where
     let doc = pp_value(7, &val);
 
     Ok(format!("{}", doc.pretty(120)))
+}
+
+pub fn sha256(data: &[u8]) -> [u8; 32] {
+    use sha2::Digest;
+
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(data);
+    hasher.finalize().into()
 }

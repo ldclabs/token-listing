@@ -31,19 +31,6 @@ pub fn derive_public_key(
     })
 }
 
-pub fn cost_sign_with_ecdsa(name: String) -> Result<u128, String> {
-    let args = mgt::SignWithEcdsaArgs {
-        message_hash: vec![],
-        derivation_path: vec![],
-        key_id: mgt::EcdsaKeyId {
-            curve: mgt::EcdsaCurve::Secp256k1,
-            name,
-        },
-    };
-
-    mgt::cost_sign_with_ecdsa(&args).map_err(|err| format!("cost_sign_with_ecdsa failed {:?}", err))
-}
-
 pub async fn sign_with_ecdsa(
     key_name: String,
     derivation_path: Vec<Vec<u8>>,
