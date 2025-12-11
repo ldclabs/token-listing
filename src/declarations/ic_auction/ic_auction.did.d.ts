@@ -82,13 +82,13 @@ export type Result_4 = { 'Ok' : Array<BidInfo> } |
   { 'Err' : string };
 export type Result_5 = { 'Ok' : bigint } |
   { 'Err' : string };
-export type Result_6 = { 'Ok' : string } |
+export type Result_6 = { 'Ok' : StateInfo } |
   { 'Err' : string };
-export type Result_7 = { 'Ok' : StateInfo } |
+export type Result_7 = { 'Ok' : Array<DepositTxInfo> } |
   { 'Err' : string };
-export type Result_8 = { 'Ok' : Array<DepositTxInfo> } |
+export type Result_8 = { 'Ok' : Array<WithdrawTxInfo> } |
   { 'Err' : string };
-export type Result_9 = { 'Ok' : Array<WithdrawTxInfo> } |
+export type Result_9 = { 'Ok' : string } |
   { 'Err' : string };
 export interface StateInfo {
   'url' : string,
@@ -162,25 +162,24 @@ export interface _SERVICE {
   'auction_info' : ActorMethod<[], [] | [AuctionInfo]>,
   'claim' : ActorMethod<[bigint], Result_3>,
   'claim_all' : ActorMethod<[], Result_4>,
+  'debug' : ActorMethod<[string], string>,
   'deposit_currency' : ActorMethod<[DepositInput], Result_5>,
   'estimate_max_price' : ActorMethod<[bigint], bigint>,
-  'evm_address' : ActorMethod<[[] | [Principal]], Result_6>,
   'get_grouped_bids' : ActorMethod<[[] | [bigint]], Array<[bigint, bigint]>>,
-  'info' : ActorMethod<[], Result_7>,
+  'info' : ActorMethod<[], Result_6>,
   'my_bids' : ActorMethod<[], Result_4>,
-  'my_deposits' : ActorMethod<[], Result_8>,
-  'my_withdraws' : ActorMethod<[], Result_9>,
-  'sol_address' : ActorMethod<[[] | [Principal]], Result_6>,
+  'my_deposits' : ActorMethod<[], Result_7>,
+  'my_withdraws' : ActorMethod<[], Result_8>,
   'submit_bid' : ActorMethod<[bigint, bigint], Result_3>,
-  'validate_admin_set_currency' : ActorMethod<[TokenInput], Result_6>,
+  'validate_admin_set_currency' : ActorMethod<[TokenInput], Result_9>,
   'validate_admin_set_paying_public_keys' : ActorMethod<
     [Array<string>],
-    Result_6
+    Result_9
   >,
-  'validate_admin_set_project' : ActorMethod<[ProjectInput], Result_6>,
-  'validate_admin_set_providers' : ActorMethod<[Array<string>], Result_6>,
-  'validate_admin_set_token' : ActorMethod<[TokenInput], Result_6>,
-  'validate_empty_input' : ActorMethod<[], Result_6>,
+  'validate_admin_set_project' : ActorMethod<[ProjectInput], Result_9>,
+  'validate_admin_set_providers' : ActorMethod<[Array<string>], Result_9>,
+  'validate_admin_set_token' : ActorMethod<[TokenInput], Result_9>,
+  'validate_empty_input' : ActorMethod<[], Result_9>,
   'withdraw_currency' : ActorMethod<[WithdrawInput], Result_2>,
   'withdraw_token' : ActorMethod<[WithdrawInput], Result_2>,
   'x402_bind_address' : ActorMethod<[PayingResultInput], Result_1>,

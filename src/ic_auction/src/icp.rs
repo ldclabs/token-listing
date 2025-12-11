@@ -71,6 +71,16 @@ pub async fn verify_transfer_token(
 
     let block = res.blocks.first().ok_or("Block not found")?;
 
+    // Check fee
+    let fee = match &block.block {
+        ICRC3Value::Map(map) => match map.get("fee") {
+            Some(ICRC3Value::Nat(n)) => n.0.to_u128().ok_or("Fee too large")?,
+            Some(ICRC3Value::Int(i)) => i.0.to_u128().ok_or("Fee too large")?,
+            _ => return Err("Block missing fee field or invalid format".to_string()),
+        },
+        _ => return Err("Invalid block format".to_string()),
+    };
+
     let tx_map = match &block.block {
         ICRC3Value::Map(map) => match map.get("tx") {
             Some(ICRC3Value::Map(tx)) => tx,
@@ -105,6 +115,6 @@ pub async fn verify_transfer_token(
         token: ledger.to_string(),
         from: from_acc.to_string(),
         to: to_acc.to_string(),
-        amount,
+        amount: amount.saturating_sub(fee),
     })
 }

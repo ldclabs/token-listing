@@ -105,13 +105,11 @@ impl<H: HttpOutcall> SvmClient<H> {
         Ok(status)
     }
 
-    #[allow(dead_code)]
     pub async fn get_transaction(
         &self,
         now_ms: u64,
         signature: String,
         encoding: Option<&str>,
-        max_supported_transaction_version: Option<u8>,
     ) -> Result<Option<EncodedTransactionWithStatusMeta>, String> {
         let mut config = Map::new();
         self.insert_commitment(&mut config);
@@ -120,12 +118,10 @@ impl<H: HttpOutcall> SvmClient<H> {
             Value::String(encoding.unwrap_or("base64").to_string()),
         );
 
-        if let Some(version) = max_supported_transaction_version {
-            config.insert(
-                "maxSupportedTransactionVersion".to_string(),
-                Value::Number(version.into()),
-            );
-        }
+        config.insert(
+            "maxSupportedTransactionVersion".to_string(),
+            Value::Number(0.into()),
+        );
 
         let id = format!("getTransaction-{now_ms}-{signature}");
         let params = vec![Value::String(signature), Value::Object(config)];
@@ -440,13 +436,9 @@ mod tests {
         }))]);
 
         let client = SvmClient::new(vec!["https://sol".to_string()], None, None, mock);
-        let tx = futures::executor::block_on(client.get_transaction(
-            1_000,
-            "sig".to_string(),
-            None,
-            None,
-        ))
-        .unwrap();
+        let tx =
+            futures::executor::block_on(client.get_transaction(1_000, "sig".to_string(), None))
+                .unwrap();
 
         assert!(tx.is_none());
     }

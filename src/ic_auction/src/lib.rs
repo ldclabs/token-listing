@@ -1,5 +1,3 @@
-use candid::Principal;
-
 mod api;
 mod api_admin;
 mod api_init;

@@ -44,13 +44,10 @@ fn get_function_hash(namespace: &str, name: &str) -> [u8; 8] {
 /// 构建 CreateAmmConfig 指令
 pub fn build_create_amm_config_ix(
     owner: Pubkey,
-    index: u16,
     trade_fee_rate: u64,
     protocol_fee_rate: u64,
-    fund_fee_rate: u64,
-    create_pool_fee: u64,
-    creator_fee_rate: u64,
 ) -> (Instruction, Pubkey) {
+    let index = 0u16;
     let (amm_config, _) = Pubkey::find_program_address(
         &[AMM_CONFIG_SEED.as_bytes(), &index.to_be_bytes()],
         &PROGRAM_ID,
@@ -66,9 +63,9 @@ pub fn build_create_amm_config_ix(
         index,
         trade_fee_rate,
         protocol_fee_rate,
-        fund_fee_rate,
-        create_pool_fee,
-        creator_fee_rate,
+        fund_fee_rate: 0,
+        create_pool_fee: 0,
+        creator_fee_rate: 0,
     };
 
     let mut data = get_function_hash("global", "create_amm_config").to_vec();

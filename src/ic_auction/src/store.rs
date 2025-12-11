@@ -476,26 +476,6 @@ pub mod state {
         STATE.with_borrow(|s| StateInfo::from(s))
     }
 
-    pub fn evm_address(user: &Principal) -> Address {
-        STATE.with_borrow(|s| {
-            let pk = derive_public_key(&s.ecdsa_public_key, vec![user.as_slice().to_vec()])
-                .expect("derive_public_key failed");
-            pk.to_evm_adress().unwrap()
-        })
-    }
-
-    pub fn sol_address(user: &Principal) -> Pubkey {
-        STATE.with_borrow(|s| {
-            let pk = derive_schnorr_public_key(
-                &s.ed25519_public_key,
-                vec![user.as_slice().to_vec()],
-                None,
-            )
-            .expect("derive_schnorr_public_key failed");
-            pk.to_sol_pubkey().unwrap()
-        })
-    }
-
     pub fn try_set_auction_timer() {
         let end_time = STATE.with_borrow(|s| {
             if s.auction.is_some() {
@@ -1370,7 +1350,7 @@ pub mod state {
     ) -> Result<TransferChecked, String> {
         let client = sol_client();
         let tx_status = client
-            .get_transaction(now_ms, txid, Some("base64"), None)
+            .get_transaction(now_ms, txid, Some("base64"))
             .await?
             .ok_or("transaction not found".to_string())?;
 
@@ -1656,12 +1636,8 @@ pub mod state {
 
             let (ix0, amm_config) = raydium::build_create_amm_config_ix(
                 s.sol_address,
-                0,
                 2500,   // trade_fee_rate: 2500 / 1,000,000 = 0.0025 = 0.25%
                 120000, // protocol_fee_rate: 120000 / 1,000,000 = 0.12 = 12%, 实际协议收入 = 0.25% * 12% = 0.03%, LP 收入 = 0.25% - 0.03% = 0.22%
-                0,
-                10_000_000, // 创建池子的费用，防垃圾攻击 0.01 SOL = 10,000,000 Lamports
-                0,
             );
 
             let (ix1, ids) = raydium::build_initialize_pool_ix(

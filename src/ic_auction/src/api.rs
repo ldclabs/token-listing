@@ -1,9 +1,8 @@
-use candid::Principal;
 use ic_auth_types::{ByteBufB64, deterministic_cbor_into_vec};
 use ic_ed25519::PublicKey;
 
 use crate::{
-    helper::{check_auth, format_error, msg_caller, sha3_256},
+    helper::{format_error, msg_caller, sha3_256},
     store, types,
 };
 
@@ -21,22 +20,6 @@ fn auction_info() -> Option<types::AuctionInfo> {
 #[ic_cdk::query]
 fn get_grouped_bids(precision: Option<u64>) -> Vec<(u128, u128)> {
     store::state::get_grouped_bids(precision.unwrap_or(10) as u128)
-}
-
-#[ic_cdk::query]
-fn evm_address(user: Option<Principal>) -> Result<String, String> {
-    let user = user.unwrap_or_else(ic_cdk::api::msg_caller);
-    check_auth(&user)?;
-    let addr = store::state::evm_address(&user);
-    Ok(addr.to_string())
-}
-
-#[ic_cdk::query]
-fn sol_address(user: Option<Principal>) -> Result<String, String> {
-    let user = user.unwrap_or_else(ic_cdk::api::msg_caller);
-    check_auth(&user)?;
-    let addr = store::state::sol_address(&user);
-    Ok(addr.to_string())
 }
 
 #[ic_cdk::query]

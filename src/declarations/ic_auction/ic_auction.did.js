@@ -90,7 +90,6 @@ export const idlFactory = ({ IDL }) => {
   const Result_4 = IDL.Variant({ 'Ok' : IDL.Vec(BidInfo), 'Err' : IDL.Text });
   const DepositInput = IDL.Record({ 'txid' : IDL.Text, 'sender' : IDL.Text });
   const Result_5 = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : IDL.Text });
-  const Result_6 = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
   const StateInfo = IDL.Record({
     'url' : IDL.Text,
     'token' : IDL.Text,
@@ -124,7 +123,7 @@ export const idlFactory = ({ IDL }) => {
     'currency_program_id' : IDL.Opt(IDL.Text),
     'currency_logo_url' : IDL.Text,
   });
-  const Result_7 = IDL.Variant({ 'Ok' : StateInfo, 'Err' : IDL.Text });
+  const Result_6 = IDL.Variant({ 'Ok' : StateInfo, 'Err' : IDL.Text });
   const DepositTxInfo = IDL.Record({
     'txid' : IDL.Text,
     'user' : IDL.Principal,
@@ -132,14 +131,15 @@ export const idlFactory = ({ IDL }) => {
     'timestamp' : IDL.Nat64,
     'amount' : IDL.Nat,
   });
-  const Result_8 = IDL.Variant({
+  const Result_7 = IDL.Variant({
     'Ok' : IDL.Vec(DepositTxInfo),
     'Err' : IDL.Text,
   });
-  const Result_9 = IDL.Variant({
+  const Result_8 = IDL.Variant({
     'Ok' : IDL.Vec(WithdrawTxInfo),
     'Err' : IDL.Text,
   });
+  const Result_9 = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
   const WithdrawInput = IDL.Record({ 'recipient' : IDL.Text });
   const PayingResultInput = IDL.Record({
     'result' : IDL.Vec(IDL.Nat8),
@@ -170,34 +170,33 @@ export const idlFactory = ({ IDL }) => {
     'auction_info' : IDL.Func([], [IDL.Opt(AuctionInfo)], ['query']),
     'claim' : IDL.Func([IDL.Nat64], [Result_3], []),
     'claim_all' : IDL.Func([], [Result_4], []),
+    'debug' : IDL.Func([IDL.Text], [IDL.Text], []),
     'deposit_currency' : IDL.Func([DepositInput], [Result_5], []),
     'estimate_max_price' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
-    'evm_address' : IDL.Func([IDL.Opt(IDL.Principal)], [Result_6], ['query']),
     'get_grouped_bids' : IDL.Func(
         [IDL.Opt(IDL.Nat64)],
         [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))],
         ['query'],
       ),
-    'info' : IDL.Func([], [Result_7], ['query']),
+    'info' : IDL.Func([], [Result_6], ['query']),
     'my_bids' : IDL.Func([], [Result_4], ['query']),
-    'my_deposits' : IDL.Func([], [Result_8], ['query']),
-    'my_withdraws' : IDL.Func([], [Result_9], ['query']),
-    'sol_address' : IDL.Func([IDL.Opt(IDL.Principal)], [Result_6], ['query']),
+    'my_deposits' : IDL.Func([], [Result_7], ['query']),
+    'my_withdraws' : IDL.Func([], [Result_8], ['query']),
     'submit_bid' : IDL.Func([IDL.Nat, IDL.Nat], [Result_3], []),
-    'validate_admin_set_currency' : IDL.Func([TokenInput], [Result_6], []),
+    'validate_admin_set_currency' : IDL.Func([TokenInput], [Result_9], []),
     'validate_admin_set_paying_public_keys' : IDL.Func(
         [IDL.Vec(IDL.Text)],
-        [Result_6],
+        [Result_9],
         [],
       ),
-    'validate_admin_set_project' : IDL.Func([ProjectInput], [Result_6], []),
+    'validate_admin_set_project' : IDL.Func([ProjectInput], [Result_9], []),
     'validate_admin_set_providers' : IDL.Func(
         [IDL.Vec(IDL.Text)],
-        [Result_6],
+        [Result_9],
         [],
       ),
-    'validate_admin_set_token' : IDL.Func([TokenInput], [Result_6], []),
-    'validate_empty_input' : IDL.Func([], [Result_6], []),
+    'validate_admin_set_token' : IDL.Func([TokenInput], [Result_9], []),
+    'validate_empty_input' : IDL.Func([], [Result_9], []),
     'withdraw_currency' : IDL.Func([WithdrawInput], [Result_2], []),
     'withdraw_token' : IDL.Func([WithdrawInput], [Result_2], []),
     'x402_bind_address' : IDL.Func([PayingResultInput], [Result_1], []),
