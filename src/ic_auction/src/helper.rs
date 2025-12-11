@@ -101,3 +101,11 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     hasher.update(data);
     hasher.finalize().into()
 }
+
+pub fn sha3_256(data: &[u8]) -> [u8; 32] {
+    use sha3::Digest;
+
+    let mut hasher = sha3::Sha3_256::new();
+    hasher.update(data);
+    hasher.finalize().into()
+}

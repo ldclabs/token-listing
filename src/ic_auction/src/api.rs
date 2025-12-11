@@ -1,7 +1,9 @@
 use candid::Principal;
+use ic_auth_types::{ByteBufB64, deterministic_cbor_into_vec};
+use ic_ed25519::PublicKey;
 
 use crate::{
-    helper::{check_auth, msg_caller},
+    helper::{check_auth, format_error, msg_caller, sha3_256},
     store, types,
 };
 
@@ -61,13 +63,162 @@ fn estimate_max_price(amount: u128) -> u128 {
     store::state::estimate_max_price(amount, now_ms)
 }
 
-// #[ic_cdk::update]
-// fn bind_address(input: BindAddressInput) -> Result<(), String> {
-//     let caller = msg_caller()?;
-//     let now_ms = ic_cdk::api::time() / 1_000_000;
-//     todo!("verification");
-//     store::state::bind_address(caller, input.address, now_ms)?;
-// }
+#[ic_cdk::query]
+fn x402_payment(amount: u128, verify_only: bool) -> Result<types::X402PaymentOutput, String> {
+    let caller = msg_caller()?;
+    let timestamp = ic_cdk::api::time() / 1_000_000;
+    store::state::with(|s| {
+        let amount = if verify_only {
+            amount.min(10u128.pow(s.currency_decimals.saturating_sub(2) as u32))
+        } else {
+            amount
+        };
+
+        let (network, pay_to) = match s.chain {
+            types::Chain::Icp => ("icp".to_string(), s.icp_address.to_string()),
+            types::Chain::Sol => ("solana".to_string(), s.sol_address.to_string()),
+            types::Chain::Evm(_) => return Err("EVM x402 is not supported yet".to_string()),
+        };
+
+        let pr = types::PaymentRequirements {
+            scheme: "exact".to_string(),
+            network,
+            max_amount_required: amount.to_string(),
+            asset: s.currency.to_string(),
+            pay_to,
+            resource: if verify_only {
+                "auction_bid_verification".to_string()
+            } else {
+                "auction_bid_payment".to_string()
+            },
+            description: if verify_only {
+                "Address verification only, no settlement will be made.".to_string()
+            } else {
+                "Auction bid payment".to_string()
+            },
+            mime_type: None,
+            output_schema: None,
+            max_timeout_seconds: 120,
+            extra: None,
+        };
+        let nonce_seed =
+            deterministic_cbor_into_vec(&(verify_only, &caller, timestamp, &pr, &s.nonce_iv))?;
+        let nonce = ByteBufB64::from(sha3_256(&nonce_seed)).to_string();
+        let x402 = types::PaymentRequirementsResponse {
+            x402_version: 1,
+            error: if verify_only {
+                format!("Verification required for auction: {:?}", s.name)
+            } else {
+                format!("Payment required for auction: {:?}", s.name)
+            },
+            accepts: vec![pr],
+        };
+
+        Ok(types::X402PaymentOutput {
+            x402: ByteBufB64::from(deterministic_cbor_into_vec(&x402)?),
+            nonce,
+            timestamp,
+        })
+    })
+}
+
+#[ic_cdk::update]
+fn x402_bind_address(input: types::PayingResultInput) -> Result<(), String> {
+    let caller = msg_caller()?;
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+
+    store::state::with(|s| {
+        let mut verified = false;
+        for pk_bytes in &s.paying_public_keys {
+            let pk = PublicKey::deserialize_raw(&pk_bytes.0).map_err(format_error)?;
+            if pk.verify_signature(&input.result, &input.signature).is_ok() {
+                verified = true;
+                break;
+            }
+        }
+        if !verified {
+            return Err("signature verification failed".to_string());
+        }
+        let pv: types::PaymentVerifyResult =
+            ciborium::from_reader(&input.result[..]).map_err(format_error)?;
+        if input.timestamp + 600 * 1000 < now_ms {
+            return Err("payment verification result expired".to_string());
+        }
+        if !pv.verify_response.is_valid {
+            return Err("payment verification failed".to_string());
+        }
+        let payer = pv
+            .verify_response
+            .payer
+            .ok_or("missing payer in verification response")?;
+
+        let nonce_seed = deterministic_cbor_into_vec(&(
+            true,
+            &caller,
+            input.timestamp,
+            &pv.payment_requirements,
+            &s.nonce_iv,
+        ))?;
+        let nonce = ByteBufB64::from(sha3_256(&nonce_seed)).to_string();
+        if nonce != pv.nonce {
+            return Err("nonce mismatch".to_string());
+        }
+
+        store::state::bind_address(caller, payer, now_ms)?;
+
+        Ok(())
+    })
+}
+
+#[ic_cdk::update]
+async fn x402_deposit_currency(input: types::PayingResultInput) -> Result<u128, String> {
+    let caller = msg_caller()?;
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    let settle_response = store::state::with(|s| {
+        let mut verified = false;
+        for pk_bytes in &s.paying_public_keys {
+            let pk = PublicKey::deserialize_raw(&pk_bytes.0).map_err(format_error)?;
+            if pk.verify_signature(&input.result, &input.signature).is_ok() {
+                verified = true;
+                break;
+            }
+        }
+        if !verified {
+            return Err("signature verification failed".to_string());
+        }
+        let pv: types::PaymentSettleResult =
+            ciborium::from_reader(&input.result[..]).map_err(format_error)?;
+        if input.timestamp + 600 * 1000 < now_ms {
+            return Err("payment verification result expired".to_string());
+        }
+
+        if !pv.settle_response.success {
+            return Err("payment settlement failed".to_string());
+        }
+
+        let nonce_seed = deterministic_cbor_into_vec(&(
+            true,
+            &caller,
+            input.timestamp,
+            &pv.payment_requirements,
+            &s.nonce_iv,
+        ))?;
+        let nonce = ByteBufB64::from(sha3_256(&nonce_seed)).to_string();
+        if nonce != pv.nonce {
+            return Err("nonce mismatch".to_string());
+        }
+
+        Ok(pv.settle_response)
+    })?;
+
+    store::state::deposit_currency(
+        caller,
+        settle_response.payer,
+        settle_response.transaction,
+        now_ms,
+    )
+    .await
+}
 
 #[ic_cdk::update]
 fn submit_bid(amount: u128, max_price: u128) -> Result<types::BidInfo, String> {

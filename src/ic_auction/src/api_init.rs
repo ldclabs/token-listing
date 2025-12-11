@@ -62,4 +62,5 @@ fn post_upgrade(args: Option<CanisterArgs>) {
     }
 
     store::state::init_http_certified_data();
+    store::state::try_set_auction_timer();
 }

@@ -57,6 +57,11 @@ export interface InitArgs {
   'chain' : Chain,
   'key_name' : string,
 }
+export interface PayingResultInput {
+  'result' : Uint8Array | number[],
+  'signature' : Uint8Array | number[],
+  'timestamp' : bigint,
+}
 export interface ProjectInput {
   'url' : string,
   'name' : string,
@@ -66,6 +71,8 @@ export interface ProjectInput {
 export type Result = { 'Ok' : [] | [FinalizeOutput] } |
   { 'Err' : string };
 export type Result_1 = { 'Ok' : null } |
+  { 'Err' : string };
+export type Result_10 = { 'Ok' : X402PaymentOutput } |
   { 'Err' : string };
 export type Result_2 = { 'Ok' : WithdrawTxInfo } |
   { 'Err' : string };
@@ -136,11 +143,17 @@ export interface WithdrawTxInfo {
   'timestamp' : bigint,
   'amount' : bigint,
 }
+export interface X402PaymentOutput {
+  'x402' : Uint8Array | number[],
+  'nonce' : string,
+  'timestamp' : bigint,
+}
 export interface _SERVICE {
   'admin_finalize_auction' : ActorMethod<[FinalizeInput], Result>,
   'admin_init_auction' : ActorMethod<[], Result_1>,
   'admin_set_auction' : ActorMethod<[AuctionConfig], Result_1>,
   'admin_set_currency' : ActorMethod<[TokenInput], Result_1>,
+  'admin_set_paying_public_keys' : ActorMethod<[Array<string>], Result_1>,
   'admin_set_project' : ActorMethod<[ProjectInput], Result_1>,
   'admin_set_providers' : ActorMethod<[Array<string>], Result_1>,
   'admin_set_token' : ActorMethod<[TokenInput], Result_1>,
@@ -160,12 +173,19 @@ export interface _SERVICE {
   'sol_address' : ActorMethod<[[] | [Principal]], Result_6>,
   'submit_bid' : ActorMethod<[bigint, bigint], Result_3>,
   'validate_admin_set_currency' : ActorMethod<[TokenInput], Result_6>,
+  'validate_admin_set_paying_public_keys' : ActorMethod<
+    [Array<string>],
+    Result_6
+  >,
   'validate_admin_set_project' : ActorMethod<[ProjectInput], Result_6>,
   'validate_admin_set_providers' : ActorMethod<[Array<string>], Result_6>,
   'validate_admin_set_token' : ActorMethod<[TokenInput], Result_6>,
   'validate_empty_input' : ActorMethod<[], Result_6>,
   'withdraw_currency' : ActorMethod<[WithdrawInput], Result_2>,
   'withdraw_token' : ActorMethod<[WithdrawInput], Result_2>,
+  'x402_bind_address' : ActorMethod<[PayingResultInput], Result_1>,
+  'x402_deposit_currency' : ActorMethod<[PayingResultInput], Result_5>,
+  'x402_payment' : ActorMethod<[bigint, boolean], Result_10>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

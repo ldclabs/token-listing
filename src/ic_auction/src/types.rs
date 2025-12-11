@@ -1,4 +1,5 @@
 use candid::{CandidType, Principal};
+use ic_auth_types::ByteBufB64;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
@@ -324,4 +325,97 @@ pub struct FinalizeInput {
 pub struct FinalizeOutput {
     pub pool_id: String,
     pub txid: String,
+}
+
+#[derive(CandidType, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct X402PaymentOutput {
+    pub x402: ByteBufB64, // PaymentRequirementsResponse in CBOR
+    pub nonce: String,
+    pub timestamp: u64,
+}
+
+#[derive(CandidType, Clone, Serialize, Deserialize)]
+pub struct PayingResultInput {
+    pub result: ByteBufB64, // PaymentVerifyResult / PaymentSettleResult in CBOR,
+    pub signature: ByteBufB64, // Signature over (result || nonce || timestamp)
+    pub timestamp: u64,     // the timestamp from X402PaymentOutput
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaymentVerifyResult {
+    pub payment_requirements: PaymentRequirements,
+    pub verify_response: VerifyResponse,
+    pub nonce: String, // the nonce from X402PaymentOutput
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaymentSettleResult {
+    pub payment_requirements: PaymentRequirements,
+    pub settle_response: SettleResponse,
+    pub nonce: String, // the nonce from X402PaymentOutput
+}
+
+#[derive(CandidType, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifyResponse {
+    pub is_valid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payer: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invalid_reason: Option<String>,
+}
+
+#[derive(CandidType, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SettleResponse {
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_reason: Option<String>,
+    pub transaction: String,
+    pub network: String,
+    pub payer: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaymentRequirementsResponse {
+    /// Protocol version identifier
+    pub x402_version: u8,
+    /// Human-readable error message explaining why payment is required
+    pub error: String,
+    /// Array of payment requirement objects defining acceptable payment methods
+    pub accepts: Vec<PaymentRequirements>,
+}
+
+/// Payment requirements set by the payment-gated endpoint for an acceptable payment.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaymentRequirements {
+    /// Payment scheme identifier (e.g., "exact")
+    pub scheme: String,
+    /// Blockchain network identifier (e.g., "icp")
+    pub network: String,
+    /// Required payment amount in atomic token units
+    pub max_amount_required: String,
+    /// Token ledger canister address
+    pub asset: String,
+    /// Recipient wallet address for the payment
+    pub pay_to: String,
+    /// the protected resource, e.g., URL of the resource endpoint
+    pub resource: String,
+    /// Human-readable description of the resource
+    pub description: String,
+    /// MIME type of the expected response
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+    /// JSON schema describing the response format
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<serde_json::Value>,
+    /// Maximum time allowed for payment completion in seconds
+    pub max_timeout_seconds: u64,
+    /// Scheme-specific additional information.
+    pub extra: Option<serde_json::Value>,
 }

@@ -141,11 +141,27 @@ export const idlFactory = ({ IDL }) => {
     'Err' : IDL.Text,
   });
   const WithdrawInput = IDL.Record({ 'recipient' : IDL.Text });
+  const PayingResultInput = IDL.Record({
+    'result' : IDL.Vec(IDL.Nat8),
+    'signature' : IDL.Vec(IDL.Nat8),
+    'timestamp' : IDL.Nat64,
+  });
+  const X402PaymentOutput = IDL.Record({
+    'x402' : IDL.Vec(IDL.Nat8),
+    'nonce' : IDL.Text,
+    'timestamp' : IDL.Nat64,
+  });
+  const Result_10 = IDL.Variant({ 'Ok' : X402PaymentOutput, 'Err' : IDL.Text });
   return IDL.Service({
     'admin_finalize_auction' : IDL.Func([FinalizeInput], [Result], []),
     'admin_init_auction' : IDL.Func([], [Result_1], []),
     'admin_set_auction' : IDL.Func([AuctionConfig], [Result_1], []),
     'admin_set_currency' : IDL.Func([TokenInput], [Result_1], []),
+    'admin_set_paying_public_keys' : IDL.Func(
+        [IDL.Vec(IDL.Text)],
+        [Result_1],
+        [],
+      ),
     'admin_set_project' : IDL.Func([ProjectInput], [Result_1], []),
     'admin_set_providers' : IDL.Func([IDL.Vec(IDL.Text)], [Result_1], []),
     'admin_set_token' : IDL.Func([TokenInput], [Result_1], []),
@@ -169,6 +185,11 @@ export const idlFactory = ({ IDL }) => {
     'sol_address' : IDL.Func([IDL.Opt(IDL.Principal)], [Result_6], ['query']),
     'submit_bid' : IDL.Func([IDL.Nat, IDL.Nat], [Result_3], []),
     'validate_admin_set_currency' : IDL.Func([TokenInput], [Result_6], []),
+    'validate_admin_set_paying_public_keys' : IDL.Func(
+        [IDL.Vec(IDL.Text)],
+        [Result_6],
+        [],
+      ),
     'validate_admin_set_project' : IDL.Func([ProjectInput], [Result_6], []),
     'validate_admin_set_providers' : IDL.Func(
         [IDL.Vec(IDL.Text)],
@@ -179,6 +200,9 @@ export const idlFactory = ({ IDL }) => {
     'validate_empty_input' : IDL.Func([], [Result_6], []),
     'withdraw_currency' : IDL.Func([WithdrawInput], [Result_2], []),
     'withdraw_token' : IDL.Func([WithdrawInput], [Result_2], []),
+    'x402_bind_address' : IDL.Func([PayingResultInput], [Result_1], []),
+    'x402_deposit_currency' : IDL.Func([PayingResultInput], [Result_5], []),
+    'x402_payment' : IDL.Func([IDL.Nat, IDL.Bool], [Result_10], ['query']),
   });
 };
 export const init = ({ IDL }) => {

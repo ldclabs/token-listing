@@ -1,6 +1,12 @@
+use std::str::FromStr;
+
+use ic_auth_types::ByteArrayB64;
 use url::Url;
 
-use crate::{helper::pretty_format, store, types};
+use crate::{
+    helper::{format_error, pretty_format},
+    store, types,
+};
 
 #[ic_cdk::update(guard = "is_controller")]
 fn admin_set_project(input: types::ProjectInput) -> Result<(), String> {
@@ -137,6 +143,27 @@ fn validate_admin_set_providers(providers: Vec<String>) -> Result<String, String
         }
     }
     pretty_format(&(providers,))
+}
+
+#[ic_cdk::update(guard = "is_controller")]
+fn admin_set_paying_public_keys(public_keys: Vec<String>) -> Result<(), String> {
+    let mut paying_public_keys = Vec::new();
+    for key in public_keys {
+        paying_public_keys.push(ByteArrayB64::from_str(&key).map_err(format_error)?)
+    }
+
+    store::state::with_mut(|s| {
+        s.paying_public_keys = paying_public_keys;
+        Ok(())
+    })
+}
+
+#[ic_cdk::update]
+fn validate_admin_set_paying_public_keys(public_keys: Vec<String>) -> Result<String, String> {
+    for key in &public_keys {
+        ByteArrayB64::<32>::from_str(key).map_err(format_error)?;
+    }
+    pretty_format(&(public_keys,))
 }
 
 #[ic_cdk::update(guard = "is_controller")]

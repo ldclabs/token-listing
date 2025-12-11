@@ -324,6 +324,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "anda_cloud_cdk"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab757ce794e82f541bb6424141ff9b7e30625f1c8efbe2539e02df188213323b"
+dependencies = [
+ "candid",
+ "ciborium",
+ "ic_auth_types",
+ "ic_auth_verifier",
+ "serde",
+ "serde_json",
+ "sha3",
+ "thiserror 2.0.17",
+ "url",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1797,6 +1814,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-canister-sig-creation"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8b2a507d1bebb111fc8c76098468e4de9c745e9b9ef160a079568ae1d6f7fef"
+dependencies = [
+ "candid",
+ "hex",
+ "ic-certification 3.0.3",
+ "ic-representation-independent-hash",
+ "ic0",
+ "lazy_static",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+ "sha2",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "ic-cdk"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1848,6 +1884,18 @@ dependencies = [
  "ic-cdk-executor",
  "ic0",
  "slotmap",
+]
+
+[[package]]
+name = "ic-certification"
+version = "2.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e64ee3d8b6e81b51f245716d3e0badb63c283c00f3c9fb5d5219afc30b5bf821"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_bytes",
+ "sha2",
 ]
 
 [[package]]
@@ -1908,7 +1956,7 @@ dependencies = [
  "base64 0.22.1",
  "candid",
  "http",
- "ic-certification",
+ "ic-certification 3.0.3",
  "ic-representation-independent-hash",
  "serde",
  "serde_cbor",
@@ -1957,6 +2005,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-signature-verification"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9de5065430a9b1a61934f7e4a65474a7a11658db84a8b5b0c42baced6c33752"
+dependencies = [
+ "ic-canister-sig-creation",
+ "ic-certification 2.6.0",
+ "ic-verify-bls-signature",
+ "ic_principal",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+ "sha2",
+]
+
+[[package]]
 name = "ic-stable-structures"
 version = "0.6.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1975,6 +2039,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ic-verify-bls-signature"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd6c4261586eb473fe1219de63186a98e554985d5fd6f3488036c8fb82452e27"
+dependencies = [
+ "hex",
+ "ic_bls12_381",
+ "lazy_static",
+ "pairing",
+ "sha2",
+]
+
+[[package]]
 name = "ic0"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1989,6 +2066,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth",
  "alloy-signer",
+ "anda_cloud_cdk",
  "bincode",
  "borsh",
  "candid",
@@ -2011,6 +2089,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "sha2",
+ "sha3",
  "solana-account-decoder-client-types",
  "solana-instruction",
  "solana-program",
@@ -2032,6 +2111,44 @@ dependencies = [
  "ciborium",
  "serde",
  "serde_bytes",
+]
+
+[[package]]
+name = "ic_auth_verifier"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2572ade98258be2a7f535c1d972c5262d04fea3c9467bc947aed851b8f2c9939"
+dependencies = [
+ "base64 0.22.1",
+ "candid",
+ "ciborium",
+ "ed25519-dalek",
+ "hex",
+ "http",
+ "ic-canister-sig-creation",
+ "ic-signature-verification",
+ "ic_auth_types",
+ "k256",
+ "p256",
+ "serde",
+ "sha2",
+ "sha3",
+ "simple_asn1",
+ "url",
+]
+
+[[package]]
+name = "ic_bls12_381"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1e828f9e804ccefe4b9b15b2195f474c60fd4f95ccd14fcb554eb6d7dfafde3"
+dependencies = [
+ "digest 0.10.7",
+ "ff",
+ "group",
+ "pairing",
+ "rand_core 0.6.4",
+ "subtle",
 ]
 
 [[package]]
@@ -2505,6 +2622,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
+name = "p256"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9863ad85fa8f4460f9c48cb909d38a0d689dba1f6f6988a5e3e0d31071bcd4b"
+dependencies = [
+ "ecdsa",
+ "elliptic-curve",
+ "primeorder",
+ "sha2",
+]
+
+[[package]]
+name = "pairing"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81fec4625e73cf41ef4bb6846cafa6d44736525f442ba45e407c4a000a13996f"
+dependencies = [
+ "group",
+]
+
+[[package]]
 name = "parity-scale-codec"
 version = "3.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2650,6 +2788,15 @@ dependencies = [
  "arrayvec 0.5.2",
  "typed-arena",
  "unicode-width",
+]
+
+[[package]]
+name = "primeorder"
+version = "0.13.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "353e1ca18966c16d9deb1c69278edbc5f194139612772bd9537af60ac231e1e6"
+dependencies = [
+ "elliptic-curve",
 ]
 
 [[package]]

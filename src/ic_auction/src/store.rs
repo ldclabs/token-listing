@@ -81,6 +81,7 @@ pub struct State {
     pub ecdsa_public_key: PublicKeyOutput,
     pub ed25519_public_key: PublicKeyOutput,
     pub nonce_iv: ByteArrayB64<32>,
+    pub paying_public_keys: Vec<ByteArrayB64<32>>,
     pub governance_canister: Option<Principal>,
     pub pending_deposits: HashMap<Principal, u64>,
     pub total_deposited_currency: u128,
@@ -162,6 +163,7 @@ impl State {
             ecdsa_public_key: PublicKeyOutput::default(),
             ed25519_public_key: PublicKeyOutput::default(),
             nonce_iv: ByteArrayB64::default(),
+            paying_public_keys: Vec::new(),
             pending_deposits: HashMap::new(),
             total_deposited_currency: 0,
             total_withdrawn_currency: 0,
@@ -494,6 +496,28 @@ pub mod state {
         })
     }
 
+    pub fn try_set_auction_timer() {
+        let end_time = STATE.with_borrow(|s| {
+            if s.auction.is_some() {
+                s.auction_config.as_ref().map(|c| c.end_time).unwrap_or(0)
+            } else {
+                0
+            }
+        });
+
+        let now_ms = ic_cdk::api::time() / 1_000_000;
+        if now_ms < end_time {
+            ic_cdk_timers::set_timer(std::time::Duration::from_millis(end_time - now_ms), async {
+                STATE.with_borrow_mut(|s| {
+                    if let Some(auction) = &mut s.auction {
+                        let now_ms = ic_cdk::api::time() / 1_000_000;
+                        auction.update_state(now_ms);
+                    }
+                })
+            });
+        }
+    }
+
     pub async fn set_auction(cfg: AuctionConfig) -> Result<(), String> {
         STATE.with_borrow_mut(|s| {
             if s.auction.is_some() {
@@ -570,7 +594,10 @@ pub mod state {
 
             s.auction = Some(cca::Auction::new(cfg)?);
             Ok(())
-        })
+        })?;
+
+        try_set_auction_timer();
+        Ok(())
     }
 
     pub async fn finalize_auction(
@@ -791,7 +818,6 @@ pub mod state {
         })
     }
 
-    #[allow(unused)]
     pub fn bind_address(caller: Principal, address: String, now_ms: u64) -> Result<(), String> {
         STATE.with_borrow(|s| {
             s.chain.parse_address(&address)?;

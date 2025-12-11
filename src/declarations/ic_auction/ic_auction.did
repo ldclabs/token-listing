@@ -50,6 +50,11 @@ type InitArgs = record {
   chain : Chain;
   key_name : text;
 };
+type PayingResultInput = record {
+  result : blob;
+  signature : blob;
+  timestamp : nat64;
+};
 type ProjectInput = record {
   url : text;
   name : text;
@@ -58,6 +63,7 @@ type ProjectInput = record {
 };
 type Result = variant { Ok : opt FinalizeOutput; Err : text };
 type Result_1 = variant { Ok; Err : text };
+type Result_10 = variant { Ok : X402PaymentOutput; Err : text };
 type Result_2 = variant { Ok : WithdrawTxInfo; Err : text };
 type Result_3 = variant { Ok : BidInfo; Err : text };
 type Result_4 = variant { Ok : vec BidInfo; Err : text };
@@ -119,11 +125,17 @@ type WithdrawTxInfo = record {
   timestamp : nat64;
   amount : nat;
 };
+type X402PaymentOutput = record {
+  x402 : blob;
+  nonce : text;
+  timestamp : nat64;
+};
 service : (opt CanisterArgs) -> {
   admin_finalize_auction : (FinalizeInput) -> (Result);
   admin_init_auction : () -> (Result_1);
   admin_set_auction : (AuctionConfig) -> (Result_1);
   admin_set_currency : (TokenInput) -> (Result_1);
+  admin_set_paying_public_keys : (vec text) -> (Result_1);
   admin_set_project : (ProjectInput) -> (Result_1);
   admin_set_providers : (vec text) -> (Result_1);
   admin_set_token : (TokenInput) -> (Result_1);
@@ -143,10 +155,14 @@ service : (opt CanisterArgs) -> {
   sol_address : (opt principal) -> (Result_6) query;
   submit_bid : (nat, nat) -> (Result_3);
   validate_admin_set_currency : (TokenInput) -> (Result_6);
+  validate_admin_set_paying_public_keys : (vec text) -> (Result_6);
   validate_admin_set_project : (ProjectInput) -> (Result_6);
   validate_admin_set_providers : (vec text) -> (Result_6);
   validate_admin_set_token : (TokenInput) -> (Result_6);
   validate_empty_input : () -> (Result_6);
   withdraw_currency : (WithdrawInput) -> (Result_2);
   withdraw_token : (WithdrawInput) -> (Result_2);
+  x402_bind_address : (PayingResultInput) -> (Result_1);
+  x402_deposit_currency : (PayingResultInput) -> (Result_5);
+  x402_payment : (nat, bool) -> (Result_10) query;
 }
