@@ -90,6 +90,13 @@ export const idlFactory = ({ IDL }) => {
   const Result_4 = IDL.Variant({ 'Ok' : IDL.Vec(BidInfo), 'Err' : IDL.Text });
   const DepositInput = IDL.Record({ 'txid' : IDL.Text, 'sender' : IDL.Text });
   const Result_5 = IDL.Variant({ 'Ok' : IDL.Nat, 'Err' : IDL.Text });
+  const AuctionSnapshot = IDL.Record({
+    'c' : IDL.Nat,
+    'd' : IDL.Nat,
+    'f' : IDL.Nat,
+    's' : IDL.Nat,
+    't' : IDL.Nat64,
+  });
   const StateInfo = IDL.Record({
     'url' : IDL.Text,
     'token' : IDL.Text,
@@ -170,12 +177,16 @@ export const idlFactory = ({ IDL }) => {
     'auction_info' : IDL.Func([], [IDL.Opt(AuctionInfo)], ['query']),
     'claim' : IDL.Func([IDL.Nat64], [Result_3], []),
     'claim_all' : IDL.Func([], [Result_4], []),
-    'debug' : IDL.Func([IDL.Text], [IDL.Text], []),
     'deposit_currency' : IDL.Func([DepositInput], [Result_5], []),
     'estimate_max_price' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
     'get_grouped_bids' : IDL.Func(
         [IDL.Opt(IDL.Nat64)],
         [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))],
+        ['query'],
+      ),
+    'get_snapshots' : IDL.Func(
+        [IDL.Nat64, IDL.Nat64],
+        [IDL.Vec(AuctionSnapshot)],
         ['query'],
       ),
     'info' : IDL.Func([], [Result_6], ['query']),

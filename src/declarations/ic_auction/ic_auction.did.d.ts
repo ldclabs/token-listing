@@ -24,6 +24,13 @@ export interface AuctionInfo {
   'is_graduated' : boolean,
   'cumulative_supply_released' : bigint,
 }
+export interface AuctionSnapshot {
+  'c' : bigint,
+  'd' : bigint,
+  'f' : bigint,
+  's' : bigint,
+  't' : bigint,
+}
 export interface BidInfo {
   'id' : bigint,
   'tokens_filled' : bigint,
@@ -162,10 +169,10 @@ export interface _SERVICE {
   'auction_info' : ActorMethod<[], [] | [AuctionInfo]>,
   'claim' : ActorMethod<[bigint], Result_3>,
   'claim_all' : ActorMethod<[], Result_4>,
-  'debug' : ActorMethod<[string], string>,
   'deposit_currency' : ActorMethod<[DepositInput], Result_5>,
   'estimate_max_price' : ActorMethod<[bigint], bigint>,
   'get_grouped_bids' : ActorMethod<[[] | [bigint]], Array<[bigint, bigint]>>,
+  'get_snapshots' : ActorMethod<[bigint, bigint], Array<AuctionSnapshot>>,
   'info' : ActorMethod<[], Result_6>,
   'my_bids' : ActorMethod<[], Result_4>,
   'my_deposits' : ActorMethod<[], Result_7>,

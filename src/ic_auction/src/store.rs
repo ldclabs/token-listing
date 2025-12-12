@@ -36,8 +36,8 @@ use crate::{
         transfer_checked_instruction,
     },
     types::{
-        AuctionConfig, AuctionInfo, BidInfo, Chain, DepositTxInfo, FinalizeInput, FinalizeOutput,
-        PublicKeyOutput, StateInfo, TransferChecked, WithdrawTxInfo,
+        AuctionConfig, AuctionInfo, AuctionSnapshot, BidInfo, Chain, DepositTxInfo, FinalizeInput,
+        FinalizeOutput, PublicKeyOutput, StateInfo, TransferChecked, WithdrawTxInfo,
     },
 };
 
@@ -84,6 +84,7 @@ pub struct State {
     pub paying_public_keys: Vec<ByteArrayB64<32>>,
     pub governance_canister: Option<Principal>,
     pub pending_deposits: HashMap<Principal, u64>,
+    pub snapshots: Vec<AuctionSnapshot>,
     pub total_deposited_currency: u128,
     pub total_withdrawn_currency: u128,
     pub total_withdrawn_token: u128,
@@ -165,6 +166,7 @@ impl State {
             nonce_iv: ByteArrayB64::default(),
             paying_public_keys: Vec::new(),
             pending_deposits: HashMap::new(),
+            snapshots: Vec::new(),
             total_deposited_currency: 0,
             total_withdrawn_currency: 0,
             total_withdrawn_token: 0,
@@ -685,9 +687,10 @@ pub mod state {
                 if user.currency_amount < amount {
                     return Err("insufficient currency balance".to_string());
                 }
-                let bid = auction.submit_bid(&BS, amount, max_price, now_ms)?;
+                let (bid, snapshot) = auction.submit_bid(&BS, amount, max_price, now_ms)?;
                 user.currency_amount -= amount;
                 user.bids.insert(bid.id);
+                s.snapshots.push(snapshot);
                 u.insert(caller, user);
 
                 Ok(bid)
@@ -820,10 +823,15 @@ pub mod state {
         sender: String,
         txid: String,
         now_ms: u64,
+        is_bound_address: bool,
     ) -> Result<u128, String> {
-        USERS.with_borrow(|u| {
-            let info = u.get(&caller).unwrap_or_default();
-            if !info.bound_addresses.contains(&sender) {
+        USERS.with_borrow_mut(|u| {
+            let mut info = u.get(&caller).unwrap_or_default();
+            if is_bound_address {
+                if info.bound_addresses.insert(sender.clone()) {
+                    u.insert(caller, info);
+                }
+            } else if !info.bound_addresses.contains(&sender) {
                 return Err("sender address is not bound to user".to_string());
             }
 

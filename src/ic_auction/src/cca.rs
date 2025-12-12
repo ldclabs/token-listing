@@ -14,7 +14,7 @@ use std::{
     collections::{BTreeMap, BinaryHeap},
 };
 
-use crate::types::{AuctionConfig, AuctionInfo, BidInfo};
+use crate::types::{AuctionConfig, AuctionInfo, AuctionSnapshot, BidInfo};
 
 // Precision constants
 const RATE_PRECISION: u128 = 1_000_000_000; // Flow rate precision (1e9)
@@ -31,7 +31,7 @@ pub struct Bid {
 
     // --- Dynamic Settlement Fields ---
     #[serde(rename = "f")]
-    pub flow_rate: u128, // Flow rate (Currency / ns)
+    pub flow_rate: u128, // Flow rate (Currency / ms)
     #[serde(rename = "s")]
     pub acc_snapshot: u128, // Global accumulator snapshot at entry
 
@@ -391,7 +391,7 @@ impl Auction {
     }
 
     /// Handle Outbid logic
-    fn process_outbids<B: BidStorage>(&mut self, bids: &B, now_ms: u64) {
+    fn process_outbids<B: BidStorage>(&mut self, bids: &B, now_ms: u64) -> u128 {
         loop {
             let clearing_price = self.get_clearing_price();
 
@@ -401,7 +401,7 @@ impl Auction {
             };
 
             if !should_pop {
-                break;
+                return clearing_price;
             }
 
             if let Some(candidate) = self.outbid_heap.pop() {
@@ -475,7 +475,7 @@ impl Auction {
         amount: u128,
         max_price: u128,
         now_ms: u64,
-    ) -> Result<BidInfo, String> {
+    ) -> Result<(BidInfo, AuctionSnapshot), String> {
         if now_ms >= self.cfg.end_time {
             return Err("AuctionEnded: Auction is ended".to_string());
         }
@@ -550,9 +550,18 @@ impl Auction {
         });
 
         // Check and evict users with insufficient price (Reactive Outbid)
-        self.process_outbids(bids, now_ms);
+        let clearing_price = self.process_outbids(bids, now_ms);
 
-        Ok(bid.into_info(id))
+        Ok((
+            bid.into_info(id),
+            AuctionSnapshot {
+                timestamp: now_ms,
+                clearing_price: clearing_price / self.price_precision,
+                current_flow_rate: self.current_flow_rate,
+                cumulative_demand_raised: self.cumulative_demand_raised / self.price_precision,
+                cumulative_supply_released: self.cumulative_supply_released,
+            },
+        ))
     }
 
     /// Claim / Settlement
@@ -667,7 +676,7 @@ mod tests {
         let price_precision = auction.price_precision; // 1e9
 
         // 1. Submit Bid before auction start
-        let bid1 = auction.submit_bid(&storage, 50_000, 500, 1).unwrap();
+        let (bid1, _) = auction.submit_bid(&storage, 50_000, 500, 1).unwrap();
         // Flow rate 1 = 50000 * 1e9 / 10000 = 5 * 1e9
         assert_eq!(bid1.flow_rate, 5 * RATE_PRECISION * price_precision);
         assert_eq!(auction.current_flow_rate, bid1.flow_rate);
@@ -681,7 +690,7 @@ mod tests {
         let err = auction.claim(&storage, bid1.id, 2000).err().unwrap();
         assert!(err.starts_with("NotClaimable:")); // Cannot claim before end
 
-        let bid2 = auction.submit_bid(&storage, 50_000, 500, 6000).unwrap();
+        let (bid2, _) = auction.submit_bid(&storage, 50_000, 500, 6000).unwrap();
         // Flow rate 2 = 50000 * 1e9 / 5000 = 10 * 1e9
         assert_eq!(bid2.flow_rate, 10 * RATE_PRECISION * price_precision);
         assert_eq!(auction.current_flow_rate, bid1.flow_rate + bid2.flow_rate);
@@ -699,7 +708,7 @@ mod tests {
         assert_eq!(auction.acc_tokens_per_share, bid2.acc_snapshot);
         assert!(!auction.is_graduated());
 
-        let bid3 = auction.submit_bid(&storage, 50_000, 500, 9000).unwrap();
+        let (bid3, _) = auction.submit_bid(&storage, 50_000, 500, 9000).unwrap();
         // Flow rate 3 = 50000 * 1e9 / 2000 = 25 * 1e9
         assert_eq!(bid3.flow_rate, 25 * RATE_PRECISION * price_precision);
 
@@ -795,14 +804,14 @@ mod tests {
 
         // User 1: Low price, early
         let max_price = auction.estimate_max_price(20_000, 1000); // 120
-        let bid1 = auction
+        let (bid1, _) = auction
             .submit_bid(&storage, 20_000, max_price, 1000)
             .unwrap();
         assert!(bid1.outbid_time.is_none());
 
         // Advance halfway
         let mid_time = 6000; // 5000ms passed
-        let bid2 = auction
+        let (bid2, _) = auction
             .submit_bid(&storage, 200_000, 1000, mid_time)
             .unwrap();
 
@@ -850,11 +859,11 @@ mod tests {
         let storage = MockBidStorage::default();
 
         // User 1: Low price, early
-        let bid1 = auction.submit_bid(&storage, 10_000, 200, 1000).unwrap();
+        let (bid1, _) = auction.submit_bid(&storage, 10_000, 200, 1000).unwrap();
 
-        let bid2 = auction.submit_bid(&storage, 50_000, 500, 2000).unwrap();
+        let (bid2, _) = auction.submit_bid(&storage, 50_000, 500, 2000).unwrap();
 
-        let bid3 = auction.submit_bid(&storage, 20_000, 500, 3000).unwrap();
+        let (bid3, _) = auction.submit_bid(&storage, 20_000, 500, 3000).unwrap();
         let err = auction
             .claim(&storage, bid1.id, cfg.end_time)
             .err()

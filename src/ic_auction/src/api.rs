@@ -23,6 +23,18 @@ fn get_grouped_bids(precision: Option<u64>) -> Vec<(u128, u128)> {
 }
 
 #[ic_cdk::query]
+fn get_snapshots(from_timestamp: u64, take: usize) -> Vec<types::AuctionSnapshot> {
+    store::state::with(|s| {
+        s.snapshots
+            .iter()
+            .filter(|v| v.timestamp >= from_timestamp)
+            .take(take.min(1000))
+            .cloned()
+            .collect()
+    })
+}
+
+#[ic_cdk::query]
 fn my_bids() -> Result<Vec<types::BidInfo>, String> {
     let caller = msg_caller()?;
     store::state::my_bids(caller)
@@ -66,35 +78,33 @@ fn x402_payment(amount: u128, verify_only: bool) -> Result<types::X402PaymentOut
         let pr = types::PaymentRequirements {
             scheme: "exact".to_string(),
             network,
-            max_amount_required: amount.to_string(),
+            amount: amount.to_string(),
             asset: s.currency.to_string(),
             pay_to,
-            resource: if verify_only {
-                "auction_bid_verification".to_string()
-            } else {
-                "auction_bid_payment".to_string()
-            },
-            description: if verify_only {
-                "Address verification only, no settlement will be made.".to_string()
-            } else {
-                "Auction bid payment".to_string()
-            },
-            mime_type: None,
-            output_schema: None,
             max_timeout_seconds: 120,
             extra: None,
         };
         let nonce_seed =
             deterministic_cbor_into_vec(&(verify_only, &caller, timestamp, &pr, &s.nonce_iv))?;
         let nonce = ByteBufB64::from(sha3_256(&nonce_seed)).to_string();
-        let x402 = types::PaymentRequirementsResponse {
-            x402_version: 1,
+        let x402 = types::PaymentRequired {
+            x402_version: 2,
             error: if verify_only {
-                format!("Verification required for auction: {:?}", s.name)
+                Some(format!("Verification required for auction: {:?}", s.name))
             } else {
-                format!("Payment required for auction: {:?}", s.name)
+                Some(format!("Payment required for auction: {:?}", s.name))
+            },
+            resource: types::ResourceInfo {
+                url: format!("https://tokenlist.ing/_/launchpad/{}", s.icp_address),
+                description: if verify_only {
+                    Some("Address verification only, no settlement will be made.".to_string())
+                } else {
+                    Some("Auction bid payment".to_string())
+                },
+                mime_type: None,
             },
             accepts: vec![pr],
+            extensions: None,
         };
 
         Ok(types::X402PaymentOutput {
@@ -130,6 +140,7 @@ fn x402_bind_address(input: types::PayingResultInput) -> Result<(), String> {
         if !pv.verify_response.is_valid {
             return Err("payment verification failed".to_string());
         }
+
         let payer = pv
             .verify_response
             .payer
@@ -178,6 +189,9 @@ async fn x402_deposit_currency(input: types::PayingResultInput) -> Result<u128, 
         if !pv.settle_response.success {
             return Err("payment settlement failed".to_string());
         }
+        if pv.settle_response.payer.is_none() {
+            return Err("missing payer in settlement response".to_string());
+        }
 
         let nonce_seed = deterministic_cbor_into_vec(&(
             true,
@@ -196,9 +210,10 @@ async fn x402_deposit_currency(input: types::PayingResultInput) -> Result<u128, 
 
     store::state::deposit_currency(
         caller,
-        settle_response.payer,
+        settle_response.payer.unwrap(),
         settle_response.transaction,
         now_ms,
+        true,
     )
     .await
 }
@@ -230,7 +245,7 @@ fn claim_all() -> Result<Vec<types::BidInfo>, String> {
 async fn deposit_currency(input: types::DepositInput) -> Result<u128, String> {
     let caller = msg_caller()?;
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    store::state::deposit_currency(caller, input.sender, input.txid, now_ms).await
+    store::state::deposit_currency(caller, input.sender, input.txid, now_ms, false).await
 }
 
 // Withdraw currency from the auction contract

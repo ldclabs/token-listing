@@ -3,7 +3,7 @@ use ic_auth_types::ByteBufB64;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::str::FromStr;
 
 use crate::{evm::Address, svm::Pubkey};
@@ -163,7 +163,7 @@ pub struct TransferChecked {
     pub amount: u128,
 }
 
-/// Auction Information Snapshot
+/// Auction Information
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
 pub struct AuctionInfo {
     // Current timestamp in milliseconds
@@ -184,6 +184,26 @@ pub struct AuctionInfo {
     pub is_graduated: bool,
     // Number of unique bidders
     pub bidders_count: u64,
+}
+
+/// Auction Snapshot
+#[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
+pub struct AuctionSnapshot {
+    // timestamp in milliseconds
+    #[serde(rename = "t")]
+    pub timestamp: u64,
+    // Current clearing price
+    #[serde(rename = "c")]
+    pub clearing_price: u128,
+    // Current total currency amount participating in the auction
+    #[serde(rename = "f")]
+    pub current_flow_rate: u128,
+    // Cumulative currency raised
+    #[serde(rename = "d")]
+    pub cumulative_demand_raised: u128,
+    // Cumulative tokens released
+    #[serde(rename = "s")]
+    pub cumulative_supply_released: u128,
 }
 
 /// Auction Configuration
@@ -376,18 +396,25 @@ pub struct SettleResponse {
     pub error_reason: Option<String>,
     pub transaction: String,
     pub network: String,
-    pub payer: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payer: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PaymentRequirementsResponse {
+pub struct PaymentRequired {
     /// Protocol version identifier
     pub x402_version: u8,
     /// Human-readable error message explaining why payment is required
-    pub error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    /// ResourceInfo object describing the protected resource
+    pub resource: ResourceInfo,
     /// Array of payment requirement objects defining acceptable payment methods
     pub accepts: Vec<PaymentRequirements>,
+    /// Protocol extensions data
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<Extensions>,
 }
 
 /// Payment requirements set by the payment-gated endpoint for an acceptable payment.
@@ -399,23 +426,37 @@ pub struct PaymentRequirements {
     /// Blockchain network identifier (e.g., "icp")
     pub network: String,
     /// Required payment amount in atomic token units
-    pub max_amount_required: String,
+    pub amount: String,
     /// Token ledger canister address
     pub asset: String,
     /// Recipient wallet address for the payment
     pub pay_to: String,
-    /// the protected resource, e.g., URL of the resource endpoint
-    pub resource: String,
-    /// Human-readable description of the resource
-    pub description: String,
-    /// MIME type of the expected response
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub mime_type: Option<String>,
-    /// JSON schema describing the response format
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_schema: Option<serde_json::Value>,
     /// Maximum time allowed for payment completion in seconds
     pub max_timeout_seconds: u64,
     /// Scheme-specific additional information.
-    pub extra: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra: Option<Map<String, Value>>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceInfo {
+    /// the protected resource, e.g., URL of the resource endpoint
+    pub url: String,
+    /// Human-readable description of the resource
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// MIME type of the expected response
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime_type: Option<String>,
+}
+
+/// Describes additional extension data for x402 payment.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Extensions {
+    /// Extension-specific data provided by the server
+    pub info: Map<String, Value>,
+    /// JSON Schema defining the expected structure of `info`
+    pub schema: Map<String, Value>,
 }
