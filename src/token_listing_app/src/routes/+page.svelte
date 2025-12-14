@@ -1,27 +1,9 @@
 <script lang="ts">
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
-  import { onMount } from 'svelte'
+  import { getTheme } from '$lib/stores/theme.svelte'
+  import Header from '$src/lib/components/Header.svelte'
 
-  type Theme = 'light' | 'dark'
-  let theme = $state<Theme>('dark')
-
-  const setTheme = (value: Theme) => {
-    theme = value
-    localStorage['theme'] = value
-
-    document.documentElement.classList.toggle(
-      'dark',
-      localStorage['theme'] === 'dark' ||
-        (!('theme' in localStorage) &&
-          window.matchMedia('(prefers-color-scheme: dark)').matches)
-    )
-  }
-
-  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark')
-
-  onMount(() => {
-    setTheme(localStorage['theme'] || 'dark')
-  })
+  const theme = getTheme()
 
   const navLinks = [
     { label: 'Features', href: '#features' },
@@ -123,7 +105,7 @@
   ]
 </script>
 
-<div class="relative flex min-h-screen flex-col overflow-x-hidden">
+<div class="flex min-h-screen flex-col">
   <!-- Global decorative elements -->
   <div
     class="pointer-events-none fixed inset-0 overflow-hidden"
@@ -148,59 +130,27 @@
   </div>
 
   <!-- Header -->
-  <header
-    class="border-border-subtle sticky top-0 z-50 border-b shadow-sm backdrop-blur-xl"
-  >
-    <div
-      class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-2 md:px-8"
+
+  <Header>
+    <nav
+      class="text-muted hidden items-center gap-6 text-sm font-medium md:flex"
     >
-      <div class="flex items-center gap-3">
-        <a href="/" class="bg-white p-0.5"
-          ><img
-            alt="TokenList.ing Logo"
-            src="/_assets/logo.webp"
-            class="h-12 w-12 rounded-sm object-contain transition-transform hover:scale-105"
-          /></a
-        >
-        <div>
-          <p class="text-muted font-serif text-lg tracking-[0.25em]"
-            >TokenList.ing</p
-          >
-          <p class="text-foreground hidden text-base font-medium md:flex">
-            Token infrastructure for the multi-chain era
-          </p>
-        </div>
-      </div>
-
-      <nav
-        class="text-muted hidden items-center gap-6 text-sm font-medium md:flex"
-      >
-        {#each navLinks as link}
-          <a
-            class="hover:text-foreground relative transition after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:bg-current after:transition-all hover:after:w-full"
-            href={link.href}
-          >
-            {link.label}
-          </a>
-        {/each}
+      {#each navLinks as link}
         <a
-          class="border-border-subtle hover:border-foreground hover:bg-accent hover:text-accent-foreground rounded-full border px-4 py-2 text-sm font-semibold transition-all hover:scale-105"
-          href="#cta"
+          class="hover:text-foreground relative block p-2 transition after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:w-0 after:bg-current after:transition-all hover:after:w-full"
+          href={link.href}
         >
-          Get early access
+          {link.label}
         </a>
-      </nav>
-
-      <button
-        class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-4 py-1 font-semibold tracking-wide uppercase transition-all hover:scale-105"
-        onclick={toggleTheme}
-        aria-pressed={theme === 'light'}
-        aria-label="Toggle theme"
+      {/each}
+      <a
+        class="border-border-subtle hover:border-foreground hover:bg-accent hover:text-accent-foreground rounded-full border px-4 py-2 font-semibold transition-all hover:scale-105"
+        href="#cta"
       >
-        {theme === 'dark' ? '☀️' : '🌙'}
-      </button>
-    </div>
-  </header>
+        Get early access
+      </a>
+    </nav>
+  </Header>
 
   <main
     class="relative z-10 mx-auto mt-10 max-w-6xl space-y-10 px-4 md:mt-20 md:px-8"

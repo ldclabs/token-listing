@@ -5,10 +5,12 @@
 
   let {
     value,
-    class: className = ''
+    class: className = '',
+    ariaLabel = 'Copy'
   }: {
     value: string
     class?: string
+    ariaLabel?: string
   } = $props()
 
   let copiedClass = $state('')
@@ -28,6 +30,7 @@
   class={copiedClass + className}
   onclick={onCopyHandler}
   disabled={copiedClass != ''}
+  aria-label={ariaLabel}
 >
   {#if copiedClass != ''}
     <CheckLine />
