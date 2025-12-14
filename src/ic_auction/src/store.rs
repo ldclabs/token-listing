@@ -36,7 +36,7 @@ use crate::{
         transfer_checked_instruction,
     },
     types::{
-        AuctionConfig, AuctionInfo, AuctionSnapshot, BidInfo, Chain, DepositTxInfo, FinalizeInput,
+        AuctionConfig, AuctionInfo, AuctionSnapshot, BidInfo, Chain, DepositTxInfo, FinalizeKind,
         FinalizeOutput, PublicKeyOutput, StateInfo, TransferChecked, WithdrawTxInfo,
     },
 };
@@ -73,6 +73,7 @@ pub struct State {
     pub funds_recipient: String,
     // The recipient of any unsold tokens at the end of the auction
     pub tokens_recipient: String,
+    pub finalize_kind: FinalizeKind,
     pub key_name: String,
     pub icp_address: Principal,
     pub evm_address: Address,
@@ -117,6 +118,7 @@ impl From<&State> for StateInfo {
             token_program_id: s.token_program_id.clone(),
             funds_recipient: s.funds_recipient.clone(),
             tokens_recipient: s.tokens_recipient.clone(),
+            finalize_kind: s.finalize_kind.clone(),
             key_name: s.key_name.clone(),
             icp_address: s.icp_address,
             evm_address: s.evm_address.to_string(),
@@ -155,6 +157,7 @@ impl State {
             token_program_id: None,
             funds_recipient: "".to_string(),
             tokens_recipient: "".to_string(),
+            finalize_kind: FinalizeKind::Transfer,
             governance_canister: None,
             key_name: "dfx_test_key".to_string(),
             icp_address: ic_cdk::api::canister_self(),
@@ -363,7 +366,7 @@ impl cca::BidStorage for BidStorage {
 }
 
 static BS: BidStorage = BidStorage;
-static SOL_ADDRESS: &str = "11111111111111111111111111111111";
+static SOL_ADDRESS: &str = "So11111111111111111111111111111111111111111";
 // Wrapping SOL: So11111111111111111111111111111111111111112
 
 pub mod state {
@@ -582,11 +585,8 @@ pub mod state {
         Ok(())
     }
 
-    pub async fn finalize_auction(
-        input: FinalizeInput,
-        now_ms: u64,
-    ) -> Result<Option<FinalizeOutput>, String> {
-        let (is_graduated, chain) = STATE.with_borrow(|s| {
+    pub async fn finalize_auction(now_ms: u64) -> Result<Option<FinalizeOutput>, String> {
+        let (chain, finalize_kind, is_graduated, currency_raised) = STATE.with_borrow(|s| {
             if s.auction_finalized {
                 return Err("auction is already finalized".to_string());
             }
@@ -597,39 +597,55 @@ pub mod state {
                     if !auction.is_ended(now_ms) {
                         return Err("auction is not ended yet".to_string());
                     }
-                    Ok((auction.is_graduated(), s.chain.clone()))
+                    Ok((
+                        s.chain.clone(),
+                        s.finalize_kind.clone(),
+                        auction.is_graduated(),
+                        auction.currency_raised(),
+                    ))
                 }
             }
         })?;
 
         let rt = if is_graduated {
             // graduated auction finalization logic
-            match chain {
-                Chain::Sol => {
-                    if input.pool_kind != "sol_raydium" {
-                        return Err("invalid pool kind for Solana auction".to_string());
-                    }
-                    let (pool, txid) = create_sol_raydium_pool(now_ms).await?;
+            match finalize_kind {
+                FinalizeKind::Transfer => {
+                    let rt = sweep_currency(now_ms, Some(currency_raised)).await?;
                     Some(FinalizeOutput {
-                        pool_id: pool.to_string(),
-                        txid,
+                        pool_id: "".to_string(),
+                        txid: rt.txid,
                     })
                 }
-                Chain::Icp => {
-                    if input.pool_kind != "icp_kong" {
-                        return Err("invalid pool kind for ICP auction".to_string());
+                FinalizeKind::CreatePool(kind) => match chain {
+                    Chain::Sol => {
+                        if kind != "sol_raydium" {
+                            return Err("invalid finalize kind for Solana auction".to_string());
+                        }
+                        let (pool, txid) = create_sol_raydium_pool(now_ms).await?;
+                        Some(FinalizeOutput {
+                            pool_id: pool.to_string(),
+                            txid,
+                        })
                     }
-                    let (pool, txid) = create_icp_kong_pool().await?;
-                    Some(FinalizeOutput {
-                        pool_id: pool.to_string(),
-                        txid: txid.to_string(),
-                    })
-                }
-                Chain::Evm(_) => {
-                    return Err(
-                        "EVM graduated auction finalization not implemented yet".to_string()
-                    );
-                }
+
+                    Chain::Icp => {
+                        if kind != "icp_kong" {
+                            return Err("invalid finalize kind for ICP auction".to_string());
+                        }
+                        let (pool, txid) = create_icp_kong_pool().await?;
+                        Some(FinalizeOutput {
+                            pool_id: pool.to_string(),
+                            txid: txid.to_string(),
+                        })
+                    }
+
+                    Chain::Evm(_) => {
+                        return Err(
+                            "EVM graduated auction finalization not implemented yet".to_string()
+                        );
+                    }
+                },
             }
         } else {
             None
@@ -1203,7 +1219,10 @@ pub mod state {
         Ok(tx.into_info(id))
     }
 
-    pub async fn sweep_currency(now_ms: u64) -> Result<WithdrawTxInfo, String> {
+    pub async fn sweep_currency(
+        now_ms: u64,
+        amount: Option<u128>,
+    ) -> Result<WithdrawTxInfo, String> {
         let (
             chain,
             icp_address,
@@ -1257,7 +1276,9 @@ pub mod state {
                 let currency_addr = Pubkey::from_str(&currency)
                     .map_err(|_| "invalid Solana token address".to_string())?;
 
-                let amount = if currency == SOL_ADDRESS {
+                let amount = if let Some(a) = amount {
+                    a
+                } else if currency == SOL_ADDRESS {
                     sol_balance_of(&sol_address, now_ms).await?
                 } else {
                     let program_id = currency_program_id
@@ -1288,7 +1309,13 @@ pub mod state {
                     .map_err(|_| "invalid ICP ledger principal".to_string())?;
                 let to = Account::from_str(&recipient)
                     .map_err(|_| "invalid ICP account format".to_string())?;
-                let amount = icp::balance_of(ledger, icp_address.into()).await?;
+
+                let amount = if let Some(a) = amount {
+                    a
+                } else {
+                    icp::balance_of(ledger, icp_address.into()).await?
+                };
+
                 if amount == 0 {
                     return Err("no tokens to sweep".to_string());
                 }
@@ -1298,7 +1325,11 @@ pub mod state {
             Chain::Evm(chain_id) => {
                 let token_addr = Address::from_str(&currency)
                     .map_err(|_| "invalid EVM token address".to_string())?;
-                let amount = erc20_balance_of(&evm_address, &token_addr, now_ms).await?;
+                let amount = if let Some(a) = amount {
+                    a
+                } else {
+                    erc20_balance_of(&evm_address, &token_addr, now_ms).await?
+                };
                 if amount == 0 {
                     return Err("no tokens to sweep".to_string());
                 }

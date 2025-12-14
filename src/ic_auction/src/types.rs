@@ -71,6 +71,7 @@ pub struct StateInfo {
     pub funds_recipient: String,
     // The recipient of any unsold tokens at the end of the auction
     pub tokens_recipient: String,
+    pub finalize_kind: FinalizeKind,
     pub key_name: String,
     pub icp_address: Principal,
     pub evm_address: String,
@@ -336,9 +337,11 @@ pub struct WithdrawTxInfo {
     pub timestamp: u64,
 }
 
-#[derive(CandidType, Clone, Serialize, Deserialize)]
-pub struct FinalizeInput {
-    pub pool_kind: String, // "icp_kong" or "sol_raydium"
+#[derive(CandidType, Clone, Default, Serialize, Deserialize)]
+pub enum FinalizeKind {
+    CreatePool(String), // "icp_kong" or "sol_raydium"
+    #[default]
+    Transfer,
 }
 
 #[derive(CandidType, Clone, Serialize, Deserialize)]

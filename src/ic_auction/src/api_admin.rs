@@ -79,7 +79,7 @@ fn admin_set_currency(input: types::TokenInput) -> Result<(), String> {
             return Err("cannot change currency when an auction is ongoing".to_string());
         }
         if matches!(s.chain, types::Chain::Sol)
-            && input.token != "11111111111111111111111111111111"
+            && input.token != "So11111111111111111111111111111111111111111"
             && input.program_id.is_none()
         {
             return Err("program_id is required for Solana tokens".to_string());
@@ -104,7 +104,7 @@ fn validate_admin_set_currency(input: types::TokenInput) -> Result<String, Strin
             return Err("cannot change currency when an auction is ongoing".to_string());
         }
         if matches!(s.chain, types::Chain::Sol)
-            && input.token != "11111111111111111111111111111111"
+            && input.token != "So11111111111111111111111111111111111111111"
             && input.program_id.is_none()
         {
             return Err("program_id is required for Solana tokens".to_string());
@@ -113,6 +113,22 @@ fn validate_admin_set_currency(input: types::TokenInput) -> Result<String, Strin
         s.chain.parse_address(&input.recipient)?;
         Ok(())
     })?;
+    pretty_format(&(input,))
+}
+
+#[ic_cdk::update(guard = "is_controller")]
+fn admin_set_finalize(input: types::FinalizeKind) -> Result<(), String> {
+    store::state::with_mut(|s| {
+        if s.auction.is_some() {
+            return Err("cannot change token when an auction is ongoing".to_string());
+        }
+        s.finalize_kind = input;
+        Ok(())
+    })
+}
+
+#[ic_cdk::update]
+fn validate_admin_set_finalize(input: types::FinalizeKind) -> Result<String, String> {
     pretty_format(&(input,))
 }
 
@@ -180,17 +196,15 @@ async fn admin_init_auction() -> Result<(), String> {
 }
 
 #[ic_cdk::update(guard = "is_controller")]
-async fn admin_finalize_auction(
-    input: types::FinalizeInput,
-) -> Result<Option<types::FinalizeOutput>, String> {
+async fn admin_finalize_auction() -> Result<Option<types::FinalizeOutput>, String> {
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    store::state::finalize_auction(input, now_ms).await
+    store::state::finalize_auction(now_ms).await
 }
 
 #[ic_cdk::update(guard = "is_controller")]
 async fn admin_sweep_currency() -> Result<types::WithdrawTxInfo, String> {
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    store::state::sweep_currency(now_ms).await
+    store::state::sweep_currency(now_ms, None).await
 }
 
 #[ic_cdk::update(guard = "is_controller")]

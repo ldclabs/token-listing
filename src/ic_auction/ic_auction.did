@@ -44,7 +44,7 @@ type DepositTxInfo = record {
   timestamp : nat64;
   amount : nat;
 };
-type FinalizeInput = record { pool_kind : text };
+type FinalizeKind = variant { CreatePool : text; Transfer };
 type FinalizeOutput = record { txid : text; pool_id : text };
 type InitArgs = record {
   governance_canister : opt principal;
@@ -97,6 +97,7 @@ type StateInfo = record {
   auction_config : opt AuctionConfig;
   currency : text;
   persons_excluded : vec text;
+  finalize_kind : FinalizeKind;
   key_name : text;
   token_decimals : nat8;
   total_deposited_currency : nat;
@@ -132,10 +133,11 @@ type X402PaymentOutput = record {
   timestamp : nat64;
 };
 service : (opt CanisterArgs) -> {
-  admin_finalize_auction : (FinalizeInput) -> (Result);
+  admin_finalize_auction : () -> (Result);
   admin_init_auction : () -> (Result_1);
   admin_set_auction : (AuctionConfig) -> (Result_1);
   admin_set_currency : (TokenInput) -> (Result_1);
+  admin_set_finalize : (FinalizeKind) -> (Result_1);
   admin_set_paying_public_keys : (vec text) -> (Result_1);
   admin_set_project : (ProjectInput) -> (Result_1);
   admin_set_providers : (vec text) -> (Result_1);
@@ -155,6 +157,7 @@ service : (opt CanisterArgs) -> {
   my_withdraws : () -> (Result_8) query;
   submit_bid : (nat, nat) -> (Result_3);
   validate_admin_set_currency : (TokenInput) -> (Result_9);
+  validate_admin_set_finalize : (FinalizeKind) -> (Result_9);
   validate_admin_set_paying_public_keys : (vec text) -> (Result_9);
   validate_admin_set_project : (ProjectInput) -> (Result_9);
   validate_admin_set_providers : (vec text) -> (Result_9);

@@ -57,7 +57,8 @@ export interface DepositTxInfo {
   'timestamp' : bigint,
   'amount' : bigint,
 }
-export interface FinalizeInput { 'pool_kind' : string }
+export type FinalizeKind = { 'CreatePool' : string } |
+  { 'Transfer' : null };
 export interface FinalizeOutput { 'txid' : string, 'pool_id' : string }
 export interface InitArgs {
   'governance_canister' : [] | [Principal],
@@ -121,6 +122,7 @@ export interface StateInfo {
   'auction_config' : [] | [AuctionConfig],
   'currency' : string,
   'persons_excluded' : Array<string>,
+  'finalize_kind' : FinalizeKind,
   'key_name' : string,
   'token_decimals' : number,
   'total_deposited_currency' : bigint,
@@ -156,10 +158,11 @@ export interface X402PaymentOutput {
   'timestamp' : bigint,
 }
 export interface _SERVICE {
-  'admin_finalize_auction' : ActorMethod<[FinalizeInput], Result>,
+  'admin_finalize_auction' : ActorMethod<[], Result>,
   'admin_init_auction' : ActorMethod<[], Result_1>,
   'admin_set_auction' : ActorMethod<[AuctionConfig], Result_1>,
   'admin_set_currency' : ActorMethod<[TokenInput], Result_1>,
+  'admin_set_finalize' : ActorMethod<[FinalizeKind], Result_1>,
   'admin_set_paying_public_keys' : ActorMethod<[Array<string>], Result_1>,
   'admin_set_project' : ActorMethod<[ProjectInput], Result_1>,
   'admin_set_providers' : ActorMethod<[Array<string>], Result_1>,
@@ -179,6 +182,7 @@ export interface _SERVICE {
   'my_withdraws' : ActorMethod<[], Result_8>,
   'submit_bid' : ActorMethod<[bigint, bigint], Result_3>,
   'validate_admin_set_currency' : ActorMethod<[TokenInput], Result_9>,
+  'validate_admin_set_finalize' : ActorMethod<[FinalizeKind], Result_9>,
   'validate_admin_set_paying_public_keys' : ActorMethod<
     [Array<string>],
     Result_9
