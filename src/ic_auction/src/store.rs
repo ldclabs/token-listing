@@ -37,7 +37,7 @@ use crate::{
     },
     types::{
         AuctionConfig, AuctionInfo, AuctionSnapshot, BidInfo, Chain, DepositTxInfo, FinalizeKind,
-        FinalizeOutput, PublicKeyOutput, StateInfo, TransferChecked, WithdrawTxInfo,
+        FinalizeOutput, PublicKeyOutput, StateInfo, TransferChecked, UserInfo, WithdrawTxInfo,
     },
 };
 
@@ -182,7 +182,7 @@ impl State {
     }
 }
 
-#[derive(Clone, CandidType, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct UserState {
     #[serde(rename = "c")]
     pub currency_amount: u128,
@@ -754,6 +754,19 @@ pub mod state {
         })
     }
 
+    pub fn my_info(caller: Principal) -> Result<UserInfo, String> {
+        USERS.with_borrow(|u| {
+            let user = u.get(&caller).unwrap_or_default();
+            Ok(UserInfo {
+                currency_amount: user.currency_amount,
+                token_amount: user.token_amount,
+                bound_addresses: user.bound_addresses.iter().cloned().collect(),
+                agreed_terms: user.agreed_terms,
+                timestamp: user.timestamp,
+            })
+        })
+    }
+
     pub fn my_bids(caller: Principal) -> Result<Vec<BidInfo>, String> {
         USERS.with_borrow(|u| {
             let user = u.get(&caller).unwrap_or_default();
@@ -813,11 +826,11 @@ pub mod state {
             s.chain.parse_address(&address)?;
             USERS.with_borrow_mut(|u| {
                 let mut info = u.get(&caller).unwrap_or_default();
-                if !info.agreed_terms {
-                    info.timestamp = now_ms;
-                    info.agreed_terms = true;
-                }
                 if info.bound_addresses.insert(address) {
+                    if !info.agreed_terms {
+                        info.timestamp = now_ms;
+                        info.agreed_terms = true;
+                    }
                     u.insert(caller, info);
                 }
                 Ok(())
@@ -836,6 +849,10 @@ pub mod state {
             let mut info = u.get(&caller).unwrap_or_default();
             if is_bound_address {
                 if info.bound_addresses.insert(sender.clone()) {
+                    if !info.agreed_terms {
+                        info.timestamp = now_ms;
+                        info.agreed_terms = true;
+                    }
                     u.insert(caller, info);
                 }
             } else if !info.bound_addresses.contains(&sender) {
@@ -928,7 +945,7 @@ pub mod state {
         recipient: String,
         now_ms: u64,
     ) -> Result<WithdrawTxInfo, String> {
-        let (chain, token, decimals, program_id) = STATE.with_borrow_mut(|s| {
+        let (chain, token, decimals, program_id) = STATE.with_borrow(|s| {
             match &s.auction {
                 Some(auction) => {
                     if !auction.is_ended(now_ms) {
@@ -1016,7 +1033,7 @@ pub mod state {
         recipient: String,
         now_ms: u64,
     ) -> Result<WithdrawTxInfo, String> {
-        let (chain, token, decimals, program_id) = STATE.with_borrow_mut(|s| {
+        let (chain, token, decimals, program_id) = STATE.with_borrow(|s| {
             match &s.auction {
                 Some(auction) => {
                     if !auction.is_ended(now_ms) {
@@ -1109,7 +1126,7 @@ pub mod state {
             token,
             decimals,
             token_program_id,
-        ) = STATE.with_borrow_mut(|s| {
+        ) = STATE.with_borrow(|s| {
             if s.finalize_output.is_none() {
                 return Err("cannot sweep tokens before auction is finalized".to_string());
             }
@@ -1223,7 +1240,7 @@ pub mod state {
             currency,
             decimals,
             currency_program_id,
-        ) = STATE.with_borrow_mut(|s| {
+        ) = STATE.with_borrow(|s| {
             if s.finalize_output.is_none() {
                 return Err("cannot sweep currency before auction is finalized".to_string());
             }

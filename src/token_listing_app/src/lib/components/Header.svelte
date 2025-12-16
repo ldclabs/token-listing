@@ -9,7 +9,10 @@
   import { tick } from 'svelte'
   import UserProfileModal from './UserProfileModal.svelte'
 
-  let { children = undefined } = $props()
+  let {
+    description = 'Token infrastructure for the multi-chain era',
+    children = undefined
+  } = $props()
 
   const theme = $derived(getTheme())
 
@@ -54,11 +57,11 @@
         /></a
       >
       <div>
-        <p class="text-muted font-serif text-lg tracking-[0.25em]"
+        <p class="text-muted font-serif text-lg tracking-widest"
           >TokenList.ing</p
         >
         <p class="text-foreground hidden text-base font-medium md:flex">
-          Token infrastructure for the multi-chain era
+          {description}
         </p>
       </div>
     </div>

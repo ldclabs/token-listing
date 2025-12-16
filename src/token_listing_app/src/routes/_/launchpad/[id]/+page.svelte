@@ -1,9 +1,23 @@
 <script lang="ts">
   import { page } from '$app/state'
+  import type {
+    AuctionConfig,
+    AuctionInfo,
+    BidInfo,
+    DepositTxInfo,
+    StateInfo,
+    UserInfo,
+    WithdrawTxInfo
+  } from '$declarations/ic_auction/ic_auction.did'
   import { icAuctionActor } from '$lib/canisters/icAuction'
+  import CanisterModal from '$lib/components/CanisterModal.svelte'
+  import CCAModal from '$lib/components/CCAModal.svelte'
   import Header from '$lib/components/Header.svelte'
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
-  import { authStore } from '$lib/stores/auth.svelte'
+  import InformationLine from '$lib/icons/information-line.svelte'
+  import Settings4Line from '$lib/icons/settings-4-line.svelte'
+  import { authStore, EventLogin } from '$lib/stores/auth.svelte'
+  import { showModal } from '$lib/stores/modal.svelte'
   import { toastRun, triggerToast } from '$lib/stores/toast.svelte'
   import { unwrapOption, unwrapResult } from '$lib/types/result'
   import Button from '$lib/ui/Button.svelte'
@@ -14,31 +28,28 @@
     pow10,
     pruneAddress
   } from '$lib/utils/helper'
+  import { renderContent } from '$lib/utils/markdown'
   import {
     ICPToken,
     PANDAToken,
     TokenDisplay,
     type TokenInfo
   } from '$lib/utils/token'
-  import { onDestroy, onMount } from 'svelte'
-
-  import type {
-    AuctionConfig,
-    AuctionInfo,
-    BidInfo,
-    DepositTxInfo,
-    StateInfo,
-    WithdrawTxInfo
-  } from '$declarations/ic_auction/ic_auction.did'
+  import { onDestroy, onMount, tick } from 'svelte'
 
   const canister = page.params['id'] || '4jxyd-pqaaa-aaaah-qdqtq-cai'
   const actor = icAuctionActor(canister)
 
-  let loading = $state(true)
-
   let stateInfo = $state<StateInfo | null>(null)
   let auctionCfg = $state<AuctionConfig | null>(null)
   let auctionInfo = $state<AuctionInfo | null>(null)
+  let myInfo = $state<UserInfo>({
+    token_amount: 0n, // token balance
+    currency_amount: 0n, // currency balance
+    agreed_terms: false,
+    timestamp: 0n,
+    bound_addresses: []
+  })
   let grouped = $state<Array<[bigint, bigint]>>([])
   let tokenInfo = $state<TokenInfo>(PANDAToken)
   let currencyInfo = $state<TokenInfo>(ICPToken)
@@ -56,8 +67,6 @@
   let bidMaxPrice = $state('')
   let groupedPrecision = $state<'0.01' | '0.1' | '1' | '10'>('0.1')
 
-  let depositSender = $state('')
-  let depositTxid = $state('')
   let withdrawCurrencyRecipient = $state('')
   let withdrawTokenRecipient = $state('')
 
@@ -127,14 +136,17 @@
     return ''
   }
 
-  function getFinalizeKind(): string {
-    if (!stateInfo) return '—'
+  function getFinalizeKind(): [string, string] {
+    if (!stateInfo) return ['—', '']
     if ('Transfer' in stateInfo.finalize_kind) {
-      return `Transfer to ${pruneAddress(stateInfo.funds_recipient, false)}`
+      return [
+        `Transfer to ${pruneAddress(stateInfo.funds_recipient, false)}`,
+        getAccountUrl(stateInfo.funds_recipient)
+      ]
     } else if ('CreatePool' in stateInfo.finalize_kind) {
-      return `Create pool on "${stateInfo.finalize_kind.CreatePool}"`
+      return [`Create pool on "${stateInfo.finalize_kind.CreatePool}"`, '']
     } else {
-      return 'Unknown'
+      return ['Unknown', '']
     }
   }
 
@@ -176,11 +188,21 @@
 
   async function refreshMine() {
     if (!authStore.identity.isAuthenticated) {
+      myInfo = {
+        token_amount: 0n,
+        currency_amount: 0n,
+        agreed_terms: false,
+        timestamp: 0n,
+        bound_addresses: []
+      }
       myBids = []
       myDeposits = []
       myWithdraws = []
       return
     }
+    const infoRes = await actor.my_info()
+    myInfo = unwrapResult(infoRes, 'failed to fetch my info')
+
     const bidsRes = await actor.my_bids()
     myBids = unwrapResult(bidsRes, 'failed to fetch my bids')
 
@@ -189,6 +211,12 @@
 
     const wdRes = await actor.my_withdraws()
     myWithdraws = unwrapResult(wdRes, 'failed to fetch my withdraws')
+
+    await tick()
+    if (myInfo.bound_addresses[0]) {
+      withdrawCurrencyRecipient = myInfo.bound_addresses[0]
+      withdrawTokenRecipient = myInfo.bound_addresses[0]
+    }
   }
 
   let isSigningIn = $state(false)
@@ -285,8 +313,9 @@
       myBids.push(bid)
       triggerToast({ type: 'success', message: 'Bid has been submitted' })
       bidAmount = ''
-      // keep max price
+
       await refreshAuction()
+      await refreshMine()
     }).finally(() => {
       isBidding = false
     })
@@ -296,32 +325,14 @@
     const res = await actor.claim(id)
     unwrapResult(res, 'claim failed')
     triggerToast({ type: 'success', message: 'Received/Refund completed' })
-    await refreshAuction()
+    await refreshMine()
   }
 
   async function claimAll() {
     const res = await actor.claim_all()
     unwrapResult(res, 'claim all failed')
     triggerToast({ type: 'success', message: 'Received/Refund completed' })
-    await refreshAuction()
-  }
-
-  async function depositCurrency() {
-    if (!depositSender.trim() || !depositTxid.trim()) {
-      throw new Error('Please fill in sender and txid')
-    }
-    const balRes = await actor.deposit_currency({
-      sender: depositSender.trim(),
-      txid: depositTxid.trim()
-    })
-    const balance = unwrapResult(balRes, 'deposit failed')
-    triggerToast({
-      type: 'success',
-      message: `Deposit successful, balance: ${currencyDisplay.displayValue(balance)} ${currencyInfo.symbol}`
-    })
-    depositSender = ''
-    depositTxid = ''
-    await refreshAuction()
+    await refreshMine()
   }
 
   async function withdrawCurrency() {
@@ -331,7 +342,7 @@
     unwrapResult(res, 'withdraw currency failed')
     triggerToast({ type: 'success', message: 'Currency withdrawal submitted' })
     withdrawCurrencyRecipient = ''
-    await refreshAuction()
+    await refreshMine()
   }
 
   async function withdrawToken() {
@@ -341,13 +352,32 @@
     unwrapResult(res, 'withdraw token failed')
     triggerToast({ type: 'success', message: 'Token withdrawal submitted' })
     withdrawTokenRecipient = ''
-    await refreshAuction()
+    await refreshMine()
+  }
+
+  function onCCAModal() {
+    showModal({
+      title: 'Continuous Clearing Auction',
+      component: CCAModal,
+      size: 'xl'
+    })
+  }
+
+  function onCanisterModal() {
+    showModal({
+      title: 'Auction Smart Contract',
+      component: CanisterModal,
+      size: 'xl',
+      componentProps: {
+        stateInfo
+      }
+    })
   }
 
   let timer: any
 
   onMount(() => {
-    return toastRun(async () => {
+    return toastRun(async (_signal, abortingQue) => {
       const sres = await actor.info()
       const s = unwrapResult(sres, 'failed to fetch auction state')
       stateInfo = s
@@ -375,8 +405,13 @@
           (auctionCfg.required_currency_raised * tokenInfo.one) /
           auctionCfg.total_supply
       }
-      loading = false
+
       await refreshAuction()
+      // await refreshMine()
+      authStore.addEventListener(EventLogin, refreshMine)
+      abortingQue.push(() => {
+        authStore.removeEventListener(EventLogin, refreshMine)
+      })
     }).abort
   })
 
@@ -406,7 +441,7 @@
     <div class="grid-pattern absolute inset-0"></div>
   </div>
 
-  <Header />
+  <Header description={'Continuous Clearing Auction'} />
 
   <main
     class="relative z-10 mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-10"
@@ -436,31 +471,37 @@
           </div>
           <div class="relative space-y-4">
             <div class="flex flex-col gap-3 sm:items-start sm:justify-between">
-              <div class="flex flex-row items-center gap-2">
-                <span
-                  class="text-muted text-xs font-semibold tracking-wide uppercase"
-                  >Project</span
-                >
-                {#if stateInfo.url}
-                  <a
-                    class="border-border-subtle text-muted hover:border-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold tracking-wide uppercase"
-                    href={stateInfo.url}
-                    target="_blank"
-                    rel="noreferrer"
+              <div class="flex w-full flex-row items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span
+                    class="text-muted text-xs font-semibold tracking-wide uppercase"
+                    >Project</span
                   >
-                    Website
-                    <ArrowRightUpLine class="h-4 w-4" />
-                  </a>
-                {/if}
-                <a
-                  class="border-border-subtle text-muted hover:border-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold tracking-wide uppercase"
-                  href={`https://dashboard.internetcomputer.org/canister/${canister}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Smart Contract
-                  <ArrowRightUpLine class="h-4 w-4" />
-                </a>
+                  {#if stateInfo.url}
+                    <a
+                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold tracking-wide uppercase"
+                      href={stateInfo.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Website
+                      <ArrowRightUpLine class="h-4 w-4" />
+                    </a>
+                  {/if}
+                </div>
+                <div class="flex items-center gap-2">
+                  <button
+                    class="border-border-subtle text-muted hover:border-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold tracking-wide uppercase"
+                    onclick={onCCAModal}
+                    ><InformationLine class="h-4 w-4" />
+                    CCA
+                  </button>
+                  <button
+                    class="border-border-subtle text-muted hover:border-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-1 py-1 text-xs font-semibold tracking-wide uppercase"
+                    onclick={onCanisterModal}
+                    ><Settings4Line class="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <div class="text-xl font-bold">
                 {stateInfo.name || 'Auction'}
@@ -468,8 +509,8 @@
                   >· {stateInfo.token_symbol}</span
                 >
               </div>
-              <div class="text-muted text-sm"
-                >{stateInfo.description || '—'}</div
+              <div class="md-content w-full text-pretty wrap-break-word"
+                >{@html renderContent(stateInfo.description || '—')}</div
               >
             </div>
 
@@ -567,6 +608,7 @@
               >Targets</div
             >
             {#if auctionCfg}
+              {@const finalizeKind = getFinalizeKind()}
               <div class="space-y-2">
                 <div class="flex items-center justify-between text-sm">
                   <div class="text-muted">Currency</div>
@@ -622,7 +664,19 @@
                 <div class="flex items-center justify-between text-sm">
                   <div class="text-muted">Finalize</div>
                   <div class="font-semibold">
-                    {getFinalizeKind()}
+                    {#if finalizeKind[1]}
+                      <a
+                        class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1"
+                        href={finalizeKind[1]}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {finalizeKind[0]}
+                        <ArrowRightUpLine class="h-4 w-4" />
+                      </a>
+                    {:else}
+                      <span>{finalizeKind[0]}</span>
+                    {/if}
                   </div>
                 </div>
               </div>
@@ -859,14 +913,14 @@
             >
           </div>
           <div class="flex items-center gap-2">
-            <button
+            <Button
               class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
               onclick={() => toastRun(claimAll, 'claim all failed')}
               disabled={!authStore.identity.isAuthenticated ||
                 myBids.length === 0}
             >
               Claim All
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -876,7 +930,7 @@
               class="text-muted mb-2 text-xs font-semibold tracking-wide uppercase"
               >My Bids</div
             >
-            {#if myBids.length === 0}
+            {#if !auctionInfo || myBids.length === 0}
               <div class="text-muted text-sm">No bids yet.</div>
             {:else}
               <div
@@ -894,6 +948,10 @@
                 {#each myBids as b (b.id)}
                   {@const isOutbid = b.outbid_time.length === 1}
                   {@const isClaimed = b.claim_time > 0n}
+                  {@const isClaimable =
+                    !isClaimed &&
+                    ((isOutbid && auctionInfo.is_graduated) ||
+                      phase == 'ended')}
                   <div
                     class="border-border-subtle grid grid-cols-12 gap-2 border-t px-3 py-2 text-xs"
                   >
@@ -916,14 +974,16 @@
                       {/if}
                     </div>
                     <div class="col-span-2 text-right">
-                      <button
-                        class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-2 py-1 text-xs font-semibold"
+                      <Button
+                        class="border-border-subtle text-muted hover:border-foreground hover:text-foreground disabled:text-muted-foreground rounded-full border px-2 py-1 text-xs font-semibold {isClaimed
+                          ? 'invisible'
+                          : ''}"
                         onclick={() =>
                           toastRun(() => claimOne(b.id), 'claim failed')}
-                        disabled={isClaimed}
+                        disabled={!isClaimable}
                       >
                         Claim
-                      </button>
+                      </Button>
                     </div>
                   </div>
                   {#if b.tokens_filled > 0n || b.refund > 0n}
@@ -957,66 +1017,55 @@
               <div
                 class="border-border-subtle bg-surface rounded-xl border p-3"
               >
-                <div class="text-xs font-semibold">Deposit Currency</div>
-                <div class="mt-3 space-y-2">
-                  <input
-                    class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-                    placeholder="sender"
-                    bind:value={depositSender}
-                  />
-                  <input
-                    class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-                    placeholder="txid"
-                    bind:value={depositTxid}
-                  />
-                  <button
-                    class="bg-foreground text-background w-full rounded-full px-3 py-2 text-xs font-semibold tracking-wide uppercase hover:opacity-90"
-                    onclick={() => toastRun(depositCurrency, 'deposit failed')}
-                    disabled={!depositSender || !depositTxid}
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold">Withdraw Currency</span>
+                  <span class="text-xs"
+                    >{currencyDisplay.displayValue(myInfo.currency_amount)}
+                    {currencyInfo.symbol}</span
                   >
-                    Deposit
-                  </button>
                 </div>
-              </div>
-
-              <div
-                class="border-border-subtle bg-surface rounded-xl border p-3"
-              >
-                <div class="text-xs font-semibold">Withdraw Currency</div>
                 <div class="mt-3 space-y-2">
                   <input
                     class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
                     placeholder="recipient"
                     bind:value={withdrawCurrencyRecipient}
                   />
-                  <button
+                  <Button
                     class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
                     onclick={() =>
                       toastRun(withdrawCurrency, 'withdraw failed')}
-                    disabled={!withdrawCurrencyRecipient}
+                    disabled={myInfo.currency_amount == 0n ||
+                      !withdrawCurrencyRecipient}
                   >
                     Withdraw
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               <div
                 class="border-border-subtle bg-surface rounded-xl border p-3"
               >
-                <div class="text-xs font-semibold">Withdraw Token</div>
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold">Withdraw Token</span>
+                  <span class="text-xs"
+                    >{tokenDisplay.displayValue(myInfo.token_amount)}
+                    {tokenInfo.symbol}</span
+                  >
+                </div>
                 <div class="mt-3 space-y-2">
                   <input
                     class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
                     placeholder="recipient"
                     bind:value={withdrawTokenRecipient}
                   />
-                  <button
+                  <Button
                     class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
                     onclick={() => toastRun(withdrawToken, 'withdraw failed')}
-                    disabled={!withdrawTokenRecipient}
+                    disabled={myInfo.token_amount == 0n ||
+                      !withdrawTokenRecipient}
                   >
                     Withdraw
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1030,21 +1079,33 @@
               >Deposits</div
             >
             {#if myDeposits.length === 0}
-              <div class="text-muted text-sm">暂无记录</div>
+              <div class="text-muted text-sm">No records yet.</div>
             {:else}
               <div
                 class="border-border-subtle overflow-hidden rounded-xl border"
               >
                 {#each myDeposits as d (d.txid)}
+                  {@const txUrl = getTxUrl(d.txid)}
                   <div
                     class="border-border-subtle border-t px-3 py-2 text-xs first:border-t-0"
                   >
                     <div class="flex items-center justify-between">
                       <div class="font-semibold"
-                        >{pruneAddress(d.txid, true)}</div
-                      >
-                      <div class="text-muted"
-                        >{new Date(Number(d.timestamp)).toLocaleString()}</div
+                        >{#if txUrl}
+                          <a
+                            class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1"
+                            href={txUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {pruneAddress(d.txid, true)}
+                            <ArrowRightUpLine class="h-4 w-4" />
+                          </a>
+                        {:else}
+                          {pruneAddress(d.txid, true)}
+                        {/if}
+                      </div>
+                      <div class="text-muted">{formatDatetime(d.timestamp)}</div
                       >
                     </div>
                     <div class="text-muted mt-1">
@@ -1069,21 +1130,44 @@
                 class="border-border-subtle overflow-hidden rounded-xl border"
               >
                 {#each myWithdraws as w (w.id)}
+                  {@const txUrl = getTxUrl(w.txid)}
                   <div
                     class="border-border-subtle border-t px-3 py-2 text-xs first:border-t-0"
                   >
                     <div class="flex items-center justify-between">
                       <div class="font-semibold">#{w.id.toString()}</div>
-                      <div class="text-muted"
-                        >{new Date(Number(w.timestamp)).toLocaleString()}</div
+                      <div class="text-muted">{formatDatetime(w.timestamp)}</div
                       >
                     </div>
                     <div class="text-muted mt-1">
-                      {currencyDisplay.displayValue(w.amount)} · recipient:
-                      {pruneAddress(w.recipient)} · tx: {pruneAddress(
-                        w.txid,
-                        true
-                      )}
+                      {#if w.kind == 0}
+                        <span
+                          >{currencyDisplay.displayValue(w.amount)}
+                          {currencyInfo.symbol}</span
+                        >
+                      {:else}
+                        <span
+                          >{tokenDisplay.displayValue(w.amount)}
+                          {tokenInfo.symbol}</span
+                        >
+                      {/if}
+                      <span
+                        >{` · recipient:
+                        ${pruneAddress(w.recipient)} · `}
+                      </span>
+                      {#if txUrl}
+                        <a
+                          class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1"
+                          href={txUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {pruneAddress(w.txid, true)}
+                          <ArrowRightUpLine class="h-4 w-4" />
+                        </a>
+                      {:else}
+                        {pruneAddress(w.txid, true)}
+                      {/if}
                     </div>
                   </div>
                 {/each}

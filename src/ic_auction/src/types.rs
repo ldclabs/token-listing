@@ -287,6 +287,15 @@ impl AuctionConfig {
     }
 }
 
+#[derive(CandidType, Clone, Default, Serialize, Deserialize)]
+pub struct UserInfo {
+    pub currency_amount: u128,
+    pub token_amount: u128,
+    pub bound_addresses: Vec<String>,
+    pub agreed_terms: bool,
+    pub timestamp: u64,
+}
+
 /// Bid Information
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
 pub struct BidInfo {

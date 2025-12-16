@@ -79,7 +79,9 @@ export type Result = { 'Ok' : [] | [FinalizeOutput] } |
   { 'Err' : string };
 export type Result_1 = { 'Ok' : null } |
   { 'Err' : string };
-export type Result_10 = { 'Ok' : X402PaymentOutput } |
+export type Result_10 = { 'Ok' : string } |
+  { 'Err' : string };
+export type Result_11 = { 'Ok' : X402PaymentOutput } |
   { 'Err' : string };
 export type Result_2 = { 'Ok' : WithdrawTxInfo } |
   { 'Err' : string };
@@ -93,9 +95,9 @@ export type Result_6 = { 'Ok' : StateInfo } |
   { 'Err' : string };
 export type Result_7 = { 'Ok' : Array<DepositTxInfo> } |
   { 'Err' : string };
-export type Result_8 = { 'Ok' : Array<WithdrawTxInfo> } |
+export type Result_8 = { 'Ok' : UserInfo } |
   { 'Err' : string };
-export type Result_9 = { 'Ok' : string } |
+export type Result_9 = { 'Ok' : Array<WithdrawTxInfo> } |
   { 'Err' : string };
 export interface StateInfo {
   'url' : string,
@@ -142,6 +144,13 @@ export interface TokenInput {
   'symbol' : string,
 }
 export interface UpgradeArgs { 'governance_canister' : [] | [Principal] }
+export interface UserInfo {
+  'token_amount' : bigint,
+  'currency_amount' : bigint,
+  'agreed_terms' : boolean,
+  'timestamp' : bigint,
+  'bound_addresses' : Array<string>,
+}
 export interface WithdrawInput { 'recipient' : string }
 export interface WithdrawTxInfo {
   'id' : bigint,
@@ -179,24 +188,25 @@ export interface _SERVICE {
   'info' : ActorMethod<[], Result_6>,
   'my_bids' : ActorMethod<[], Result_4>,
   'my_deposits' : ActorMethod<[], Result_7>,
-  'my_withdraws' : ActorMethod<[], Result_8>,
+  'my_info' : ActorMethod<[], Result_8>,
+  'my_withdraws' : ActorMethod<[], Result_9>,
   'submit_bid' : ActorMethod<[bigint, bigint], Result_3>,
-  'validate_admin_set_auction' : ActorMethod<[AuctionConfig], Result_9>,
-  'validate_admin_set_currency' : ActorMethod<[TokenInput], Result_9>,
-  'validate_admin_set_finalize' : ActorMethod<[FinalizeKind], Result_9>,
+  'validate_admin_set_auction' : ActorMethod<[AuctionConfig], Result_10>,
+  'validate_admin_set_currency' : ActorMethod<[TokenInput], Result_10>,
+  'validate_admin_set_finalize' : ActorMethod<[FinalizeKind], Result_10>,
   'validate_admin_set_paying_public_keys' : ActorMethod<
     [Array<string>],
-    Result_9
+    Result_10
   >,
-  'validate_admin_set_project' : ActorMethod<[ProjectInput], Result_9>,
-  'validate_admin_set_providers' : ActorMethod<[Array<string>], Result_9>,
-  'validate_admin_set_token' : ActorMethod<[TokenInput], Result_9>,
-  'validate_empty_input' : ActorMethod<[], Result_9>,
+  'validate_admin_set_project' : ActorMethod<[ProjectInput], Result_10>,
+  'validate_admin_set_providers' : ActorMethod<[Array<string>], Result_10>,
+  'validate_admin_set_token' : ActorMethod<[TokenInput], Result_10>,
+  'validate_empty_input' : ActorMethod<[], Result_10>,
   'withdraw_currency' : ActorMethod<[WithdrawInput], Result_2>,
   'withdraw_token' : ActorMethod<[WithdrawInput], Result_2>,
   'x402_bind_address' : ActorMethod<[PayingResultInput], Result_1>,
   'x402_deposit_currency' : ActorMethod<[PayingResultInput], Result_5>,
-  'x402_payment' : ActorMethod<[bigint, boolean], Result_10>,
+  'x402_payment' : ActorMethod<[bigint, boolean], Result_11>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

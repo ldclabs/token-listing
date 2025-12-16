@@ -181,7 +181,7 @@
         onclick={() => handleBackdrop(modal)}
       ></div>
       <div
-        class={`relative z-10 flex max-h-full w-full flex-col gap-6 bg-white/98 p-4 text-slate-900 shadow-xl ring-1 ring-black/5 focus:outline-none sm:rounded-lg sm:p-6 dark:bg-slate-900/95 dark:text-slate-100 ${sizeClasses[modal.size ?? 'md']}`}
+        class={`relative z-10 flex w-full flex-col gap-6 bg-white/98 p-4 text-slate-900 shadow-xl ring-1 ring-black/5 focus:outline-none sm:rounded-lg sm:p-6 dark:bg-slate-900/95 dark:text-slate-100 ${sizeClasses[modal.size ?? 'md']}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={modal.title ? `modal-title-${modal.id}` : undefined}

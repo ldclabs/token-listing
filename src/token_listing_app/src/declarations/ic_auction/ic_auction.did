@@ -63,15 +63,16 @@ type ProjectInput = record {
 };
 type Result = variant { Ok : opt FinalizeOutput; Err : text };
 type Result_1 = variant { Ok; Err : text };
-type Result_10 = variant { Ok : X402PaymentOutput; Err : text };
+type Result_10 = variant { Ok : text; Err : text };
+type Result_11 = variant { Ok : X402PaymentOutput; Err : text };
 type Result_2 = variant { Ok : WithdrawTxInfo; Err : text };
 type Result_3 = variant { Ok : BidInfo; Err : text };
 type Result_4 = variant { Ok : vec BidInfo; Err : text };
 type Result_5 = variant { Ok : nat; Err : text };
 type Result_6 = variant { Ok : StateInfo; Err : text };
 type Result_7 = variant { Ok : vec DepositTxInfo; Err : text };
-type Result_8 = variant { Ok : vec WithdrawTxInfo; Err : text };
-type Result_9 = variant { Ok : text; Err : text };
+type Result_8 = variant { Ok : UserInfo; Err : text };
+type Result_9 = variant { Ok : vec WithdrawTxInfo; Err : text };
 type StateInfo = record {
   url : text;
   token : text;
@@ -117,6 +118,13 @@ type TokenInput = record {
   symbol : text;
 };
 type UpgradeArgs = record { governance_canister : opt principal };
+type UserInfo = record {
+  token_amount : nat;
+  currency_amount : nat;
+  agreed_terms : bool;
+  timestamp : nat64;
+  bound_addresses : vec text;
+};
 type WithdrawInput = record { recipient : text };
 type WithdrawTxInfo = record {
   id : nat64;
@@ -154,19 +162,20 @@ service : (opt CanisterArgs) -> {
   info : () -> (Result_6) query;
   my_bids : () -> (Result_4) query;
   my_deposits : () -> (Result_7) query;
-  my_withdraws : () -> (Result_8) query;
+  my_info : () -> (Result_8) query;
+  my_withdraws : () -> (Result_9) query;
   submit_bid : (nat, nat) -> (Result_3);
-  validate_admin_set_auction : (AuctionConfig) -> (Result_9);
-  validate_admin_set_currency : (TokenInput) -> (Result_9);
-  validate_admin_set_finalize : (FinalizeKind) -> (Result_9);
-  validate_admin_set_paying_public_keys : (vec text) -> (Result_9);
-  validate_admin_set_project : (ProjectInput) -> (Result_9);
-  validate_admin_set_providers : (vec text) -> (Result_9);
-  validate_admin_set_token : (TokenInput) -> (Result_9);
-  validate_empty_input : () -> (Result_9);
+  validate_admin_set_auction : (AuctionConfig) -> (Result_10);
+  validate_admin_set_currency : (TokenInput) -> (Result_10);
+  validate_admin_set_finalize : (FinalizeKind) -> (Result_10);
+  validate_admin_set_paying_public_keys : (vec text) -> (Result_10);
+  validate_admin_set_project : (ProjectInput) -> (Result_10);
+  validate_admin_set_providers : (vec text) -> (Result_10);
+  validate_admin_set_token : (TokenInput) -> (Result_10);
+  validate_empty_input : () -> (Result_10);
   withdraw_currency : (WithdrawInput) -> (Result_2);
   withdraw_token : (WithdrawInput) -> (Result_2);
   x402_bind_address : (PayingResultInput) -> (Result_1);
   x402_deposit_currency : (PayingResultInput) -> (Result_5);
-  x402_payment : (nat, bool) -> (Result_10) query;
+  x402_payment : (nat, bool) -> (Result_11) query;
 }

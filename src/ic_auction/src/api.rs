@@ -35,6 +35,12 @@ fn get_snapshots(from_timestamp: u64, take: usize) -> Vec<types::AuctionSnapshot
 }
 
 #[ic_cdk::query]
+fn my_info() -> Result<types::UserInfo, String> {
+    let caller = msg_caller()?;
+    store::state::my_info(caller)
+}
+
+#[ic_cdk::query]
 fn my_bids() -> Result<Vec<types::BidInfo>, String> {
     let caller = msg_caller()?;
     store::state::my_bids(caller)
