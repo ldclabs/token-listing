@@ -3,7 +3,6 @@ type AuctionConfig = record {
   liquidity_pool_amount : nat;
   end_time : nat64;
   start_time : nat64;
-  token_decimals : nat8;
   required_currency_raised : nat;
   max_amount : nat;
   total_supply : nat;
@@ -13,9 +12,9 @@ type AuctionInfo = record {
   cumulative_demand_raised : nat;
   total_amount : nat;
   total_tokens_filled : nat;
+  bids_count : nat64;
   timestamp : nat64;
   clearing_price : nat;
-  bidders_count : nat64;
   total_refunded : nat;
   is_graduated : bool;
   cumulative_supply_released : nat;
@@ -101,8 +100,9 @@ type StateInfo = record {
   key_name : text;
   token_decimals : nat8;
   total_deposited_currency : nat;
+  paying_public_keys : vec blob;
   token_name : text;
-  auction_finalized : bool;
+  finalize_output : opt FinalizeOutput;
   total_withdrawn_currency : nat;
   currency_program_id : opt text;
   currency_logo_url : text;
@@ -134,7 +134,6 @@ type X402PaymentOutput = record {
 };
 service : (opt CanisterArgs) -> {
   admin_finalize_auction : () -> (Result);
-  admin_init_auction : () -> (Result_1);
   admin_set_auction : (AuctionConfig) -> (Result_1);
   admin_set_currency : (TokenInput) -> (Result_1);
   admin_set_finalize : (FinalizeKind) -> (Result_1);
@@ -142,6 +141,7 @@ service : (opt CanisterArgs) -> {
   admin_set_project : (ProjectInput) -> (Result_1);
   admin_set_providers : (vec text) -> (Result_1);
   admin_set_token : (TokenInput) -> (Result_1);
+  admin_setup_auction : () -> (Result_1);
   admin_sweep_currency : () -> (Result_2);
   admin_sweep_token : () -> (Result_2);
   auction_info : () -> (opt AuctionInfo) query;
@@ -156,6 +156,7 @@ service : (opt CanisterArgs) -> {
   my_deposits : () -> (Result_7) query;
   my_withdraws : () -> (Result_8) query;
   submit_bid : (nat, nat) -> (Result_3);
+  validate_admin_set_auction : (AuctionConfig) -> (Result_9);
   validate_admin_set_currency : (TokenInput) -> (Result_9);
   validate_admin_set_finalize : (FinalizeKind) -> (Result_9);
   validate_admin_set_paying_public_keys : (vec text) -> (Result_9);

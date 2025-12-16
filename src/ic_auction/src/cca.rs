@@ -171,7 +171,7 @@ pub struct Auction {
 // =============================================================================
 
 impl Auction {
-    pub fn new(cfg: AuctionConfig) -> Result<Self, String> {
+    pub fn new(cfg: AuctionConfig, token_decimals: u8) -> Result<Self, String> {
         let supply_rate = Nat::from(cfg.total_supply) * Nat::from(RATE_PRECISION)
             / Nat::from(cfg.end_time - cfg.start_time);
         let supply_rate: u128 = supply_rate
@@ -181,7 +181,7 @@ impl Auction {
         if supply_rate == 0 {
             return Err("Supply rate too low for the auction duration".to_string());
         }
-        let one_token = 10u128.pow(cfg.token_decimals as u32);
+        let one_token = 10u128.pow(token_decimals as u32);
         let floor_price = Nat::from(cfg.required_currency_raised) * Nat::from(one_token)
             / Nat::from(cfg.total_supply);
         let floor_price: u128 = floor_price
@@ -233,7 +233,7 @@ impl Auction {
             cumulative_demand_raised: self.cumulative_demand_raised / self.price_precision,
             cumulative_supply_released: self.cumulative_supply_released,
             is_graduated: self.is_graduated(),
-            bidders_count: 0,
+            bids_count: self.next_bid_id - 1,
         };
 
         if now_ms < self.cfg.end_time && now_ms > self.last_update_time {
@@ -659,7 +659,6 @@ mod tests {
             start_time: 1000,
             end_time: 11000, // 10s duration
             min_bid_duration: 100,
-            token_decimals: 8,
             total_supply: 1000 * 100_000_000,   // 1000 tokens
             liquidity_pool_amount: 100_000_000, // 100 tokens
             min_amount: 1000,
@@ -671,7 +670,7 @@ mod tests {
     #[test]
     fn test_basic_auction_flow() {
         let cfg = get_test_config();
-        let mut auction = Auction::new(cfg.clone()).unwrap();
+        let mut auction = Auction::new(cfg.clone(), 8).unwrap();
         let storage = MockBidStorage::default();
         let price_precision = auction.price_precision; // 1e9
 
@@ -799,7 +798,7 @@ mod tests {
     #[test]
     fn test_outbid_logic() {
         let cfg = get_test_config();
-        let mut auction = Auction::new(cfg.clone()).unwrap();
+        let mut auction = Auction::new(cfg.clone(), 8).unwrap();
         let storage = MockBidStorage::default();
 
         // User 1: Low price, early
@@ -855,7 +854,7 @@ mod tests {
     #[test]
     fn test_auction_failure() {
         let cfg = get_test_config();
-        let mut auction = Auction::new(cfg.clone()).unwrap();
+        let mut auction = Auction::new(cfg.clone(), 8).unwrap();
         let storage = MockBidStorage::default();
 
         // User 1: Low price, early

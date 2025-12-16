@@ -24,18 +24,17 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : IDL.Opt(FinalizeOutput),
     'Err' : IDL.Text,
   });
-  const Result_1 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text });
   const AuctionConfig = IDL.Record({
     'min_amount' : IDL.Nat,
     'liquidity_pool_amount' : IDL.Nat,
     'end_time' : IDL.Nat64,
     'start_time' : IDL.Nat64,
-    'token_decimals' : IDL.Nat8,
     'required_currency_raised' : IDL.Nat,
     'max_amount' : IDL.Nat,
     'total_supply' : IDL.Nat,
     'min_bid_duration' : IDL.Nat64,
   });
+  const Result_1 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text });
   const TokenInput = IDL.Record({
     'decimals' : IDL.Nat8,
     'token' : IDL.Text,
@@ -69,9 +68,9 @@ export const idlFactory = ({ IDL }) => {
     'cumulative_demand_raised' : IDL.Nat,
     'total_amount' : IDL.Nat,
     'total_tokens_filled' : IDL.Nat,
+    'bids_count' : IDL.Nat64,
     'timestamp' : IDL.Nat64,
     'clearing_price' : IDL.Nat,
-    'bidders_count' : IDL.Nat64,
     'total_refunded' : IDL.Nat,
     'is_graduated' : IDL.Bool,
     'cumulative_supply_released' : IDL.Nat,
@@ -128,8 +127,9 @@ export const idlFactory = ({ IDL }) => {
     'key_name' : IDL.Text,
     'token_decimals' : IDL.Nat8,
     'total_deposited_currency' : IDL.Nat,
+    'paying_public_keys' : IDL.Vec(IDL.Vec(IDL.Nat8)),
     'token_name' : IDL.Text,
-    'auction_finalized' : IDL.Bool,
+    'finalize_output' : IDL.Opt(FinalizeOutput),
     'total_withdrawn_currency' : IDL.Nat,
     'currency_program_id' : IDL.Opt(IDL.Text),
     'currency_logo_url' : IDL.Text,
@@ -165,7 +165,6 @@ export const idlFactory = ({ IDL }) => {
   const Result_10 = IDL.Variant({ 'Ok' : X402PaymentOutput, 'Err' : IDL.Text });
   return IDL.Service({
     'admin_finalize_auction' : IDL.Func([], [Result], []),
-    'admin_init_auction' : IDL.Func([], [Result_1], []),
     'admin_set_auction' : IDL.Func([AuctionConfig], [Result_1], []),
     'admin_set_currency' : IDL.Func([TokenInput], [Result_1], []),
     'admin_set_finalize' : IDL.Func([FinalizeKind], [Result_1], []),
@@ -177,6 +176,7 @@ export const idlFactory = ({ IDL }) => {
     'admin_set_project' : IDL.Func([ProjectInput], [Result_1], []),
     'admin_set_providers' : IDL.Func([IDL.Vec(IDL.Text)], [Result_1], []),
     'admin_set_token' : IDL.Func([TokenInput], [Result_1], []),
+    'admin_setup_auction' : IDL.Func([], [Result_1], []),
     'admin_sweep_currency' : IDL.Func([], [Result_2], []),
     'admin_sweep_token' : IDL.Func([], [Result_2], []),
     'auction_info' : IDL.Func([], [IDL.Opt(AuctionInfo)], ['query']),
@@ -199,6 +199,7 @@ export const idlFactory = ({ IDL }) => {
     'my_deposits' : IDL.Func([], [Result_7], ['query']),
     'my_withdraws' : IDL.Func([], [Result_8], ['query']),
     'submit_bid' : IDL.Func([IDL.Nat, IDL.Nat], [Result_3], []),
+    'validate_admin_set_auction' : IDL.Func([AuctionConfig], [Result_9], []),
     'validate_admin_set_currency' : IDL.Func([TokenInput], [Result_9], []),
     'validate_admin_set_finalize' : IDL.Func([FinalizeKind], [Result_9], []),
     'validate_admin_set_paying_public_keys' : IDL.Func(

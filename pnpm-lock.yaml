@@ -28,9 +28,15 @@ importers:
       '@dfinity/utils':
         specifier: ^3.2.0
         version: 3.2.0(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)
+      '@ldclabs/1paying-kit':
+        specifier: ^0.4.1
+        version: 0.4.1
       '@ldclabs/cose-ts':
         specifier: ^1.4.2
         version: 1.5.0
+      '@ldclabs/ic-auth':
+        specifier: ^0.3.1
+        version: 0.3.1(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/identity@3.4.3(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0)(cborg@4.3.2)
       '@noble/hashes':
         specifier: ^1.8.0
         version: 1.8.0
@@ -532,9 +538,24 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
+  '@ldclabs/1paying-kit@0.4.1':
+    resolution: {integrity: sha512-lLR+szG2CxZFW9pOd3mhgsmedpsPjTs9i6q069LuDyEEAOBMzE7uLhb+5o8ZyUSR7mCUE94SFzbMsTM29SVNTA==}
+    engines: {node: '>=20.0.0'}
+
   '@ldclabs/cose-ts@1.5.0':
     resolution: {integrity: sha512-SzHx7IMt5CUl5KphJ2y8Mu2rREfkIhTOUoxq8A7gpG3JWKg5BwtLNnP/yelUrdRHs/mWko+SkdB9GpfqSvuaVw==}
     engines: {node: '>=18.0.0'}
+
+  '@ldclabs/ic-auth@0.3.1':
+    resolution: {integrity: sha512-x6u1ak2M1Mfvrh3w3KEAuzLn+Tg5XvYL0hSfwChTqxjuuDaN9SW+ytINuh9J7V5heJ2jN9aq52RkaCMzyh+NdQ==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@dfinity/agent': '>=3.2.0'
+      '@dfinity/candid': '>=3.2.0'
+      '@dfinity/identity': '>=3.2.0'
+      '@dfinity/principal': '>=3.2.0'
+      '@noble/hashes': '>=1.8.0'
+      cborg: '>=4.3.0'
 
   '@noble/ciphers@1.3.0':
     resolution: {integrity: sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw==}
@@ -2759,10 +2780,25 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@ldclabs/1paying-kit@0.4.1':
+    dependencies:
+      '@noble/curves': 1.9.7
+      '@noble/hashes': 1.8.0
+      cborg: 4.3.2
+
   '@ldclabs/cose-ts@1.5.0':
     dependencies:
       '@noble/ciphers': 1.3.0
       '@noble/curves': 1.9.7
+      '@noble/hashes': 1.8.0
+      cborg: 4.3.2
+
+  '@ldclabs/ic-auth@0.3.1(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/identity@3.4.3(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0)(cborg@4.3.2)':
+    dependencies:
+      '@dfinity/agent': 3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0)
+      '@dfinity/candid': 3.4.3(@dfinity/principal@3.4.3)
+      '@dfinity/identity': 3.4.3(@dfinity/agent@3.4.3(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/hashes@1.8.0))(@dfinity/candid@3.4.3(@dfinity/principal@3.4.3))(@dfinity/principal@3.4.3)(@noble/curves@1.9.7)(@noble/hashes@1.8.0)
+      '@dfinity/principal': 3.4.3
       '@noble/hashes': 1.8.0
       cborg: 4.3.2
 

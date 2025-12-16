@@ -185,14 +185,23 @@ fn validate_admin_set_paying_public_keys(public_keys: Vec<String>) -> Result<Str
 #[ic_cdk::update(guard = "is_controller")]
 async fn admin_set_auction(auction: types::AuctionConfig) -> Result<(), String> {
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    auction.validate(now_ms)?;
+    let token_decimals = store::state::with(|s| s.token_decimals);
+    auction.validate(token_decimals, now_ms)?;
     store::state::set_auction(auction).await
 }
 
-#[ic_cdk::update(guard = "is_controller")]
-async fn admin_init_auction() -> Result<(), String> {
+#[ic_cdk::update]
+fn validate_admin_set_auction(auction: types::AuctionConfig) -> Result<String, String> {
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    store::state::init_auction(now_ms).await
+    let token_decimals = store::state::with(|s| s.token_decimals);
+    auction.validate(token_decimals, now_ms)?;
+    pretty_format(&(auction,))
+}
+
+#[ic_cdk::update(guard = "is_controller")]
+async fn admin_setup_auction() -> Result<(), String> {
+    let now_ms = ic_cdk::api::time() / 1_000_000;
+    store::state::setup_auction(now_ms).await
 }
 
 #[ic_cdk::update(guard = "is_controller")]

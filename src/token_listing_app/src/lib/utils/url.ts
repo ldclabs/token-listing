@@ -1,4 +1,4 @@
-import { decodeCBOR, encodeCBOR } from '@ldclabs/cose-ts/utils'
+import { decode, encode, rfc8949EncodeOptions } from 'cborg'
 
 export type URLSearchParamsInit =
   | URLSearchParams
@@ -12,8 +12,8 @@ export function joinURL(
 ) {
   const url = new URL(baseURL)
   if (path) {
-    if (!url.pathname.endsWith('/')) url.pathname += '/'
-    if (path.startsWith('/')) path = path.slice(1)
+    if (url.pathname.endsWith('/')) url.pathname = url.pathname.slice(0, -1)
+    if (!path.startsWith('/')) path = '/' + path
     url.pathname += path
   }
 
@@ -60,7 +60,7 @@ export function toURLSearchParams(params: URLSearchParamsInit) {
 export function createBlobURL(object: unknown) {
   return btoa(
     URL.createObjectURL(
-      new Blob([encodeCBOR(object) as BufferSource], {
+      new Blob([encode(object, rfc8949EncodeOptions) as BufferSource], {
         type: 'application/cbor'
       })
     )
@@ -75,7 +75,7 @@ export async function parseBlobURL<T>(url: string) {
     const blob = await resp.blob()
     if (blob.type !== 'application/cbor') return null
     const buffer = await blob.arrayBuffer()
-    return decodeCBOR(new Uint8Array(buffer)) as T
+    return decode(new Uint8Array(buffer)) as T
   } catch {
     return null
   }

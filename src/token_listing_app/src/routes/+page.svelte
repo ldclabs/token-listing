@@ -143,12 +143,6 @@
           {link.label}
         </a>
       {/each}
-      <a
-        class="border-border-subtle hover:border-foreground hover:bg-accent hover:text-accent-foreground rounded-full border px-4 py-2 font-semibold transition-all hover:scale-105"
-        href="#cta"
-      >
-        Get early access
-      </a>
     </nav>
   </Header>
 

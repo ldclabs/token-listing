@@ -1,5 +1,5 @@
 use candid::{CandidType, Principal};
-use ic_auth_types::ByteBufB64;
+use ic_auth_types::{ByteArrayB64, ByteBufB64};
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
@@ -77,13 +77,14 @@ pub struct StateInfo {
     pub evm_address: String,
     pub sol_address: String,
     pub chain_providers: Vec<String>,
+    pub paying_public_keys: Vec<ByteArrayB64<32>>,
     pub total_deposited_currency: u128,
     pub total_withdrawn_currency: u128,
     pub total_withdrawn_token: u128,
     pub total_bidders: u64,
     pub governance_canister: Option<Principal>,
     pub auction_config: Option<AuctionConfig>,
-    pub auction_finalized: bool,
+    pub finalize_output: Option<FinalizeOutput>,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -183,8 +184,8 @@ pub struct AuctionInfo {
     pub cumulative_supply_released: u128,
     // Whether the auction has graduated
     pub is_graduated: bool,
-    // Number of unique bidders
-    pub bidders_count: u64,
+    // Number of bids
+    pub bids_count: u64,
 }
 
 /// Auction Snapshot
@@ -209,7 +210,7 @@ pub struct AuctionSnapshot {
 
 /// Auction Configuration
 /// Example scenario:
-/// Auctioning PAY tokens. Total supply 1 billion. Auctioning 10% (100 million PAY). Decimals: 9.
+/// Auctioning PAY tokens. Total supply 1 billion. Auctioning 10% (100 million PAY).
 /// Auction time: 2026-01-01 08:00:00 GMT+08 to 2026-01-04 08:00:00 GMT+08.
 /// Currency: USDC. Minimum raise target: 500,000 USDC. Decimals: 6.
 /// Floor price will be: 0.005 USDC / PAY.
@@ -219,7 +220,6 @@ pub struct AuctionSnapshot {
 ///     start_time: 1767225600000, // in milliseconds
 ///     end_time: 1767484800000,
 ///     min_bid_duration: 300000,          // 5 minutes
-///     token_decimals: 9,
 ///     total_supply: 100_000_000_000_000_000,
 ///     liquidity_pool_amount: 80_000_000_000_000_000, // 80% of total supply
 ///     min_amount: 100_000_000,
@@ -234,8 +234,6 @@ pub struct AuctionConfig {
     pub end_time: u64,
     // Minimum bid duration in milliseconds. Prevents sniping attacks; longer duration increases sniping cost.
     pub min_bid_duration: u64,
-    // Token decimals
-    pub token_decimals: u8,
     // Total supply to be released linearly, in token atomic units
     pub total_supply: u128,
     // Amount of tokens to be added to the liquidity pool, in token atomic units
@@ -249,7 +247,7 @@ pub struct AuctionConfig {
 }
 
 impl AuctionConfig {
-    pub fn validate(&self, now_ms: u64) -> Result<(), String> {
+    pub fn validate(&self, token_decimals: u8, now_ms: u64) -> Result<(), String> {
         if self.start_time <= now_ms {
             return Err("Auction start time cannot be in the past".to_string());
         }
@@ -259,10 +257,10 @@ impl AuctionConfig {
         if self.min_bid_duration < 1000 {
             return Err("Minimum bid duration too short".to_string());
         }
-        if self.token_decimals > 18 {
+        if token_decimals > 18 {
             return Err("Token decimals too high".to_string());
         }
-        let one_token = 10u128.pow(self.token_decimals as u32);
+        let one_token = 10u128.pow(token_decimals as u32);
         if self.total_supply < one_token {
             return Err("Total supply too low".to_string());
         }
@@ -272,12 +270,6 @@ impl AuctionConfig {
 
         if self.liquidity_pool_amount > self.total_supply {
             return Err("Liquidity pool amount cannot exceed total auction supply".to_string());
-        }
-
-        if self.liquidity_pool_amount * 10 < self.total_supply {
-            return Err(
-                "Liquidity pool amount must be at least 10% of total auction supply".to_string(),
-            );
         }
 
         if self.min_amount == 0 {
@@ -339,7 +331,7 @@ pub struct WithdrawTxInfo {
 
 #[derive(CandidType, Clone, Default, Serialize, Deserialize)]
 pub enum FinalizeKind {
-    CreatePool(String), // "icp_kong" or "sol_raydium"
+    CreatePool(String), // "KongSwap" or "Raydium"
     #[default]
     Transfer,
 }

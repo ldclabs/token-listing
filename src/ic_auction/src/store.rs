@@ -91,9 +91,9 @@ pub struct State {
     pub total_withdrawn_token: u128,
     // (gas_updated_at, gas_price, max_priority_fee_per_gas)
     pub evm_latest_gas: (u64, u128, u128),
-    pub auction_finalized: bool,
     pub auction_config: Option<AuctionConfig>,
     pub auction: Option<cca::Auction>,
+    pub finalize_output: Option<FinalizeOutput>,
 }
 
 impl From<&State> for StateInfo {
@@ -124,12 +124,13 @@ impl From<&State> for StateInfo {
             evm_address: s.evm_address.to_string(),
             sol_address: s.sol_address.to_string(),
             chain_providers: s.chain_providers.clone(),
+            paying_public_keys: s.paying_public_keys.clone(),
             total_deposited_currency: s.total_deposited_currency,
             total_withdrawn_currency: s.total_withdrawn_currency,
             total_withdrawn_token: s.total_withdrawn_token,
             total_bidders: USERS.with_borrow(|u| u.len()),
             governance_canister: s.governance_canister,
-            auction_finalized: s.auction_finalized,
+            finalize_output: s.finalize_output.clone(),
             auction_config: s.auction_config.clone(),
         }
     }
@@ -174,7 +175,7 @@ impl State {
             total_withdrawn_currency: 0,
             total_withdrawn_token: 0,
             evm_latest_gas: (0, 0, 0),
-            auction_finalized: false,
+            finalize_output: None,
             auction_config: None,
             auction: None,
         }
@@ -513,11 +514,11 @@ pub mod state {
         })
     }
 
-    pub async fn init_auction(now_ms: u64) -> Result<(), String> {
+    pub async fn setup_auction(now_ms: u64) -> Result<(), String> {
         let (chain, cfg, icp_address, sol_address, evm_address, token, decimals, token_program_id) =
             STATE.with_borrow(|s| {
                 if s.auction.is_some() {
-                    return Err("auction is already initialized".to_string());
+                    return Err("auction is already setup".to_string());
                 }
 
                 let auction_config = match &s.auction_config {
@@ -564,10 +565,6 @@ pub mod state {
             }
         };
 
-        if cfg.token_decimals != decimals {
-            return Err("token decimals do not match the auction configuration".to_string());
-        }
-
         if cfg.total_supply + cfg.liquidity_pool_amount > amount {
             return Err("insufficient token balance for the auction".to_string());
         }
@@ -577,7 +574,7 @@ pub mod state {
                 return Err("auction is already initialized".to_string());
             }
 
-            s.auction = Some(cca::Auction::new(cfg)?);
+            s.auction = Some(cca::Auction::new(cfg, decimals)?);
             Ok(())
         })?;
 
@@ -587,7 +584,7 @@ pub mod state {
 
     pub async fn finalize_auction(now_ms: u64) -> Result<Option<FinalizeOutput>, String> {
         let (chain, finalize_kind, is_graduated, currency_raised) = STATE.with_borrow(|s| {
-            if s.auction_finalized {
+            if s.finalize_output.is_some() {
                 return Err("auction is already finalized".to_string());
             }
 
@@ -619,7 +616,7 @@ pub mod state {
                 }
                 FinalizeKind::CreatePool(kind) => match chain {
                     Chain::Sol => {
-                        if kind != "sol_raydium" {
+                        if kind.to_lowercase() != "raydium" {
                             return Err("invalid finalize kind for Solana auction".to_string());
                         }
                         let (pool, txid) = create_sol_raydium_pool(now_ms).await?;
@@ -630,7 +627,7 @@ pub mod state {
                     }
 
                     Chain::Icp => {
-                        if kind != "icp_kong" {
+                        if kind.to_lowercase() != "kongswap" {
                             return Err("invalid finalize kind for ICP auction".to_string());
                         }
                         let (pool, txid) = create_icp_kong_pool().await?;
@@ -652,19 +649,13 @@ pub mod state {
         };
 
         STATE.with_borrow_mut(|s| {
-            s.auction_finalized = true;
+            s.finalize_output = rt.clone();
             Ok(rt)
         })
     }
 
     pub fn auction_info(now_ms: u64) -> Option<AuctionInfo> {
-        STATE.with_borrow(|s| {
-            s.auction.as_ref().map(|a| {
-                let mut info = a.get_info(now_ms);
-                info.bidders_count = USERS.with_borrow(|u| u.len());
-                info
-            })
-        })
+        STATE.with_borrow(|s| s.auction.as_ref().map(|a| a.get_info(now_ms)))
     }
 
     pub fn get_grouped_bids(precision: u128) -> Vec<(u128, u128)> {
@@ -1119,7 +1110,7 @@ pub mod state {
             decimals,
             token_program_id,
         ) = STATE.with_borrow_mut(|s| {
-            if !s.auction_finalized {
+            if s.finalize_output.is_none() {
                 return Err("cannot sweep tokens before auction is finalized".to_string());
             }
 
@@ -1233,7 +1224,7 @@ pub mod state {
             decimals,
             currency_program_id,
         ) = STATE.with_borrow_mut(|s| {
-            if !s.auction_finalized {
+            if s.finalize_output.is_none() {
                 return Err("cannot sweep currency before auction is finalized".to_string());
             }
 

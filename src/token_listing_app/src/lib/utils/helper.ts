@@ -40,3 +40,23 @@ export function formatTimeAgo(timestamp: number) {
   }
   return `${minutes} minutes ago`
 }
+
+export function formatDatetime(tsMs: number | bigint): string {
+  const d = new Date(Number(tsMs))
+  return d.toLocaleString()
+}
+
+export function parseUnits(input: string, decimals: number): bigint {
+  const s = input.trim().replace(/[,\s_']/g, '')
+  if (!s) throw new Error('Input is empty')
+  if (!/^\d*(?:\.\d*)?$/.test(s)) throw new Error('Invalid amount')
+  const [i = '0', f = ''] = s.split('.')
+  const intPart = i ? BigInt(i) : 0n
+  const frac = f.slice(0, decimals).padEnd(decimals, '0')
+  const fracPart = frac ? BigInt(frac) : 0n
+  return intPart * pow10(decimals) + fracPart
+}
+
+export function pow10(n: number): bigint {
+  return 10n ** BigInt(Math.max(0, n))
+}

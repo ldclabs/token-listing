@@ -1,27 +1,126 @@
-import { TokenAmountV2 as TokenAmount, type Token } from '@dfinity/utils'
-
-export { TokenAmountV2 as TokenAmount } from '@dfinity/utils'
-
 const locale = new Intl.Locale(globalThis?.navigator.language || 'en')
+
+export interface Token {
+  symbol: string
+  name: string
+  decimals: number
+  logo?: string
+}
+
+export class TokenAmount {
+  private constructor(
+    protected ulps: bigint,
+    public token: Token
+  ) {}
+
+  public static fromUlps({
+    amount,
+    token
+  }: {
+    amount: bigint
+    token: Token
+  }): TokenAmount {
+    return new TokenAmount(amount, token)
+  }
+
+  public static fromString({
+    amount,
+    token
+  }: {
+    amount: string
+    token: Token
+  }): TokenAmount | FromStringToTokenError {
+    const ulps = convertStringToUlps({ amount, decimals: token.decimals })
+
+    if (typeof ulps === 'bigint') {
+      return new TokenAmount(ulps, token)
+    }
+    return ulps
+  }
+
+  public static fromNumber({
+    amount,
+    token
+  }: {
+    amount: number
+    token: Token
+  }): TokenAmount {
+    const tokenAmount = TokenAmount.fromString({
+      amount: amount.toFixed(token.decimals),
+      token
+    })
+    if (tokenAmount instanceof TokenAmount) {
+      return tokenAmount
+    }
+    if (tokenAmount === FromStringToTokenError.FractionalTooManyDecimals) {
+      throw new Error(
+        `Number ${amount} has more than ${token.decimals} decimals`
+      )
+    }
+
+    // This should never happen
+    throw new Error(`Invalid number ${amount}`)
+  }
+
+  public toUlps(): bigint {
+    return this.ulps
+  }
+
+  public toE8s(): bigint {
+    if (this.token.decimals < 8) {
+      return this.ulps * 10n ** BigInt(8 - this.token.decimals)
+    }
+    if (this.token.decimals === 8) {
+      return this.ulps
+    }
+    return this.ulps / 10n ** BigInt(this.token.decimals - 8)
+  }
+}
 
 export interface TokenInfo extends Token {
   fee: bigint
   one: bigint
-  logo: string // base64 encoded
-  canisterId: string
+  logo: string
+  address: string
 }
 
-// export const PANDAToken: TokenInfo = {
-// name: 'ICPanda',
-// symbol: 'PANDA',
-// decimals: 8,
-// fee: 10000n,
-// one: 100000000n,
-// logo: '',
-// canisterId: TOKEN_LEDGER_CANISTER_ID
-// }
+export const PANDAToken: TokenInfo = {
+  name: 'PANDA',
+  symbol: 'PANDA',
+  decimals: 8,
+  fee: 10000n,
+  one: 100000000n,
+  logo: 'https://panda.fans/_assets/logo.webp',
+  address: 'druyg-tyaaa-aaaaq-aactq-cai'
+}
+
+export const ICPToken: TokenInfo = {
+  name: 'ICP',
+  symbol: 'ICP',
+  decimals: 8,
+  fee: 10000n,
+  one: 100000000n,
+  logo: 'https://1bridge.app/_assets/icp.webp',
+  address: 'ryjl3-tyaaa-aaaaa-aaaba-cai'
+}
 
 export function formatNumber(val: number, maxDigits: number = 4): string {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDigits,
+    roundingMode: 'trunc'
+  } as Intl.NumberFormatOptions).format(val)
+}
+
+export function formatAmount(
+  amount: bigint,
+  decimals: number,
+  maxDigits: number = 6
+): string {
+  const decimalVal = 10n ** BigInt(decimals)
+  const integerPart = amount / decimalVal
+  const fractionalPart = amount % decimalVal
+  const val = Number(integerPart) + Number(fractionalPart) / Number(decimalVal)
   return new Intl.NumberFormat(locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: maxDigits,
@@ -32,6 +131,7 @@ export function formatNumber(val: number, maxDigits: number = 4): string {
 export class TokenDisplay {
   readonly billedToSource: boolean
   readonly token: TokenInfo
+  readonly decimals: bigint
   readonly one: bigint
   readonly formater: Intl.NumberFormat
 
@@ -70,10 +170,11 @@ export class TokenDisplay {
   ) {
     this.billedToSource = billedToSource
     this.token = token
-    this.one = 10n ** BigInt(token.decimals)
+    this.decimals = BigInt(token.decimals)
+    this.one = 10n ** this.decimals
     this.formater = new Intl.NumberFormat(locale, {
       minimumFractionDigits: 1,
-      maximumFractionDigits: token.decimals,
+      maximumFractionDigits: 6,
       roundingMode: 'floor'
     } as Intl.NumberFormatOptions)
     this.amount = amount
@@ -81,7 +182,10 @@ export class TokenDisplay {
   }
 
   get num(): number {
-    return Number(this.amount) / Number(this.one)
+    const integerPart = this.amount / this.one
+    const fractionalPart = this.amount % this.one
+    const val = Number(integerPart) + Number(fractionalPart) / Number(this.one)
+    return val
   }
 
   set num(amount: number) {
@@ -98,6 +202,10 @@ export class TokenDisplay {
 
   get received(): bigint {
     return this.billedToSource ? this.amount : this.amount - this.fee
+  }
+
+  withAmount(amount: bigint): TokenDisplay {
+    return new TokenDisplay(this.token, amount, this.billedToSource)
   }
 
   parseAmount(amount: string | number): bigint {
@@ -128,7 +236,10 @@ export class TokenDisplay {
   }
 
   displayValue(value: bigint): string {
-    return this.fullFormat(Number(value) / Number(this.one))
+    const integerPart = value / this.one
+    const fractionalPart = value % this.one
+    const val = Number(integerPart) + Number(fractionalPart) / Number(this.one)
+    return this.fullFormat(val)
   }
 
   displayFee(): string {
@@ -142,4 +253,53 @@ export class TokenDisplay {
   displayReceived(): string {
     return this.displayValue(this.received)
   }
+}
+
+export enum FromStringToTokenError {
+  FractionalMoreThan8Decimals,
+  InvalidFormat,
+  FractionalTooManyDecimals
+}
+
+function convertStringToUlps({
+  amount,
+  decimals
+}: {
+  amount: string
+  decimals: number
+}): bigint | FromStringToTokenError {
+  // Remove all instances of "," and "'".
+  amount = amount.trim().replace(/[,']/g, '')
+
+  // Verify that the string is of the format 1234.5678
+  const regexMatch = amount.match(/\d*(\.\d*)?/)
+  if (!regexMatch || regexMatch[0] !== amount) {
+    return FromStringToTokenError.InvalidFormat
+  }
+
+  const [integral, fractional] = amount.split('.')
+
+  let ulps = 0n
+  const ulpsPerToken = 10n ** BigInt(decimals)
+
+  if (integral) {
+    try {
+      ulps += BigInt(integral) * ulpsPerToken
+    } catch {
+      return FromStringToTokenError.InvalidFormat
+    }
+  }
+
+  if (fractional) {
+    if (fractional.length > decimals) {
+      return FromStringToTokenError.FractionalTooManyDecimals
+    }
+    try {
+      ulps += BigInt(fractional.padEnd(decimals, '0'))
+    } catch {
+      return FromStringToTokenError.InvalidFormat
+    }
+  }
+
+  return ulps
 }

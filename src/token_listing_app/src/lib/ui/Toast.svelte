@@ -51,7 +51,7 @@
 <div
   {@attach init}
   popover="manual"
-  class="pointer-events-none fixed top-auto right-4 bottom-4 left-auto z-[2147483647] m-0 flex max-w-sm flex-col items-end gap-2 border-0 bg-transparent p-0 outline-none"
+  class="pointer-events-none fixed top-auto right-4 bottom-4 left-auto z-999999 m-0 flex max-w-sm flex-col items-end gap-2 border-0 bg-transparent p-0 outline-none"
 >
   {#each toastStore as toast (toast.id)}
     <div
@@ -63,7 +63,7 @@
       aria-live="assertive"
     >
       <div
-        class="flex flex-shrink-0 items-center justify-center rounded bg-black/10 p-1 *:size-6 {typeClasses[
+        class="flex shrink-0 items-center justify-center rounded bg-black/10 p-1 *:size-6 {typeClasses[
           toast.type
         ]}"
       >
