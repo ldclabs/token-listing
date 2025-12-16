@@ -7,7 +7,8 @@
     DepositTxInfo,
     StateInfo,
     UserInfo,
-    WithdrawTxInfo
+    WithdrawTxInfo,
+    X402PaymentOutput
   } from '$declarations/ic_auction/ic_auction.did'
   import { icAuctionActor } from '$lib/canisters/icAuction'
   import CanisterModal from '$lib/components/CanisterModal.svelte'
@@ -16,18 +17,14 @@
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
   import InformationLine from '$lib/icons/information-line.svelte'
   import Settings4Line from '$lib/icons/settings-4-line.svelte'
+  import { x402Settle } from '$lib/services/paying'
   import { authStore, EventLogin } from '$lib/stores/auth.svelte'
   import { showModal } from '$lib/stores/modal.svelte'
   import { toastRun, triggerToast } from '$lib/stores/toast.svelte'
   import { unwrapOption, unwrapResult } from '$lib/types/result'
   import Button from '$lib/ui/Button.svelte'
   import Spinner from '$lib/ui/Spinner.svelte'
-  import {
-    formatDatetime,
-    parseUnits,
-    pow10,
-    pruneAddress
-  } from '$lib/utils/helper'
+  import { formatDatetime, parseUnits, pruneAddress } from '$lib/utils/helper'
   import { renderContent } from '$lib/utils/markdown'
   import {
     ICPToken,
@@ -35,6 +32,14 @@
     TokenDisplay,
     type TokenInfo
   } from '$lib/utils/token'
+  import {
+    base64ToBytes,
+    base64ToString,
+    payingKit,
+    type PaymentRequired,
+    type PaymentRequirements
+  } from '@ldclabs/1paying-kit'
+  import { decode, encode, rfc8949EncodeOptions } from 'cborg'
   import { onDestroy, onMount, tick } from 'svelte'
 
   const canister = page.params['id'] || '4jxyd-pqaaa-aaaah-qdqtq-cai'
@@ -53,6 +58,13 @@
   let grouped = $state<Array<[bigint, bigint]>>([])
   let tokenInfo = $state<TokenInfo>(PANDAToken)
   let currencyInfo = $state<TokenInfo>(ICPToken)
+  let x402Payment = $state<
+    (X402PaymentOutput & { paymentRequired: PaymentRequired }) | null
+  >(null)
+  let payReq = $state<{
+    payUrl: string
+    txid: string
+  } | null>(null)
 
   const tokenDisplay = $derived.by(() => new TokenDisplay(tokenInfo, 0n))
   const currencyDisplay = $derived.by(() => new TokenDisplay(currencyInfo, 0n))
@@ -65,7 +77,11 @@
   let floorPrice = $state(ICPToken.one)
   let bidAmount = $state('')
   let bidMaxPrice = $state('')
-  let groupedPrecision = $state<'0.01' | '0.1' | '1' | '10'>('0.1')
+  let floorGroupedPrecision = $derived.by(() => {
+    const val = Math.max(floorPrice.toString().length - 1, 1)
+    return 10n ** BigInt(val)
+  })
+  let groupedPrecision = $state('')
 
   let withdrawCurrencyRecipient = $state('')
   let withdrawTokenRecipient = $state('')
@@ -173,17 +189,11 @@
   }
 
   async function refreshGrouped() {
-    const dec = currencyInfo.decimals
-    const precisionAtomic =
-      groupedPrecision === '0.01'
-        ? pow10(dec - 2)
-        : groupedPrecision === '0.1'
-          ? pow10(dec - 1)
-          : groupedPrecision === '1'
-            ? pow10(dec)
-            : pow10(dec + 1)
-
-    grouped = await actor.get_grouped_bids([precisionAtomic])
+    try {
+      const precisionAtomic = BigInt(groupedPrecision)
+      console.log(groupedPrecision, precisionAtomic)
+      grouped = await actor.get_grouped_bids([precisionAtomic])
+    } catch {}
   }
 
   async function refreshMine() {
@@ -266,6 +276,14 @@
       bidMaxPrice = currencyDisplay.displayValue(
         priceAtomic + priceAtomic / 10n // add 10% buffer
       )
+      const x402 = await actor.x402_payment(bidAmountUnits, false)
+      const res = unwrapResult(
+        x402,
+        'failed to estimate x402 payment'
+      ) as X402PaymentOutput & { paymentRequired: PaymentRequired }
+      res.paymentRequired = decode(res.x402 as Uint8Array)
+      x402Payment = res
+      payReq = await payingKit.getPayUrl(res.paymentRequired)
     }).finally(() => {
       isEstimating = false
     })
@@ -302,11 +320,40 @@
   })
 
   function submitBid() {
+    if (!stateInfo || !auctionCfg || !auctionInfo) {
+      throw new Error('auction not ready')
+    }
+    if (!isBidable || !x402Payment || !payReq) return
+    const payWindow = window.open(payReq.payUrl, '1paying-checkout')
     toastRun(async () => {
-      if (!isBidable) return
+      if (!isBidable || !x402Payment || !payReq) return
 
-      if (!stateInfo || !auctionCfg || !auctionInfo)
-        throw new Error('auction not ready')
+      const paymentPayload = await payingKit.waitForPaymentPayload(payReq!.txid)
+
+      if (payWindow && !payWindow.closed) {
+        // Close the payment window if it's still open
+        // We can not reuse the window for another payment due to browser security policies
+        // Error: Blocked a frame with origin "https://1paying-coffee.zensh.workers.dev" from accessing a cross-origin frame.
+        payWindow.close()
+      }
+
+      const x402Res = await x402Settle({
+        paymentRequirements: x402Payment.paymentRequired
+          .accepts[0] as PaymentRequirements,
+        paymentPayload: JSON.parse(base64ToString(paymentPayload)),
+        nonce: x402Payment.nonce
+      })
+
+      triggerToast({ type: 'success', message: 'Payment successful' })
+
+      const depositRes = await actor.x402_deposit_currency({
+        result: encode(x402Res.result, rfc8949EncodeOptions),
+        signature: base64ToBytes(x402Res.signature),
+        timestamp: x402Payment.timestamp
+      })
+
+      unwrapResult(depositRes, 'failed to deposit currency via 1Paying')
+      triggerToast({ type: 'success', message: 'Deposit successful' })
 
       const res = await actor.submit_bid(bidAmountUnits, bidMaxPriceUnits)
       const bid = unwrapResult(res, 'submit bid failed')
@@ -383,28 +430,33 @@
       stateInfo = s
       auctionCfg = unwrapOption(s.auction_config)
       tokenInfo = {
-        name: stateInfo.token_name,
-        symbol: stateInfo.token_symbol,
-        decimals: stateInfo.token_decimals,
+        name: s.token_name,
+        symbol: s.token_symbol,
+        decimals: s.token_decimals,
         fee: 0n,
-        one: 10n ** BigInt(stateInfo.token_decimals),
-        logo: stateInfo.token_logo_url,
-        address: stateInfo.token
+        one: 10n ** BigInt(s.token_decimals),
+        logo: s.token_logo_url,
+        address: s.token
       }
       currencyInfo = {
-        name: stateInfo.currency_name,
-        symbol: stateInfo.currency_symbol,
-        decimals: stateInfo.currency_decimals,
+        name: s.currency_name,
+        symbol: s.currency_symbol,
+        decimals: s.currency_decimals,
         fee: 0n,
-        one: 10n ** BigInt(stateInfo.currency_decimals),
-        logo: stateInfo.currency_logo_url,
-        address: stateInfo.currency
+        one: 10n ** BigInt(s.currency_decimals),
+        logo: s.currency_logo_url,
+        address: s.currency
       }
+
+      await tick()
       if (auctionCfg) {
         floorPrice =
           (auctionCfg.required_currency_raised * tokenInfo.one) /
           auctionCfg.total_supply
       }
+
+      await tick()
+      groupedPrecision = (floorGroupedPrecision * 5n).toString()
 
       await refreshAuction()
       // await refreshMine()
@@ -745,14 +797,35 @@
                 >
                 <select
                   id="groupedPrecision"
-                  class="border-border-subtle bg-card w-12 rounded-md border px-1 py-1 text-xs"
+                  class="border-border-subtle bg-card w-16 rounded-md border px-1 py-1 text-xs"
                   bind:value={groupedPrecision}
                   oninput={() => toastRun(refreshGrouped)}
                 >
-                  <option value="0.01">0.01</option>
-                  <option value="0.1">0.1</option>
-                  <option value="1">1</option>
-                  <option value="10">10</option>
+                  <option value={floorGroupedPrecision}
+                    >{currencyDisplay.displayValue(
+                      floorGroupedPrecision
+                    )}</option
+                  >
+                  <option value={floorGroupedPrecision * 5n}
+                    >{currencyDisplay.displayValue(
+                      floorGroupedPrecision * 5n
+                    )}</option
+                  >
+                  <option value={floorGroupedPrecision * 10n}
+                    >{currencyDisplay.displayValue(
+                      floorGroupedPrecision * 10n
+                    )}</option
+                  >
+                  <option value={floorGroupedPrecision * 50n}
+                    >{currencyDisplay.displayValue(
+                      floorGroupedPrecision * 50n
+                    )}</option
+                  >
+                  <option value={floorGroupedPrecision * 100n}
+                    >{currencyDisplay.displayValue(
+                      floorGroupedPrecision * 100n
+                    )}</option
+                  >
                 </select>
                 <span class="text-muted text-xs"
                   >{currencyInfo.symbol}/{tokenInfo.symbol}</span
@@ -841,6 +914,7 @@
                   class="border-border-subtle bg-card mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                   placeholder={`e.g. ${currencyDisplay.displayValue(auctionInfo ? auctionInfo.clearing_price * 2n : floorPrice)} ${currencyInfo.symbol}/${tokenInfo.symbol}`}
                   bind:value={bidMaxPrice}
+                  onfocus={estimateMaxPrice}
                   inputmode="decimal"
                 />
               </div>
