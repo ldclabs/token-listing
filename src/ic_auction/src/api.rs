@@ -75,10 +75,19 @@ fn x402_payment(amount: u128, verify_only: bool) -> Result<types::X402PaymentOut
             amount
         };
 
-        let (network, pay_to) = match s.chain {
-            types::Chain::Icp => ("icp".to_string(), s.icp_address.to_string()),
-            types::Chain::Sol => ("solana".to_string(), s.sol_address.to_string()),
-            types::Chain::Evm(_) => return Err("EVM x402 is not supported yet".to_string()),
+        let (network, pay_to) = match &s.chain {
+            types::Chain::Icp(1) => ("icp:1".to_string(), s.icp_address.to_string()),
+            types::Chain::Sol(0) => (
+                "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1sK6u9hC4BXj".to_string(),
+                s.sol_address.to_string(),
+            ),
+            types::Chain::Sol(1) => (
+                "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp".to_string(),
+                s.sol_address.to_string(),
+            ),
+            types::Chain::Evm(8453) => ("eip155:8453".to_string(), s.evm_address.to_string()),
+            types::Chain::Evm(84532) => ("eip155:8453".to_string(), s.evm_address.to_string()),
+            other => return Err(format!("{:?} is not supported yet", other)),
         };
 
         let pr = types::PaymentRequirements {

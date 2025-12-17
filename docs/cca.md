@@ -1,10 +1,10 @@
-# Continuous Clearing Auction (CCA) on ICP
+# Tokenlist.ing Continuous Clearing Auction (CCA)
 
 **Language:** Rust
 
 **Reference:** [Uniswap CCA](https://docs.uniswap.org/contracts/liquidity-launchpad/CCA)
 
-The **ICP Continuous Clearing Auction (CCA)** is a high-precision, continuous-time token distribution mechanism designed for the Internet Computer. Unlike EVM-based implementations that rely on discrete blocks and tick-based approximations, this implementation leverages the computational capacity of ICP to achieve **millisecond-level precision** and **O(1) settlement complexity** using an accumulator-based mathematical model.
+The **Tokenlist.ing Continuous Clearing Auction** is a high-precision, continuous-time token distribution mechanism designed for the Internet Computer. Unlike EVM-based implementations that rely on discrete blocks and tick-based approximations, this implementation leverages the computational capacity of ICP to achieve **millisecond-level precision** and **O(1) settlement complexity** using an accumulator-based mathematical model.
 
 ## 1. Overview & Key Advantages
 

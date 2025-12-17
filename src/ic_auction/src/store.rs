@@ -48,7 +48,7 @@ pub struct State {
     pub name: String,
     pub description: String,
     pub url: String,
-    pub persons_excluded: Vec<String>,
+    pub restricted_countries: Vec<String>,
     // The blockchain this auction is running for
     pub chain: Chain,
     // The currency being raised in the auction
@@ -103,7 +103,7 @@ impl From<&State> for StateInfo {
             name: s.name.clone(),
             description: s.description.clone(),
             url: s.url.clone(),
-            persons_excluded: s.persons_excluded.clone(),
+            restricted_countries: s.restricted_countries.clone(),
             currency: s.currency.clone(),
             currency_decimals: s.currency_decimals,
             currency_name: s.currency_name.clone(),
@@ -139,11 +139,11 @@ impl From<&State> for StateInfo {
 impl State {
     fn new() -> Self {
         Self {
-            chain: Chain::Icp,
+            chain: Chain::Icp(0),
             name: "".to_string(),
             description: "".to_string(),
             url: "".to_string(),
-            persons_excluded: Vec::new(),
+            restricted_countries: Vec::new(),
             currency: "".to_string(),
             currency_decimals: 0,
             currency_name: "".to_string(),
@@ -543,7 +543,7 @@ pub mod state {
             })?;
 
         let amount = match chain {
-            Chain::Sol => {
+            Chain::Sol(_) => {
                 let token_addr = Pubkey::from_str(&token)
                     .map_err(|_| "invalid Solana token address".to_string())?;
                 let program_id = token_program_id
@@ -553,7 +553,7 @@ pub mod state {
                     .map_err(|_| "invalid Solana token program ID".to_string())?;
                 spl_balance_of(&sol_address, &token_addr, &program_id, now_ms).await?
             }
-            Chain::Icp => {
+            Chain::Icp(_) => {
                 let ledger = Principal::from_text(&token)
                     .map_err(|_| "invalid ICP ledger principal".to_string())?;
                 icp::balance_of(ledger, icp_address.into()).await?
@@ -615,7 +615,7 @@ pub mod state {
                     })
                 }
                 FinalizeKind::CreatePool(kind) => match chain {
-                    Chain::Sol => {
+                    Chain::Sol(_) => {
                         if kind.to_lowercase() != "raydium" {
                             return Err("invalid finalize kind for Solana auction".to_string());
                         }
@@ -626,7 +626,7 @@ pub mod state {
                         })
                     }
 
-                    Chain::Icp => {
+                    Chain::Icp(_) => {
                         if kind.to_lowercase() != "kongswap" {
                             return Err("invalid finalize kind for ICP auction".to_string());
                         }
@@ -903,8 +903,8 @@ pub mod state {
         })?;
 
         let tx_status = match chain {
-            Chain::Sol => check_sol_deposit_currency(caller, sender, txid.clone(), now_ms).await,
-            Chain::Icp => check_icp_deposit_currency(caller, sender, txid.clone()).await,
+            Chain::Sol(_) => check_sol_deposit_currency(caller, sender, txid.clone(), now_ms).await,
+            Chain::Icp(_) => check_icp_deposit_currency(caller, sender, txid.clone()).await,
             Chain::Evm(_) => check_evm_deposit_currency(caller, sender, txid.clone(), now_ms).await,
         };
 
@@ -984,10 +984,10 @@ pub mod state {
         })?;
 
         let tx_status = match chain {
-            Chain::Sol => {
+            Chain::Sol(_) => {
                 withdraw_sol_token(&token, program_id, decimals, &recipient, amount, now_ms).await
             }
-            Chain::Icp => withdraw_icp_token(&token, &recipient, amount).await,
+            Chain::Icp(_) => withdraw_icp_token(&token, &recipient, amount).await,
             Chain::Evm(chain_id) => {
                 withdraw_evm_token(&token, &recipient, chain_id, amount, now_ms).await
             }
@@ -1072,10 +1072,10 @@ pub mod state {
         })?;
 
         let tx_status = match chain {
-            Chain::Sol => {
+            Chain::Sol(_) => {
                 withdraw_sol_token(&token, program_id, decimals, &recipient, amount, now_ms).await
             }
-            Chain::Icp => withdraw_icp_token(&token, &recipient, amount).await,
+            Chain::Icp(_) => withdraw_icp_token(&token, &recipient, amount).await,
             Chain::Evm(chain_id) => {
                 withdraw_evm_token(&token, &recipient, chain_id, amount, now_ms).await
             }
@@ -1159,7 +1159,7 @@ pub mod state {
         })?;
 
         let (amount, txid) = match chain {
-            Chain::Sol => {
+            Chain::Sol(_) => {
                 let token_addr = Pubkey::from_str(&token)
                     .map_err(|_| "invalid Solana token address".to_string())?;
                 let program_id = token_program_id
@@ -1183,7 +1183,7 @@ pub mod state {
                 .await?;
                 (amount, txid)
             }
-            Chain::Icp => {
+            Chain::Icp(_) => {
                 let ledger = Principal::from_text(&token)
                     .map_err(|_| "invalid ICP ledger principal".to_string())?;
                 let to = Account::from_str(&recipient)
@@ -1280,7 +1280,7 @@ pub mod state {
         })?;
 
         let (amount, txid) = match chain {
-            Chain::Sol => {
+            Chain::Sol(_) => {
                 let currency_addr = Pubkey::from_str(&currency)
                     .map_err(|_| "invalid Solana token address".to_string())?;
 
@@ -1312,7 +1312,7 @@ pub mod state {
                 .await?;
                 (amount, txid)
             }
-            Chain::Icp => {
+            Chain::Icp(_) => {
                 let ledger = Principal::from_text(&currency)
                     .map_err(|_| "invalid ICP ledger principal".to_string())?;
                 let to = Account::from_str(&recipient)
@@ -1681,13 +1681,21 @@ pub mod state {
             let creator_token_1_account =
                 get_associated_token_address(&s.sol_address, &token_1, &token1_program);
 
+            let program_id = if s.chain == Chain::Sol(1) {
+                raydium::PROGRAM_ID
+            } else {
+                raydium::PROGRAM_ID_DEV
+            };
+
             let (ix0, amm_config) = raydium::build_create_amm_config_ix(
+                program_id,
                 s.sol_address,
                 2500,   // trade_fee_rate: 2500 / 1,000,000 = 0.0025 = 0.25%
                 120000, // protocol_fee_rate: 120000 / 1,000,000 = 0.12 = 12%, 实际协议收入 = 0.25% * 12% = 0.03%, LP 收入 = 0.25% - 0.03% = 0.22%
             );
 
             let (ix1, ids) = raydium::build_initialize_pool_ix(
+                program_id,
                 s.sol_address,
                 amm_config,
                 token_0,

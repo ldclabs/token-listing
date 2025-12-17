@@ -18,7 +18,7 @@ fn admin_set_project(input: types::ProjectInput) -> Result<(), String> {
         s.name = input.name;
         s.description = input.description;
         s.url = input.url;
-        s.persons_excluded = input.persons_excluded;
+        s.restricted_countries = input.restricted_countries;
         Ok(())
     })
 }
@@ -40,7 +40,7 @@ fn admin_set_token(input: types::TokenInput) -> Result<(), String> {
         if s.auction.is_some() {
             return Err("cannot change token when an auction is ongoing".to_string());
         }
-        if matches!(s.chain, types::Chain::Sol) && input.program_id.is_none() {
+        if matches!(s.chain, types::Chain::Sol(_)) && input.program_id.is_none() {
             return Err("program_id is required for Solana tokens".to_string());
         }
         s.chain.parse_address(&input.token)?;
@@ -62,7 +62,7 @@ fn validate_admin_set_token(input: types::TokenInput) -> Result<String, String> 
         if s.auction.is_some() {
             return Err("cannot change token when an auction is ongoing".to_string());
         }
-        if matches!(s.chain, types::Chain::Sol) && input.program_id.is_none() {
+        if matches!(s.chain, types::Chain::Sol(_)) && input.program_id.is_none() {
             return Err("program_id is required for Solana tokens".to_string());
         }
         s.chain.parse_address(&input.token)?;
@@ -78,7 +78,7 @@ fn admin_set_currency(input: types::TokenInput) -> Result<(), String> {
         if s.auction.is_some() {
             return Err("cannot change currency when an auction is ongoing".to_string());
         }
-        if matches!(s.chain, types::Chain::Sol)
+        if matches!(s.chain, types::Chain::Sol(_))
             && input.token != "So11111111111111111111111111111111111111111"
             && input.program_id.is_none()
         {
@@ -103,7 +103,7 @@ fn validate_admin_set_currency(input: types::TokenInput) -> Result<String, Strin
         if s.auction.is_some() {
             return Err("cannot change currency when an auction is ongoing".to_string());
         }
-        if matches!(s.chain, types::Chain::Sol)
+        if matches!(s.chain, types::Chain::Sol(_))
             && input.token != "So11111111111111111111111111111111111111111"
             && input.program_id.is_none()
         {

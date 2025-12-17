@@ -6,7 +6,7 @@ Repository: [github.com/ldclabs/token-listing/blob/main/src/ic_auction](https://
 
 The **Continuous Clearing Auction (CCA)** is a novel auction mechanism that generalizes the uniform-price auction into continuous time. It provides fair price discovery for bootstrapping initial liquidity while eliminating timing games and encouraging early participation.
 
-The **ICP Continuous Clearing Auction** is a high-precision, continuous-time token distribution mechanism designed for the Internet Computer. Unlike EVM-based implementations that rely on discrete blocks and tick-based approximations, this implementation leverages the computational capacity of ICP to achieve **millisecond-level precision** and **O(1) settlement complexity** using an accumulator-based mathematical model.
+The **Tokenlist.ing Continuous Clearing Auction** is a high-precision, continuous-time token distribution mechanism designed for the Internet Computer. Unlike EVM-based implementations that rely on discrete blocks and tick-based approximations, this implementation leverages the computational capacity of ICP to achieve **millisecond-level precision** and **O(1) settlement complexity** using an accumulator-based mathematical model.
 
 ## References
 

@@ -34,7 +34,7 @@ type BidInfo = record {
   refund : nat;
 };
 type CanisterArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
-type Chain = variant { Evm : nat64; Icp; Sol };
+type Chain = variant { Evm : nat64; Icp : nat64; Sol : nat64 };
 type DepositInput = record { txid : text; sender : text };
 type DepositTxInfo = record {
   txid : text;
@@ -59,7 +59,7 @@ type ProjectInput = record {
   url : text;
   name : text;
   description : text;
-  persons_excluded : vec text;
+  restricted_countries : vec text;
 };
 type Result = variant { Ok : opt FinalizeOutput; Err : text };
 type Result_1 = variant { Ok; Err : text };
@@ -96,7 +96,6 @@ type StateInfo = record {
   tokens_recipient : text;
   auction_config : opt AuctionConfig;
   currency : text;
-  persons_excluded : vec text;
   finalize_kind : FinalizeKind;
   key_name : text;
   token_decimals : nat8;
@@ -105,6 +104,7 @@ type StateInfo = record {
   token_name : text;
   finalize_output : opt FinalizeOutput;
   total_withdrawn_currency : nat;
+  restricted_countries : vec text;
   currency_program_id : opt text;
   currency_logo_url : text;
 };

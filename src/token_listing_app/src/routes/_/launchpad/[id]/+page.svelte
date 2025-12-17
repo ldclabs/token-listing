@@ -77,6 +77,23 @@
   let floorPrice = $state(ICPToken.one)
   let bidAmount = $state('')
   let bidMaxPrice = $state('')
+
+  let isDescriptionExpanded = $state(false)
+  const descriptionText = $derived.by(() =>
+    (stateInfo?.description || '').trim()
+  )
+  const isDescriptionLong = $derived.by(() => {
+    if (!descriptionText) return false
+    return (
+      descriptionText.length > 280 || descriptionText.split('\n').length > 6
+    )
+  })
+
+  $effect(() => {
+    // Reset to collapsed when project/description changes
+    descriptionText
+    isDescriptionExpanded = false
+  })
   let floorGroupedPrecision = $derived.by(() => {
     const val = Math.max(floorPrice.toString().length - 1, 1)
     return 10n ** BigInt(val)
@@ -103,15 +120,23 @@
     if ('Icp' in stateInfo.chain) {
       return `https://www.icexplorer.io/token/details/${address}`
     } else if ('Sol' in stateInfo.chain) {
-      return `https://solscan.io/token/${address}`
-    }
-    switch (stateInfo.chain['Evm']) {
-      case 1n:
-        return `https://etherscan.io/token/${address}`
-      case 56n:
-        return `https://bscscan.com/token/${address}`
-      case 8453n:
-        return `https://basescan.org/token/${address}`
+      switch (stateInfo.chain['Sol']) {
+        case 0n:
+          return `https://solscan.io/token/${address}?cluster=devnet`
+        case 1n:
+          return `https://solscan.io/token/${address}`
+      }
+    } else if ('Evm' in stateInfo.chain) {
+      switch (stateInfo.chain['Evm']) {
+        case 1n:
+          return `https://etherscan.io/token/${address}`
+        case 56n:
+          return `https://bscscan.com/token/${address}`
+        case 8453n:
+          return `https://basescan.org/token/${address}`
+        case 84532n:
+          return `https://sepolia.basescan.org/token/${address}`
+      }
     }
     return ''
   }
@@ -121,15 +146,23 @@
     if ('Icp' in stateInfo.chain) {
       return `https://www.icexplorer.io/address/details/${address}`
     } else if ('Sol' in stateInfo.chain) {
-      return `https://solscan.io/account/${address}`
-    }
-    switch (stateInfo.chain['Evm']) {
-      case 1n:
-        return `https://etherscan.io/address/${address}`
-      case 56n:
-        return `https://bscscan.com/address/${address}`
-      case 8453n:
-        return `https://basescan.org/address/${address}`
+      switch (stateInfo.chain['Sol']) {
+        case 0n:
+          return `https://solscan.io/address/${address}?cluster=devnet`
+        case 1n:
+          return `https://solscan.io/address/${address}`
+      }
+    } else if ('Evm' in stateInfo.chain) {
+      switch (stateInfo.chain['Evm']) {
+        case 1n:
+          return `https://etherscan.io/address/${address}`
+        case 56n:
+          return `https://bscscan.com/address/${address}`
+        case 8453n:
+          return `https://basescan.org/address/${address}`
+        case 84532n:
+          return `https://sepolia.basescan.org/address/${address}`
+      }
     }
     return ''
   }
@@ -139,15 +172,23 @@
     if ('Icp' in stateInfo.chain) {
       return ''
     } else if ('Sol' in stateInfo.chain) {
-      return `https://solscan.io/tx/${tx}`
-    }
-    switch (stateInfo.chain['Evm']) {
-      case 1n:
-        return `https://etherscan.io/tx/${tx}`
-      case 56n:
-        return `https://bscscan.com/tx/${tx}`
-      case 8453n:
-        return `https://basescan.org/tx/${tx}`
+      switch (stateInfo.chain['Sol']) {
+        case 0n:
+          return `https://solscan.io/tx/${tx}?cluster=devnet`
+        case 1n:
+          return `https://solscan.io/tx/${tx}`
+      }
+    } else if ('Evm' in stateInfo.chain) {
+      switch (stateInfo.chain['Evm']) {
+        case 1n:
+          return `https://etherscan.io/tx/${tx}`
+        case 56n:
+          return `https://bscscan.com/tx/${tx}`
+        case 8453n:
+          return `https://basescan.org/tx/${tx}`
+        case 84532n:
+          return `https://sepolia.basescan.org/tx/${tx}`
+      }
     }
     return ''
   }
@@ -561,9 +602,29 @@
                   >· {stateInfo.token_symbol}</span
                 >
               </div>
-              <div class="md-content w-full text-pretty wrap-break-word"
-                >{@html renderContent(stateInfo.description || '—')}</div
-              >
+              {#if descriptionText}
+                <div class="space-y-2">
+                  <div
+                    class={`md-content w-full text-pretty wrap-break-word ${!isDescriptionExpanded && isDescriptionLong ? 'cca-desc-clamp' : ''}`}
+                  >
+                    {@html renderContent(descriptionText)}
+                  </div>
+                  {#if isDescriptionLong}
+                    <button
+                      class="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-violet-400 uppercase hover:text-violet-600"
+                      onclick={() =>
+                        (isDescriptionExpanded = !isDescriptionExpanded)}
+                      type="button"
+                    >
+                      {isDescriptionExpanded ? 'Show less' : 'Show more'}
+                    </button>
+                  {/if}
+                </div>
+              {:else}
+                <div class="md-content w-full text-pretty wrap-break-word"
+                  >—</div
+                >
+              {/if}
             </div>
 
             <div class="grid gap-3 sm:grid-cols-3">
@@ -642,10 +703,10 @@
                   <span>📝 Finalize Transaction: {txid}</span>
                 {/if}
               </div>
-            {:else if stateInfo.persons_excluded.length > 0}
+            {:else if stateInfo.restricted_countries.length > 0}
               <div class="text-muted text-xs">
                 ⚠️ Excluded Persons:{' '}
-                {stateInfo.persons_excluded
+                {stateInfo.restricted_countries
                   .map((p) => pruneAddress(p, false))
                   .join(', ')}
               </div>
@@ -1116,32 +1177,34 @@
                 </div>
               </div>
 
-              <div
-                class="border-border-subtle bg-surface rounded-xl border p-3"
-              >
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold">Withdraw Token</span>
-                  <span class="text-xs"
-                    >{tokenDisplay.displayValue(myInfo.token_amount)}
-                    {tokenInfo.symbol}</span
-                  >
+              {#if myInfo.token_amount > 0n}
+                <div
+                  class="border-border-subtle bg-surface rounded-xl border p-3"
+                >
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold">Withdraw Token</span>
+                    <span class="text-xs"
+                      >{tokenDisplay.displayValue(myInfo.token_amount)}
+                      {tokenInfo.symbol}</span
+                    >
+                  </div>
+                  <div class="mt-3 space-y-2">
+                    <input
+                      class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
+                      placeholder="recipient"
+                      bind:value={withdrawTokenRecipient}
+                    />
+                    <Button
+                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
+                      onclick={() => toastRun(withdrawToken, 'withdraw failed')}
+                      disabled={myInfo.token_amount == 0n ||
+                        !withdrawTokenRecipient}
+                    >
+                      Withdraw
+                    </Button>
+                  </div>
                 </div>
-                <div class="mt-3 space-y-2">
-                  <input
-                    class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-                    placeholder="recipient"
-                    bind:value={withdrawTokenRecipient}
-                  />
-                  <Button
-                    class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
-                    onclick={() => toastRun(withdrawToken, 'withdraw failed')}
-                    disabled={myInfo.token_amount == 0n ||
-                      !withdrawTokenRecipient}
-                  >
-                    Withdraw
-                  </Button>
-                </div>
-              </div>
+              {/if}
             </div>
           </div>
         </div>
@@ -1253,3 +1316,12 @@
     {/if}
   </main>
 </div>
+
+<style>
+  .cca-desc-clamp {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+  }
+</style>

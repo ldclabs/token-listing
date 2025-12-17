@@ -50,7 +50,7 @@ pub struct StateInfo {
     pub name: String,
     pub description: String,
     pub url: String,
-    pub persons_excluded: Vec<String>,
+    pub restricted_countries: Vec<String>,
     // The blockchain this auction is running for
     pub chain: Chain,
     // The currency being raised in the auction
@@ -89,8 +89,8 @@ pub struct StateInfo {
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Chain {
-    Icp,
-    Sol,
+    Icp(u64),
+    Sol(u64),
     Evm(u64),
 }
 
@@ -104,10 +104,10 @@ pub enum ChainAddress {
 impl Chain {
     pub fn parse_address(&self, address: &str) -> Result<ChainAddress, String> {
         match self {
-            Chain::Icp => Account::from_str(address)
+            Chain::Icp(_) => Account::from_str(address)
                 .map(ChainAddress::Icp)
                 .map_err(|_| format!("Invalid ICP Account: {address}")),
-            Chain::Sol => Pubkey::from_str(address)
+            Chain::Sol(_) => Pubkey::from_str(address)
                 .map(ChainAddress::Sol)
                 .map_err(|_| format!("Invalid SOL pubkey: {address}")),
             Chain::Evm(_) => Address::from_str(address)
@@ -132,7 +132,7 @@ pub struct ProjectInput {
     pub name: String,
     pub description: String,
     pub url: String,
-    pub persons_excluded: Vec<String>,
+    pub restricted_countries: Vec<String>,
 }
 
 #[derive(CandidType, Debug, Clone, PartialEq, Deserialize, Serialize)]

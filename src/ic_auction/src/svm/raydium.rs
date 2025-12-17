@@ -1,6 +1,6 @@
 use borsh::BorshSerialize;
 use solana_instruction::{AccountMeta, Instruction};
-use solana_program::{pubkey::Pubkey, sysvar};
+use solana_program::{config::program, pubkey::Pubkey, sysvar};
 
 use super::{constants, spl::get_associated_token_address};
 use crate::helper::sha256;
@@ -15,7 +15,10 @@ const OBSERVATION_SEED: &str = "observation";
 const AUTH_SEED: &str = "vault_and_lp_mint_auth_seed";
 
 //  devnet: DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb
-const PROGRAM_ID: Pubkey = Pubkey::from_str_const("CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C");
+pub const PROGRAM_ID: Pubkey =
+    Pubkey::from_str_const("CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C");
+pub const PROGRAM_ID_DEV: Pubkey =
+    Pubkey::from_str_const("DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb");
 
 #[derive(BorshSerialize)]
 struct CreateAmmConfigArgs {
@@ -43,6 +46,7 @@ fn get_function_hash(namespace: &str, name: &str) -> [u8; 8] {
 
 /// 构建 CreateAmmConfig 指令
 pub fn build_create_amm_config_ix(
+    program_id: Pubkey,
     owner: Pubkey,
     trade_fee_rate: u64,
     protocol_fee_rate: u64,
@@ -50,7 +54,7 @@ pub fn build_create_amm_config_ix(
     let index = 0u16;
     let (amm_config, _) = Pubkey::find_program_address(
         &[AMM_CONFIG_SEED.as_bytes(), &index.to_be_bytes()],
-        &PROGRAM_ID,
+        &program_id,
     );
 
     let accounts = vec![
@@ -73,7 +77,7 @@ pub fn build_create_amm_config_ix(
 
     (
         Instruction {
-            program_id: PROGRAM_ID,
+            program_id: program_id,
             accounts,
             data,
         },
@@ -84,6 +88,7 @@ pub fn build_create_amm_config_ix(
 /// 构建 Initialize Pool 指令
 #[allow(clippy::too_many_arguments)]
 pub fn build_initialize_pool_ix(
+    program_id: Pubkey,
     creator: Pubkey,
     amm_config: Pubkey,
     token0_mint: Pubkey,
@@ -107,19 +112,19 @@ pub fn build_initialize_pool_ix(
                 token0_mint.as_ref(),
                 token1_mint.as_ref(),
             ],
-            &PROGRAM_ID,
+            &program_id,
         )
         .0
     });
 
-    let (authority, _) = Pubkey::find_program_address(&[AUTH_SEED.as_bytes()], &PROGRAM_ID);
+    let (authority, _) = Pubkey::find_program_address(&[AUTH_SEED.as_bytes()], &program_id);
     let (token0_vault, _) = Pubkey::find_program_address(
         &[
             POOL_VAULT_SEED.as_bytes(),
             pool_id.as_ref(),
             token0_mint.as_ref(),
         ],
-        &PROGRAM_ID,
+        &program_id,
     );
     let (token1_vault, _) = Pubkey::find_program_address(
         &[
@@ -127,15 +132,15 @@ pub fn build_initialize_pool_ix(
             pool_id.as_ref(),
             token1_mint.as_ref(),
         ],
-        &PROGRAM_ID,
+        &program_id,
     );
     let (lp_mint, _) = Pubkey::find_program_address(
         &[POOL_LP_MINT_SEED.as_bytes(), pool_id.as_ref()],
-        &PROGRAM_ID,
+        &program_id,
     );
     let (observation_state, _) = Pubkey::find_program_address(
         &[OBSERVATION_SEED.as_bytes(), pool_id.as_ref()],
-        &PROGRAM_ID,
+        &program_id,
     );
 
     let creator_lp_token =
@@ -175,7 +180,7 @@ pub fn build_initialize_pool_ix(
     data.append(&mut borsh::to_vec(&args).unwrap());
 
     let ix = Instruction {
-        program_id: PROGRAM_ID,
+        program_id: program_id,
         accounts,
         data,
     };

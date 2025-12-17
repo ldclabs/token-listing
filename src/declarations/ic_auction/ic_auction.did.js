@@ -4,8 +4,8 @@ export const idlFactory = ({ IDL }) => {
   });
   const Chain = IDL.Variant({
     'Evm' : IDL.Nat64,
-    'Icp' : IDL.Null,
-    'Sol' : IDL.Null,
+    'Icp' : IDL.Nat64,
+    'Sol' : IDL.Nat64,
   });
   const InitArgs = IDL.Record({
     'governance_canister' : IDL.Opt(IDL.Principal),
@@ -52,7 +52,7 @@ export const idlFactory = ({ IDL }) => {
     'url' : IDL.Text,
     'name' : IDL.Text,
     'description' : IDL.Text,
-    'persons_excluded' : IDL.Vec(IDL.Text),
+    'restricted_countries' : IDL.Vec(IDL.Text),
   });
   const WithdrawTxInfo = IDL.Record({
     'id' : IDL.Nat64,
@@ -122,7 +122,6 @@ export const idlFactory = ({ IDL }) => {
     'tokens_recipient' : IDL.Text,
     'auction_config' : IDL.Opt(AuctionConfig),
     'currency' : IDL.Text,
-    'persons_excluded' : IDL.Vec(IDL.Text),
     'finalize_kind' : FinalizeKind,
     'key_name' : IDL.Text,
     'token_decimals' : IDL.Nat8,
@@ -131,6 +130,7 @@ export const idlFactory = ({ IDL }) => {
     'token_name' : IDL.Text,
     'finalize_output' : IDL.Opt(FinalizeOutput),
     'total_withdrawn_currency' : IDL.Nat,
+    'restricted_countries' : IDL.Vec(IDL.Text),
     'currency_program_id' : IDL.Opt(IDL.Text),
     'currency_logo_url' : IDL.Text,
   });
@@ -237,8 +237,8 @@ export const init = ({ IDL }) => {
   });
   const Chain = IDL.Variant({
     'Evm' : IDL.Nat64,
-    'Icp' : IDL.Null,
-    'Sol' : IDL.Null,
+    'Icp' : IDL.Nat64,
+    'Sol' : IDL.Nat64,
   });
   const InitArgs = IDL.Record({
     'governance_canister' : IDL.Opt(IDL.Principal),

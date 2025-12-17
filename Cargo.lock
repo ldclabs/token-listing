@@ -4497,6 +4497,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
+name = "token_listing_canister"
+version = "0.1.0"
+dependencies = [
+ "alloy-consensus",
+ "alloy-eips",
+ "alloy-primitives",
+ "alloy-rpc-types-eth",
+ "alloy-signer",
+ "anda_cloud_cdk",
+ "bincode",
+ "borsh",
+ "candid",
+ "ciborium",
+ "futures",
+ "ic-cdk",
+ "ic-cdk-timers",
+ "ic-dummy-getrandom-for-wasm",
+ "ic-ed25519",
+ "ic-http-certification",
+ "ic-secp256k1",
+ "ic-stable-structures 0.7.2",
+ "ic_auth_types",
+ "icrc-ledger-types",
+ "k256",
+ "lazy_static",
+ "num-traits",
+ "once_cell",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha2",
+ "sha3",
+ "solana-account-decoder-client-types",
+ "solana-instruction",
+ "solana-program",
+ "solana-system-interface 3.0.0",
+ "solana-transaction",
+ "solana-transaction-status-client-types",
+ "spl-associated-token-account-interface",
+ "url",
+]
+
+[[package]]
 name = "toml_datetime"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

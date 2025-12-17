@@ -46,8 +46,8 @@ export interface BidInfo {
 export type CanisterArgs = { 'Upgrade' : UpgradeArgs } |
   { 'Init' : InitArgs };
 export type Chain = { 'Evm' : bigint } |
-  { 'Icp' : null } |
-  { 'Sol' : null };
+  { 'Icp' : bigint } |
+  { 'Sol' : bigint };
 export interface DepositInput { 'txid' : string, 'sender' : string }
 export interface DepositTxInfo {
   'txid' : string,
@@ -73,7 +73,7 @@ export interface ProjectInput {
   'url' : string,
   'name' : string,
   'description' : string,
-  'persons_excluded' : Array<string>,
+  'restricted_countries' : Array<string>,
 }
 export type Result = { 'Ok' : [] | [FinalizeOutput] } |
   { 'Err' : string };
@@ -122,7 +122,6 @@ export interface StateInfo {
   'tokens_recipient' : string,
   'auction_config' : [] | [AuctionConfig],
   'currency' : string,
-  'persons_excluded' : Array<string>,
   'finalize_kind' : FinalizeKind,
   'key_name' : string,
   'token_decimals' : number,
@@ -131,6 +130,7 @@ export interface StateInfo {
   'token_name' : string,
   'finalize_output' : [] | [FinalizeOutput],
   'total_withdrawn_currency' : bigint,
+  'restricted_countries' : Array<string>,
   'currency_program_id' : [] | [string],
   'currency_logo_url' : string,
 }
