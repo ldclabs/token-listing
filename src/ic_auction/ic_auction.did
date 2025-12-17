@@ -59,6 +59,7 @@ type ProjectInput = record {
   url : text;
   name : text;
   description : text;
+  detail : text;
   restricted_countries : vec text;
 };
 type Result = variant { Ok : opt FinalizeOutput; Err : text };
@@ -90,6 +91,7 @@ type StateInfo = record {
   icp_address : principal;
   currency_symbol : text;
   description : text;
+  detail : text;
   chain_providers : vec text;
   currency_decimals : nat8;
   funds_recipient : text;
@@ -156,7 +158,7 @@ service : (opt CanisterArgs) -> {
   claim : (nat64) -> (Result_3);
   claim_all : () -> (Result_4);
   deposit_currency : (DepositInput) -> (Result_5);
-  estimate_max_price : (nat) -> (nat) query;
+  estimate_max_price : (nat) -> (nat, nat) query;
   get_grouped_bids : (opt nat64) -> (vec record { nat; nat }) query;
   get_snapshots : (nat64, nat64) -> (vec AuctionSnapshot) query;
   info : () -> (Result_6) query;

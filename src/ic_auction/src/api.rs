@@ -59,7 +59,7 @@ fn my_withdraws() -> Result<Vec<types::WithdrawTxInfo>, String> {
 }
 
 #[ic_cdk::query]
-fn estimate_max_price(amount: u128) -> u128 {
+fn estimate_max_price(amount: u128) -> (u128, u128) {
     let now_ms = ic_cdk::api::time() / 1_000_000;
     store::state::estimate_max_price(amount, now_ms)
 }

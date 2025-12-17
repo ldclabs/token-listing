@@ -1,8 +1,8 @@
 [package]
-name = "ic_auction"
-description = "Continuous Clearing Auction (CCA) on ICP"
+name = "token_listing_canister"
+description = "Token Listing Canister"
 publish = false
-repository = "https://github.com/ldclabs/token-listing/tree/main/src/ic_auction"
+repository = "https://github.com/ldclabs/token-listing/tree/main/src/token_listing_canister"
 version = "0.1.0"
 edition.workspace = true
 keywords.workspace = true
@@ -21,7 +21,6 @@ alloy-primitives = { workspace = true }
 alloy-rpc-types-eth = { workspace = true }
 alloy-signer = { workspace = true }
 bincode = { workspace = true }
-borsh = { workspace = true }
 candid = { workspace = true }
 ciborium = { workspace = true }
 futures = { workspace = true }

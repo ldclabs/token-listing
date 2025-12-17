@@ -11,9 +11,11 @@
     X402PaymentOutput
   } from '$declarations/ic_auction/ic_auction.did'
   import { icAuctionActor } from '$lib/canisters/icAuction'
+  import { tokenListingActor } from '$lib/canisters/tokenListing'
   import CanisterModal from '$lib/components/CanisterModal.svelte'
   import CCAModal from '$lib/components/CCAModal.svelte'
   import Header from '$lib/components/Header.svelte'
+  import { TOKEN_LISTING } from '$lib/constants'
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
   import InformationLine from '$lib/icons/information-line.svelte'
   import Settings4Line from '$lib/icons/settings-4-line.svelte'
@@ -32,6 +34,7 @@
     TokenDisplay,
     type TokenInfo
   } from '$lib/utils/token'
+  import { Principal } from '@dfinity/principal'
   import {
     base64ToBytes,
     base64ToString,
@@ -42,9 +45,12 @@
   import { decode, encode, rfc8949EncodeOptions } from 'cborg'
   import { onDestroy, onMount, tick } from 'svelte'
 
-  const canister = page.params['id'] || '4jxyd-pqaaa-aaaah-qdqtq-cai'
-  const actor = icAuctionActor(canister)
+  const listingActor = tokenListingActor(TOKEN_LISTING)
 
+  let canister = $state('kfzgd-diaaa-aaaap-an56q-cai') // page.params['id'] || '4jxyd-pqaaa-aaaah-qdqtq-cai'
+  const actor = $derived(icAuctionActor(canister))
+
+  let isListed = $state(true)
   let stateInfo = $state<StateInfo | null>(null)
   let auctionCfg = $state<AuctionConfig | null>(null)
   let auctionInfo = $state<AuctionInfo | null>(null)
@@ -78,22 +84,21 @@
   let bidAmount = $state('')
   let bidMaxPrice = $state('')
 
-  let isDescriptionExpanded = $state(false)
-  const descriptionText = $derived.by(() =>
-    (stateInfo?.description || '').trim()
+  let isDetailExpanded = $state(false)
+  const detailText = $derived.by(() =>
+    (stateInfo?.detail || stateInfo?.description || '').trim()
   )
-  const isDescriptionLong = $derived.by(() => {
-    if (!descriptionText) return false
-    return (
-      descriptionText.length > 280 || descriptionText.split('\n').length > 6
-    )
+  const isDetailLong = $derived.by(() => {
+    if (!detailText) return false
+    return detailText.length > 280 || detailText.split('\n').length > 6
   })
 
   $effect(() => {
     // Reset to collapsed when project/description changes
-    descriptionText
-    isDescriptionExpanded = false
+    detailText
+    isDetailExpanded = false
   })
+
   let floorGroupedPrecision = $derived.by(() => {
     const val = Math.max(floorPrice.toString().length - 1, 1)
     return 10n ** BigInt(val)
@@ -312,10 +317,11 @@
     toastRun(async () => {
       if (isEstimating || bidAmountUnits == 0n) return
       if (!stateInfo) throw new Error('state not ready')
-      const priceAtomic = await actor.estimate_max_price(bidAmountUnits)
-      bidMaxPriceLimit = priceAtomic
+      const [_priceAtomic, priceLimitAtomic] =
+        await actor.estimate_max_price(bidAmountUnits)
+      bidMaxPriceLimit = priceLimitAtomic
       bidMaxPrice = currencyDisplay.displayValue(
-        priceAtomic + priceAtomic / 10n // add 10% buffer
+        priceLimitAtomic + priceLimitAtomic / 10n // add 10% buffer
       )
       const x402 = await actor.x402_payment(bidAmountUnits, false)
       const res = unwrapResult(
@@ -466,6 +472,18 @@
 
   onMount(() => {
     return toastRun(async (_signal, abortingQue) => {
+      const id =
+        page.params['id'] == 'latest'
+          ? ''
+          : Principal.fromText(page.params['id'] || '').toString()
+      const auction = await listingActor.get_auction(id ? [{ Icp: id }] : [])
+      isListed = auction[0] != null && 'Icp' in auction[0].id
+      canister = id
+        ? id
+        : auction[0] && 'Icp' in auction[0].id
+          ? auction[0].id.Icp
+          : canister
+
       const sres = await actor.info()
       const s = unwrapResult(sres, 'failed to fetch auction state')
       stateInfo = s
@@ -536,6 +554,11 @@
 
   <Header description={'Continuous Clearing Auction'} />
 
+  {#if !isListed}
+    <div class="text-md mx-auto mt-2 -mb-4 text-center text-red-600 md:-mb-8">
+      This auction is not listed on TokenList.ing
+    </div>
+  {/if}
   <main
     class="relative z-10 mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-10"
   >
@@ -562,6 +585,7 @@
               class="animate-pulse-glow absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-amber-500/10 blur-3xl"
             ></div>
           </div>
+
           <div class="relative space-y-4">
             <div class="flex flex-col gap-3 sm:items-start sm:justify-between">
               <div class="flex w-full flex-row items-center justify-between">
@@ -602,21 +626,20 @@
                   >· {stateInfo.token_symbol}</span
                 >
               </div>
-              {#if descriptionText}
+              {#if detailText}
                 <div class="space-y-2">
                   <div
-                    class={`md-content w-full text-pretty wrap-break-word ${!isDescriptionExpanded && isDescriptionLong ? 'cca-desc-clamp' : ''}`}
+                    class={`md-content w-full text-pretty wrap-break-word ${!isDetailExpanded && isDetailLong ? 'cca-desc-clamp' : ''}`}
                   >
-                    {@html renderContent(descriptionText)}
+                    {@html renderContent(detailText)}
                   </div>
-                  {#if isDescriptionLong}
+                  {#if isDetailLong}
                     <button
                       class="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-violet-400 uppercase hover:text-violet-600"
-                      onclick={() =>
-                        (isDescriptionExpanded = !isDescriptionExpanded)}
+                      onclick={() => (isDetailExpanded = !isDetailExpanded)}
                       type="button"
                     >
-                      {isDescriptionExpanded ? 'Show less' : 'Show more'}
+                      {isDetailExpanded ? 'Show less' : 'Show more'}
                     </button>
                   {/if}
                 </div>
@@ -835,13 +858,13 @@
               <div class="mt-1 text-base font-bold">
                 {auctionInfo
                   ? priceUnitsPerToken(auctionInfo.clearing_price)
-                  : '—'}
+                  : priceUnitsPerToken(floorPrice)}
               </div>
             </div>
             <div class="border-border-subtle bg-surface rounded-lg border p-3">
               <div class="text-muted text-xs">Bids</div>
               <div class="mt-1 text-base font-bold">
-                {auctionInfo ? auctionInfo.bids_count : '—'}
+                {auctionInfo ? auctionInfo.bids_count : '0'}
               </div>
             </div>
           </div>

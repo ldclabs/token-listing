@@ -318,16 +318,16 @@ impl Auction {
         self.floor_price.max(price)
     }
 
-    pub fn get_max_price_threshold(&self, flow_rate: u128) -> u128 {
+    pub fn get_max_price_threshold(&self, flow_rate: u128) -> (u128, u128) {
         if self.supply_rate == 0 {
-            return 0;
+            return (0, 0);
         }
         let clearing_price = self.get_clearing_price();
         let price_delta = Nat::from(flow_rate) * Nat::from(self.one_token);
         let denominator = Nat::from(self.supply_rate);
         let price_delta = (price_delta + denominator.clone() - Nat::from(1u64)) / denominator;
         let price_delta: u128 = price_delta.0.try_into().expect("Clearing price overflow");
-        clearing_price + price_delta
+        (clearing_price, clearing_price + price_delta)
     }
 
     /// State advancement and settlement
@@ -448,13 +448,13 @@ impl Auction {
         }
     }
 
-    pub fn estimate_max_price(&self, amount: u128, now_ms: u64) -> u128 {
+    pub fn estimate_max_price(&self, amount: u128, now_ms: u64) -> (u128, u128) {
         let remaining_time = self
             .cfg
             .end_time
             .saturating_sub(now_ms.max(self.cfg.start_time));
         if remaining_time < self.cfg.min_bid_duration {
-            return 0;
+            return (0, 0);
         }
 
         // Calculate flow rate: Linear distribution
@@ -462,10 +462,14 @@ impl Auction {
             / Nat::from(remaining_time);
         let flow_rate: u128 = flow_rate.0.try_into().unwrap_or_default();
         if flow_rate == 0 {
-            return 0;
+            return (0, 0);
         }
+        let (clearing_price, max_price_threshold) = self.get_max_price_threshold(flow_rate);
 
-        self.get_max_price_threshold(flow_rate) / self.price_precision
+        (
+            clearing_price.div_ceil(self.price_precision),
+            max_price_threshold.div_ceil(self.price_precision),
+        )
     }
 
     /// Submit Bid
@@ -513,7 +517,7 @@ impl Auction {
         self.update_state(now_ms);
 
         let pp = max_price * self.price_precision;
-        let mpt = self.get_max_price_threshold(flow_rate);
+        let (_, mpt) = self.get_max_price_threshold(flow_rate);
         if pp < mpt {
             return Err("InvalidBidPrice: Price limit below current market".to_string());
         }
@@ -802,7 +806,7 @@ mod tests {
         let storage = MockBidStorage::default();
 
         // User 1: Low price, early
-        let max_price = auction.estimate_max_price(20_000, 1000); // 120
+        let (_, max_price) = auction.estimate_max_price(20_000, 1000); // 120
         let (bid1, _) = auction
             .submit_bid(&storage, 20_000, max_price, 1000)
             .unwrap();

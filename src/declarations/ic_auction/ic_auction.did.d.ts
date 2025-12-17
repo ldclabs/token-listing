@@ -73,6 +73,7 @@ export interface ProjectInput {
   'url' : string,
   'name' : string,
   'description' : string,
+  'detail' : string,
   'restricted_countries' : Array<string>,
 }
 export type Result = { 'Ok' : [] | [FinalizeOutput] } |
@@ -116,6 +117,7 @@ export interface StateInfo {
   'icp_address' : Principal,
   'currency_symbol' : string,
   'description' : string,
+  'detail' : string,
   'chain_providers' : Array<string>,
   'currency_decimals' : number,
   'funds_recipient' : string,
@@ -182,7 +184,7 @@ export interface _SERVICE {
   'claim' : ActorMethod<[bigint], Result_3>,
   'claim_all' : ActorMethod<[], Result_4>,
   'deposit_currency' : ActorMethod<[DepositInput], Result_5>,
-  'estimate_max_price' : ActorMethod<[bigint], bigint>,
+  'estimate_max_price' : ActorMethod<[bigint], [bigint, bigint]>,
   'get_grouped_bids' : ActorMethod<[[] | [bigint]], Array<[bigint, bigint]>>,
   'get_snapshots' : ActorMethod<[bigint, bigint], Array<AuctionSnapshot>>,
   'info' : ActorMethod<[], Result_6>,

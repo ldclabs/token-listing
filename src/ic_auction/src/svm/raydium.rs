@@ -1,6 +1,6 @@
 use borsh::BorshSerialize;
 use solana_instruction::{AccountMeta, Instruction};
-use solana_program::{config::program, pubkey::Pubkey, sysvar};
+use solana_program::{pubkey::Pubkey, sysvar};
 
 use super::{constants, spl::get_associated_token_address};
 use crate::helper::sha256;
@@ -77,7 +77,7 @@ pub fn build_create_amm_config_ix(
 
     (
         Instruction {
-            program_id: program_id,
+            program_id,
             accounts,
             data,
         },
@@ -180,7 +180,7 @@ pub fn build_initialize_pool_ix(
     data.append(&mut borsh::to_vec(&args).unwrap());
 
     let ix = Instruction {
-        program_id: program_id,
+        program_id,
         accounts,
         data,
     };

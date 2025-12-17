@@ -49,6 +49,7 @@ pub struct RPCResponse<T> {
 pub struct StateInfo {
     pub name: String,
     pub description: String,
+    pub detail: String,
     pub url: String,
     pub restricted_countries: Vec<String>,
     // The blockchain this auction is running for
@@ -131,6 +132,7 @@ impl std::fmt::Display for ChainAddress {
 pub struct ProjectInput {
     pub name: String,
     pub description: String,
+    pub detail: String,
     pub url: String,
     pub restricted_countries: Vec<String>,
 }

@@ -17,6 +17,7 @@ fn admin_set_project(input: types::ProjectInput) -> Result<(), String> {
 
         s.name = input.name;
         s.description = input.description;
+        s.detail = input.detail;
         s.url = input.url;
         s.restricted_countries = input.restricted_countries;
         Ok(())

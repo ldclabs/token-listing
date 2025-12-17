@@ -52,6 +52,7 @@ export const idlFactory = ({ IDL }) => {
     'url' : IDL.Text,
     'name' : IDL.Text,
     'description' : IDL.Text,
+    'detail' : IDL.Text,
     'restricted_countries' : IDL.Vec(IDL.Text),
   });
   const WithdrawTxInfo = IDL.Record({
@@ -116,6 +117,7 @@ export const idlFactory = ({ IDL }) => {
     'icp_address' : IDL.Principal,
     'currency_symbol' : IDL.Text,
     'description' : IDL.Text,
+    'detail' : IDL.Text,
     'chain_providers' : IDL.Vec(IDL.Text),
     'currency_decimals' : IDL.Nat8,
     'funds_recipient' : IDL.Text,
@@ -191,7 +193,7 @@ export const idlFactory = ({ IDL }) => {
     'claim' : IDL.Func([IDL.Nat64], [Result_3], []),
     'claim_all' : IDL.Func([], [Result_4], []),
     'deposit_currency' : IDL.Func([DepositInput], [Result_5], []),
-    'estimate_max_price' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
+    'estimate_max_price' : IDL.Func([IDL.Nat], [IDL.Nat, IDL.Nat], ['query']),
     'get_grouped_bids' : IDL.Func(
         [IDL.Opt(IDL.Nat64)],
         [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))],

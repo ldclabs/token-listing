@@ -1,0 +1,57 @@
+type AuctionId = variant { Evm : text; Icp : text; Sol : text };
+type AuctionInfo = record {
+  id : AuctionId;
+  url : text;
+  token : text;
+  token_logo_url : text;
+  total_demand_raised : nat;
+  token_symbol : text;
+  chain : Chain;
+  name : text;
+  currency_name : text;
+  update_time : nat64;
+  currency_symbol : text;
+  description : text;
+  end_time : nat64;
+  bids_count : nat64;
+  total_supply_released : nat;
+  start_time : nat64;
+  currency_decimals : nat8;
+  currency : text;
+  clearing_price : nat;
+  token_decimals : nat8;
+  token_name : text;
+  is_graduated : bool;
+  currency_logo_url : text;
+};
+type CanisterArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type Chain = variant { Evm : nat64; Icp : nat64; Sol : nat64 };
+type InitArgs = record { governance_canister : opt principal; key_name : text };
+type Result = variant { Ok; Err : text };
+type Result_1 = variant { Ok : StateInfo; Err : text };
+type Result_2 = variant { Ok : text; Err : text };
+type StateInfo = record {
+  sol_address : text;
+  evm_address : text;
+  governance_canister : opt principal;
+  daos : vec principal;
+  auctions : vec AuctionId;
+  icp_address : principal;
+  chain_providers : vec record { Chain; vec text };
+  key_name : text;
+  paying_public_keys : vec blob;
+  storages : vec principal;
+};
+type UpgradeArgs = record { governance_canister : opt principal };
+service : (opt CanisterArgs) -> {
+  admin_set_auction : (AuctionInfo) -> (Result);
+  admin_set_paying_public_keys : (vec text) -> (Result);
+  admin_set_providers : (Chain, vec text) -> (Result);
+  get_auction : (opt AuctionId) -> (opt AuctionInfo) query;
+  info : () -> (Result_1) query;
+  list_auctions : (nat64, opt AuctionId) -> (vec AuctionInfo) query;
+  validate_admin_set_auction : (AuctionInfo) -> (Result_2);
+  validate_admin_set_paying_public_keys : (vec text) -> (Result_2);
+  validate_admin_set_providers : (Chain, vec text) -> (Result_2);
+  validate_empty_input : () -> (Result_2);
+}

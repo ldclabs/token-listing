@@ -47,6 +47,8 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 pub struct State {
     pub name: String,
     pub description: String,
+    #[serde(default)]
+    pub detail: String,
     pub url: String,
     pub restricted_countries: Vec<String>,
     // The blockchain this auction is running for
@@ -102,6 +104,7 @@ impl From<&State> for StateInfo {
             chain: s.chain.clone(),
             name: s.name.clone(),
             description: s.description.clone(),
+            detail: s.detail.clone(),
             url: s.url.clone(),
             restricted_countries: s.restricted_countries.clone(),
             currency: s.currency.clone(),
@@ -142,6 +145,7 @@ impl State {
             chain: Chain::Icp(0),
             name: "".to_string(),
             description: "".to_string(),
+            detail: "".to_string(),
             url: "".to_string(),
             restricted_countries: Vec::new(),
             currency: "".to_string(),
@@ -668,12 +672,12 @@ pub mod state {
         })
     }
 
-    pub fn estimate_max_price(amount: u128, now_ms: u64) -> u128 {
+    pub fn estimate_max_price(amount: u128, now_ms: u64) -> (u128, u128) {
         STATE.with_borrow(|s| {
             if let Some(auction) = &s.auction {
                 auction.estimate_max_price(amount, now_ms)
             } else {
-                0
+                (0, 0)
             }
         })
     }

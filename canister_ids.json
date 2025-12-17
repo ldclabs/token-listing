@@ -8,5 +8,9 @@
   },
   "token_listing_app": {
     "ic": "nd6u2-wqaaa-aaaap-an5oa-cai"
+  },
+  "token_listing_canister": {
+    "ic": "km2n7-vaaaa-aaaap-an57a-cai",
+    "local": "km2n7-vaaaa-aaaap-an57a-cai"
   }
 }
