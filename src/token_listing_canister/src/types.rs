@@ -88,6 +88,7 @@ pub struct AuctionInfo {
     pub token_name: String,
     pub token_symbol: String,
     pub token_logo_url: String,
+    pub required_currency_raised: u128,
     pub clearing_price: u128,
     pub total_demand_raised: u128,
     pub total_supply_released: u128,

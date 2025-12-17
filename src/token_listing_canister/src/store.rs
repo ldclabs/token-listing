@@ -199,6 +199,8 @@ pub struct AuctionState {
     pub token_symbol: String,
     #[serde(rename = "tl")]
     pub token_logo_url: String,
+    #[serde(rename = "cr")]
+    pub required_currency_raised: u128,
     #[serde(rename = "cp")]
     pub clearing_price: u128,
     #[serde(rename = "tdr")]
@@ -235,6 +237,7 @@ impl From<AuctionState> for AuctionInfo {
             token_name: s.token_name,
             token_symbol: s.token_symbol,
             token_logo_url: s.token_logo_url,
+            required_currency_raised: s.required_currency_raised,
             clearing_price: s.clearing_price,
             total_demand_raised: s.total_demand_raised,
             total_supply_released: s.total_supply_released,
@@ -498,6 +501,7 @@ pub mod state {
             token_name: auction.token_name,
             token_symbol: auction.token_symbol,
             token_logo_url: auction.token_logo_url,
+            required_currency_raised: auction.required_currency_raised,
             clearing_price: auction.clearing_price,
             total_demand_raised: auction.total_demand_raised,
             total_supply_released: auction.total_supply_released,

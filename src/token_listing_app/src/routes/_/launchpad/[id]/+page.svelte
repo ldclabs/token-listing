@@ -26,6 +26,12 @@
   import { unwrapOption, unwrapResult } from '$lib/types/result'
   import Button from '$lib/ui/Button.svelte'
   import Spinner from '$lib/ui/Spinner.svelte'
+  import {
+    getAccountUrl,
+    getSwapUrl,
+    getTokenUrl,
+    getTxUrl
+  } from '$lib/utils/chain'
   import { formatDatetime, parseUnits, pruneAddress } from '$lib/utils/helper'
   import { renderContent } from '$lib/utils/markdown'
   import {
@@ -47,7 +53,7 @@
 
   const listingActor = tokenListingActor(TOKEN_LISTING)
 
-  let canister = $state('kfzgd-diaaa-aaaap-an56q-cai') // page.params['id'] || '4jxyd-pqaaa-aaaah-qdqtq-cai'
+  let canister = $state('kfzgd-diaaa-aaaap-an56q-cai')
   const actor = $derived(icAuctionActor(canister))
 
   let isListed = $state(true)
@@ -120,93 +126,18 @@
     return 'ended' as const
   })
 
-  function getTokenUrl(address: string): string {
-    if (!stateInfo) return ''
-    if ('Icp' in stateInfo.chain) {
-      return `https://www.icexplorer.io/token/details/${address}`
-    } else if ('Sol' in stateInfo.chain) {
-      switch (stateInfo.chain['Sol']) {
-        case 0n:
-          return `https://solscan.io/token/${address}?cluster=devnet`
-        case 1n:
-          return `https://solscan.io/token/${address}`
-      }
-    } else if ('Evm' in stateInfo.chain) {
-      switch (stateInfo.chain['Evm']) {
-        case 1n:
-          return `https://etherscan.io/token/${address}`
-        case 56n:
-          return `https://bscscan.com/token/${address}`
-        case 8453n:
-          return `https://basescan.org/token/${address}`
-        case 84532n:
-          return `https://sepolia.basescan.org/token/${address}`
-      }
-    }
-    return ''
-  }
-
-  function getAccountUrl(address: string): string {
-    if (!stateInfo) return ''
-    if ('Icp' in stateInfo.chain) {
-      return `https://www.icexplorer.io/address/details/${address}`
-    } else if ('Sol' in stateInfo.chain) {
-      switch (stateInfo.chain['Sol']) {
-        case 0n:
-          return `https://solscan.io/address/${address}?cluster=devnet`
-        case 1n:
-          return `https://solscan.io/address/${address}`
-      }
-    } else if ('Evm' in stateInfo.chain) {
-      switch (stateInfo.chain['Evm']) {
-        case 1n:
-          return `https://etherscan.io/address/${address}`
-        case 56n:
-          return `https://bscscan.com/address/${address}`
-        case 8453n:
-          return `https://basescan.org/address/${address}`
-        case 84532n:
-          return `https://sepolia.basescan.org/address/${address}`
-      }
-    }
-    return ''
-  }
-
-  function getTxUrl(tx: string): string {
-    if (!stateInfo) return ''
-    if ('Icp' in stateInfo.chain) {
-      return ''
-    } else if ('Sol' in stateInfo.chain) {
-      switch (stateInfo.chain['Sol']) {
-        case 0n:
-          return `https://solscan.io/tx/${tx}?cluster=devnet`
-        case 1n:
-          return `https://solscan.io/tx/${tx}`
-      }
-    } else if ('Evm' in stateInfo.chain) {
-      switch (stateInfo.chain['Evm']) {
-        case 1n:
-          return `https://etherscan.io/tx/${tx}`
-        case 56n:
-          return `https://bscscan.com/tx/${tx}`
-        case 8453n:
-          return `https://basescan.org/tx/${tx}`
-        case 84532n:
-          return `https://sepolia.basescan.org/tx/${tx}`
-      }
-    }
-    return ''
-  }
-
   function getFinalizeKind(): [string, string] {
     if (!stateInfo) return ['—', '']
     if ('Transfer' in stateInfo.finalize_kind) {
       return [
         `Transfer to ${pruneAddress(stateInfo.funds_recipient, false)}`,
-        getAccountUrl(stateInfo.funds_recipient)
+        getAccountUrl(stateInfo.chain, stateInfo.funds_recipient)
       ]
     } else if ('CreatePool' in stateInfo.finalize_kind) {
-      return [`Create pool on "${stateInfo.finalize_kind.CreatePool}"`, '']
+      return [
+        `Create pool on ${stateInfo.finalize_kind.CreatePool}`,
+        getSwapUrl(stateInfo.finalize_kind.CreatePool)
+      ]
     } else {
       return ['Unknown', '']
     }
@@ -552,7 +483,7 @@
     <div class="grid-pattern absolute inset-0"></div>
   </div>
 
-  <Header description={'Continuous Clearing Auction'} />
+  <Header backUrl="/_/launchpad" description={'Continuous Clearing Auction'} />
 
   {#if !isListed}
     <div class="text-md mx-auto mt-2 -mb-4 text-center text-red-600 md:-mb-8">
@@ -635,7 +566,7 @@
                   </div>
                   {#if isDetailLong}
                     <button
-                      class="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-violet-400 uppercase hover:text-violet-600"
+                      class="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-indigo-500 uppercase hover:text-indigo-700"
                       onclick={() => (isDetailExpanded = !isDetailExpanded)}
                       type="button"
                     >
@@ -710,7 +641,7 @@
 
             {#if stateInfo.finalize_output.length > 0}
               {@const txid = stateInfo.finalize_output[0]?.txid || ''}
-              {@const txUrl = getTxUrl(txid)}
+              {@const txUrl = getTxUrl(stateInfo.chain, txid)}
               <div class="text-md font-semibold">
                 {#if txUrl}
                   <a
@@ -750,7 +681,10 @@
                   <div class="text-muted">Currency</div>
                   <a
                     class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1 font-semibold"
-                    href={getTokenUrl(currencyDisplay.token.address)}
+                    href={getTokenUrl(
+                      stateInfo.chain,
+                      currencyDisplay.token.address
+                    )}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -763,7 +697,10 @@
                   <div class="text-muted">Token</div>
                   <a
                     class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1 font-semibold"
-                    href={getTokenUrl(tokenDisplay.token.address)}
+                    href={getTokenUrl(
+                      stateInfo.chain,
+                      tokenDisplay.token.address
+                    )}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -802,7 +739,7 @@
                   <div class="font-semibold">
                     {#if finalizeKind[1]}
                       <a
-                        class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1"
+                        class=" inline-flex items-center gap-1 text-indigo-500 hover:text-indigo-700"
                         href={finalizeKind[1]}
                         target="_blank"
                         rel="noreferrer"
@@ -1245,7 +1182,7 @@
                 class="border-border-subtle overflow-hidden rounded-xl border"
               >
                 {#each myDeposits as d (d.txid)}
-                  {@const txUrl = getTxUrl(d.txid)}
+                  {@const txUrl = getTxUrl(stateInfo.chain, d.txid)}
                   <div
                     class="border-border-subtle border-t px-3 py-2 text-xs first:border-t-0"
                   >
@@ -1290,7 +1227,7 @@
                 class="border-border-subtle overflow-hidden rounded-xl border"
               >
                 {#each myWithdraws as w (w.id)}
-                  {@const txUrl = getTxUrl(w.txid)}
+                  {@const txUrl = getTxUrl(stateInfo.chain, w.txid)}
                   <div
                     class="border-border-subtle border-t px-3 py-2 text-xs first:border-t-0"
                   >
@@ -1345,6 +1282,7 @@
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
+    line-clamp: 4;
     -webkit-line-clamp: 4;
   }
 </style>

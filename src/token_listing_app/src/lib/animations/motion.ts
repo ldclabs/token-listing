@@ -65,7 +65,6 @@ export function parallax(node: HTMLElement, opts: ParallaxOptions = {}) {
   let frame: number | null = null
   let baseY = 0
   let delayLeft = Math.max(0, initialDelayFrames)
-  let firstApply = true
   let disabledByWidth = false
 
   function computeBase() {
@@ -92,7 +91,6 @@ export function parallax(node: HTMLElement, opts: ParallaxOptions = {}) {
       const distanceBelowFold = baseY - (scrollY + viewportH)
       if (distanceBelowFold > startWithinPx) {
         // 仍未到视区，下次再试
-        firstApply = false
         return
       }
     }
@@ -101,7 +99,6 @@ export function parallax(node: HTMLElement, opts: ParallaxOptions = {}) {
       else if (offset < -maxOffset) offset = -maxOffset
     }
     node.style.transform = `translate3d(0, ${offset.toFixed(2)}px, 0)`
-    firstApply = false
   }
 
   function schedule() {
@@ -127,7 +124,6 @@ export function parallax(node: HTMLElement, opts: ParallaxOptions = {}) {
     ) {
       // 恢复
       disabledByWidth = false
-      firstApply = true
     }
     schedule()
   }

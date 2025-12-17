@@ -11,6 +11,7 @@
 
   let {
     description = 'Token infrastructure for the multi-chain era',
+    backUrl = '/',
     children = undefined
   } = $props()
 
@@ -49,7 +50,7 @@
     class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-2 sm:px-8"
   >
     <div class="flex items-center gap-3">
-      <a href="/" class="bg-white p-0.5"
+      <a href={backUrl} class="bg-white p-0.5"
         ><img
           alt="TokenList.ing Logo"
           src="/_assets/logo.webp"

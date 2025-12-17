@@ -20,6 +20,7 @@ type AuctionInfo = record {
   currency : text;
   clearing_price : nat;
   token_decimals : nat8;
+  required_currency_raised : nat;
   token_name : text;
   is_graduated : bool;
   currency_logo_url : text;

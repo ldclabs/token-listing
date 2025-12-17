@@ -41,6 +41,7 @@ export const idlFactory = ({ IDL }) => {
     'currency' : IDL.Text,
     'clearing_price' : IDL.Nat,
     'token_decimals' : IDL.Nat8,
+    'required_currency_raised' : IDL.Nat,
     'token_name' : IDL.Text,
     'is_graduated' : IDL.Bool,
     'currency_logo_url' : IDL.Text,

@@ -26,6 +26,7 @@ export interface AuctionInfo {
   'currency' : string,
   'clearing_price' : bigint,
   'token_decimals' : number,
+  'required_currency_raised' : bigint,
   'token_name' : string,
   'is_graduated' : boolean,
   'currency_logo_url' : string,

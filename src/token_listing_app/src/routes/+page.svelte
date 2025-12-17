@@ -1,13 +1,113 @@
 <script lang="ts">
+  import type {
+    AuctionId,
+    AuctionInfo
+  } from '$declarations/token_listing_canister/token_listing_canister.did'
+  import { tokenListingActor } from '$lib/canisters/tokenListing'
+  import { TOKEN_LISTING } from '$lib/constants'
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
   import { getTheme } from '$lib/stores/theme.svelte'
+  import { chainLabel } from '$lib/utils/chain'
+  import { formatDatetime } from '$lib/utils/helper'
+  import { TokenDisplay, type TokenInfo } from '$lib/utils/token'
   import Header from '$src/lib/components/Header.svelte'
+  import { onDestroy, onMount } from 'svelte'
 
   const theme = getTheme()
+  const listingActor = tokenListingActor(TOKEN_LISTING)
+
+  let latestAuction = $state<AuctionInfo | null>(null)
+
+  let nowMs = $state(Date.now())
+  let nowTimer: number | null = null
+
+  function auctionIdText(id: AuctionId): string {
+    if ('Icp' in id) return id.Icp
+    if ('Sol' in id) return id.Sol
+    return id.Evm
+  }
+
+  function tokenInfoFromAuction(a: AuctionInfo): TokenInfo {
+    return {
+      name: a.token_name,
+      symbol: a.token_symbol,
+      decimals: a.token_decimals,
+      fee: 0n,
+      one: 10n ** BigInt(a.token_decimals),
+      logo: a.token_logo_url,
+      address: a.token
+    }
+  }
+
+  function currencyInfoFromAuction(a: AuctionInfo): TokenInfo {
+    return {
+      name: a.currency_name,
+      symbol: a.currency_symbol,
+      decimals: a.currency_decimals,
+      fee: 0n,
+      one: 10n ** BigInt(a.currency_decimals),
+      logo: a.currency_logo_url,
+      address: a.currency
+    }
+  }
+
+  function statusLabel(a: AuctionInfo): 'Upcoming' | 'Active' | 'Ended' {
+    const n = BigInt(nowMs)
+    if (n < a.start_time) return 'Upcoming'
+    if (n < a.end_time) return 'Active'
+    return 'Ended'
+  }
+
+  function timeRemainingLabel(a: AuctionInfo): string {
+    const endMs =
+      nowMs > a.start_time ? Number(a.end_time) : Number(a.start_time)
+    const delta = Math.max(0, endMs - nowMs)
+    const totalMinutes = Math.floor(delta / 60000)
+    const days = Math.floor(totalMinutes / (60 * 24))
+    const hours = Math.floor((totalMinutes - days * 60 * 24) / 60)
+    const minutes = Math.max(0, totalMinutes - days * 60 * 24 - hours * 60)
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
+  }
+
+  const latest = $derived.by(() => {
+    if (!latestAuction) return null
+    const a = latestAuction
+    const token = tokenInfoFromAuction(a)
+    const currency = currencyInfoFromAuction(a)
+    const currencyDisplay = new TokenDisplay(currency, 0n)
+    const requiredCurrency = currencyDisplay.displayValue(
+      a.required_currency_raised
+    )
+    const clearingPriceValue = currencyDisplay.displayValue(a.clearing_price)
+    const raised = currencyDisplay.displayValue(a.total_demand_raised)
+    const participants = a.bids_count.toString()
+    const remaining = timeRemainingLabel(a)
+    const status = statusLabel(a)
+    const isActive = status === 'Active'
+    const id = auctionIdText(a.id)
+    const href = `/_/launchpad/${id}`
+    return {
+      a,
+      token,
+      currency,
+      requiredCurrency,
+      clearingPriceValue,
+      raised,
+      participants,
+      remaining,
+      status,
+      isActive,
+      href,
+      total_demand_raised: a.total_demand_raised,
+      chain: chainLabel(a.chain)
+    }
+  })
 
   const navLinks = [
+    { label: 'Launchpad', href: '/_/launchpad' },
     { label: 'Features', href: '#features' },
-    { label: 'Launchpad', href: '#launchpad' },
     { label: 'Chains', href: '#chains' },
     { label: 'FAQ', href: '#faq' }
   ]
@@ -103,6 +203,22 @@
       a: 'Every participant gets a full refund, automatically. No locked funds, no rug risk.'
     }
   ]
+
+  onMount(async () => {
+    const res = await listingActor.get_auction([])
+    latestAuction = res[0] || null
+
+    if (nowTimer == null) {
+      nowTimer = window.setInterval(() => {
+        nowMs = Date.now()
+      }, 15_000)
+    }
+  })
+
+  onDestroy(() => {
+    if (nowTimer != null) window.clearInterval(nowTimer)
+    nowTimer = null
+  })
 </script>
 
 <div class="flex min-h-screen flex-col">
@@ -156,7 +272,7 @@
           class="border-border-subtle text-muted bg-surface inline-flex items-center gap-3 rounded-full border px-2 py-1 text-xs font-semibold md:px-4 md:py-2"
         >
           <a
-            class="hover:text-foreground flex flex-row items-center gap-1 transition"
+            class="flex flex-row items-center gap-1 text-amber-500 transition hover:text-amber-700"
             href="https://dashboard.internetcomputer.org/sns/d7wvo-iiaaa-aaaaq-aacsq-cai"
             target="_blank"
             rel="noreferrer"
@@ -176,12 +292,12 @@
           </a>
           <span class="">|</span>
           <a
-            class="hover:text-foreground flex flex-row items-center gap-1 transition"
+            class="flex flex-row items-center gap-1 text-indigo-500 transition hover:text-indigo-700"
             href="https://nns.ic0.app/proposals/?u=d7wvo-iiaaa-aaaaq-aacsq-cai"
             target="_blank"
             rel="noreferrer"
           >
-            <span class="">SNS DAO Gov</span>
+            <span class="">SNS DAO Governance</span>
             <span class="*:size-4"><ArrowRightUpLine /></span>
           </a>
         </div>
@@ -223,88 +339,283 @@
 
       <!-- Live Auction Preview -->
       <div class="relative">
-        <div
-          class="animated-border glass-border from-surface-hover relative overflow-hidden rounded-xl bg-linear-to-b via-transparent to-transparent p-4 md:p-8"
-        >
-          <div class="text-muted flex items-center justify-between text-sm">
-            <span>Live auction preview</span>
-            <span class="flex items-center gap-1.5">
-              <span class="relative flex h-2 w-2">
-                <span
-                  class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
-                ></span>
-                <span
-                  class="relative inline-flex h-2 w-2 rounded-full bg-green-500"
-                ></span>
+        {#if latest}
+          <a
+            class="animated-border glass-border from-surface-hover relative block overflow-hidden rounded-xl bg-linear-to-b via-transparent to-transparent p-4 transition-transform md:p-8"
+            href={latest.href}
+          >
+            <div class="text-muted flex items-center justify-between text-sm">
+              <span>Latest auction</span>
+              <span class="flex items-center gap-1.5">
+                {#if latest.isActive}
+                  <span class="relative flex h-2 w-2">
+                    <span
+                      class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
+                    ></span>
+                    <span
+                      class="relative inline-flex h-2 w-2 rounded-full bg-green-500"
+                    ></span>
+                  </span>
+                {:else}
+                  <span class="relative flex h-2 w-2">
+                    <span
+                      class="bg-border-subtle relative inline-flex h-2 w-2 rounded-full"
+                    ></span>
+                  </span>
+                {/if}
+                {latest.status}
               </span>
-              Active (mock)
-            </span>
-          </div>
-
-          <div class="mt-8 space-y-6">
-            <div>
-              <p
-                class="text-muted-foreground text-xs tracking-widest uppercase"
-              >
-                Current price
-              </p>
-              <p class="font-mono text-3xl font-medium">
-                <span class="gradient-text">0.0847</span> USDC
-              </p>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="mt-6 flex items-start justify-between gap-4">
+              <div class="flex min-w-0 items-center gap-3">
+                <div
+                  class="bg-surface relative h-10 w-10 shrink-0 overflow-hidden rounded-full"
+                >
+                  {#if latest.a.token_logo_url}
+                    <img
+                      class="h-full w-full object-cover"
+                      src={latest.a.token_logo_url}
+                      alt={latest.a.token_symbol}
+                      loading="lazy"
+                    />
+                  {/if}
+                </div>
+                <div class="min-w-0">
+                  <p class="truncate font-semibold">
+                    {latest.a.name || latest.a.token_symbol}
+                  </p>
+                  <p class="text-muted-foreground truncate text-xs">
+                    {latest.a.token_symbol}/{latest.a.currency_symbol} · {latest.chain}{#if latest.a.is_graduated}
+                      {' · Graduated'}
+                    {/if}
+                  </p>
+                </div>
+              </div>
+
+              <span
+                class="text-muted-foreground shrink-0 text-xs font-semibold underline underline-offset-4"
+                >View →</span
+              >
+            </div>
+
+            <div class="mt-8 space-y-6">
+              {#if latest.total_demand_raised > 0n}
+                <div class="grid grid-cols-1 gap-4">
+                  <div>
+                    <p
+                      class="text-muted-foreground text-xs tracking-widest uppercase"
+                    >
+                      Current price
+                    </p>
+                    <p class="font-mono text-3xl font-medium">
+                      <span class="gradient-text"
+                        >{latest.clearingPriceValue}</span
+                      >
+                      {latest.currency.symbol}
+                    </p>
+                  </div>
+                  <div>
+                    <p
+                      class="text-muted-foreground text-xs tracking-widest uppercase"
+                    >
+                      Total raised
+                    </p>
+                    <p class="font-mono text-3xl font-medium">
+                      <span class="gradient-text">{latest.raised}</span>
+                      {latest.currency.symbol}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <p
+                      class="text-muted-foreground text-xs tracking-widest uppercase"
+                    >
+                      Required to graduate
+                    </p>
+                    <p class="font-mono text-xl font-medium">
+                      <span class="">{latest.requiredCurrency}</span>
+                      {latest.currency.symbol}
+                    </p>
+                  </div>
+                  <div>
+                    <p
+                      class="text-muted-foreground text-xs tracking-widest uppercase"
+                    >
+                      Bids
+                    </p>
+                    <p class="text-muted font-mono text-xl"
+                      >{latest.participants}</p
+                    >
+                  </div>
+                </div>
+              {:else}
+                <div class="grid grid-cols-1 gap-4">
+                  <div>
+                    <p
+                      class="text-muted-foreground text-xs tracking-widest uppercase"
+                    >
+                      Current price
+                    </p>
+                    <p class="font-mono text-3xl font-medium">
+                      <span class="gradient-text"
+                        >{latest.clearingPriceValue}</span
+                      >
+                      {latest.currency.symbol}
+                    </p>
+                  </div>
+                  <div>
+                    <p
+                      class="text-muted-foreground text-xs tracking-widest uppercase"
+                    >
+                      Required to graduate
+                    </p>
+                    <p class="font-mono text-3xl font-medium">
+                      <span class="gradient-text"
+                        >{latest.requiredCurrency}</span
+                      >
+                      {latest.currency.symbol}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <p
+                      class="text-muted-foreground text-xs tracking-widest uppercase"
+                    >
+                      Total raised
+                    </p>
+                    <p class="text-muted font-mono text-xl">{latest.raised}</p>
+                  </div>
+                  <div>
+                    <p
+                      class="text-muted-foreground text-xs tracking-widest uppercase"
+                    >
+                      Bids
+                    </p>
+                    <p class="text-muted font-mono text-xl"
+                      >{latest.participants}</p
+                    >
+                  </div>
+                </div>
+              {/if}
+
+              <div class="bg-border-subtle h-px w-full"></div>
+
               <div>
                 <p
                   class="text-muted-foreground text-xs tracking-widest uppercase"
                 >
-                  Total raised
+                  {#if latest.status === 'Upcoming'}
+                    Starts in
+                  {:else}
+                    Time remaining
+                  {/if}
                 </p>
-                <p class="text-muted font-mono text-xl">$127,450</p>
-              </div>
-              <div>
-                <p
-                  class="text-muted-foreground text-xs tracking-widest uppercase"
-                >
-                  Participants
+                <p class="text-muted font-mono text-xl">
+                  {#if latest.status === 'Ended'}
+                    Ended
+                  {:else}
+                    {latest.remaining}
+                  {/if}
                 </p>
-                <p class="text-muted font-mono text-xl">342</p>
+                <p class="text-muted-foreground mt-2 text-xs">
+                  {formatDatetime(latest.a.start_time)} → {formatDatetime(
+                    latest.a.end_time
+                  )}
+                </p>
+              </div>
+
+              <!-- Mini chart visualization -->
+              <div class="bg-surface rounded-xl p-4">
+                <div class="mb-2 flex h-16 items-end justify-between gap-1">
+                  {#each [30, 45, 35, 60, 55, 70, 65, 80, 75, 90, 85, 100] as height}
+                    <div
+                      class="flex-1 rounded-t bg-linear-to-t from-purple-500/40 to-amber-500/80 transition-all hover:from-purple-500/60 hover:to-amber-400"
+                      style="height: {height}%;"
+                    ></div>
+                  {/each}
+                </div>
+                <p class="text-muted-foreground text-xs">
+                  Price adjusts continuously as bids come in. Your final cost is
+                  the clearing price at auction end—same for everyone.
+                </p>
               </div>
             </div>
 
-            <div class="bg-border-subtle h-px w-full"></div>
-
-            <div>
-              <p
-                class="text-muted-foreground text-xs tracking-widest uppercase"
-              >
-                Time remaining
-              </p>
-              <p class="text-muted font-mono text-xl">2d 14h 22m</p>
-            </div>
-
-            <!-- Mini chart visualization -->
-            <div class="bg-surface rounded-xl p-4">
-              <div class="mb-2 flex h-16 items-end justify-between gap-1">
-                {#each [30, 45, 35, 60, 55, 70, 65, 80, 75, 90, 85, 100] as height}
-                  <div
-                    class="flex-1 rounded-t bg-linear-to-t from-purple-500/40 to-amber-500/80 transition-all hover:from-purple-500/60 hover:to-amber-400"
-                    style="height: {height}%;"
-                  ></div>
-                {/each}
-              </div>
-              <p class="text-muted-foreground text-xs">
-                Price adjusts continuously as bids come in. Your final cost is
-                the clearing price at auction end—same for everyone.
-              </p>
-            </div>
-          </div>
-
+            <div
+              class="animate-pulse-glow absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-amber-500/20 blur-2xl"
+              aria-hidden="true"
+            ></div>
+          </a>
+        {:else}
           <div
-            class="animate-pulse-glow absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-amber-500/20 blur-2xl"
-            aria-hidden="true"
-          ></div>
-        </div>
+            class="animated-border glass-border from-surface-hover relative overflow-hidden rounded-xl bg-linear-to-b via-transparent to-transparent p-4 md:p-8"
+          >
+            <div class="text-muted flex items-center justify-between text-sm">
+              <span>Live auction preview</span>
+              <span class="flex items-center gap-1.5">
+                <span class="relative flex h-2 w-2">
+                  <span
+                    class="bg-border-subtle relative inline-flex h-2 w-2 rounded-full"
+                  ></span>
+                </span>
+                Loading…
+              </span>
+            </div>
+
+            <div class="mt-8 space-y-6">
+              <div>
+                <p
+                  class="text-muted-foreground text-xs tracking-widest uppercase"
+                >
+                  Current price
+                </p>
+                <p class="font-mono text-3xl font-medium">
+                  <span class="gradient-text">—</span>
+                </p>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <p
+                    class="text-muted-foreground text-xs tracking-widest uppercase"
+                  >
+                    Total raised
+                  </p>
+                  <p class="text-muted font-mono text-xl">—</p>
+                </div>
+                <div>
+                  <p
+                    class="text-muted-foreground text-xs tracking-widest uppercase"
+                  >
+                    Bids
+                  </p>
+                  <p class="text-muted font-mono text-xl">—</p>
+                </div>
+              </div>
+
+              <div class="bg-border-subtle h-px w-full"></div>
+
+              <div>
+                <p
+                  class="text-muted-foreground text-xs tracking-widest uppercase"
+                >
+                  Time remaining
+                </p>
+                <p class="text-muted font-mono text-xl">—</p>
+              </div>
+            </div>
+
+            <div
+              class="animate-pulse-glow absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-amber-500/20 blur-2xl"
+              aria-hidden="true"
+            ></div>
+          </div>
+        {/if}
       </div>
     </section>
 
@@ -346,7 +657,7 @@
             </div>
 
             <div
-              class="border-border-subtle bg-surface text-muted mb-4 inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold tracking-widest uppercase transition-colors group-hover:border-amber-500/50 group-hover:text-amber-400"
+              class="border-border-subtle bg-surface text-muted mb-4 inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold tracking-widest uppercase transition-colors group-hover:border-amber-500/50 group-hover:text-amber-500"
             >
               {item.tag}
             </div>
@@ -727,18 +1038,18 @@
           stack for agents to remember, transact, and evolve as first-class
           citizens in Web3.<br />
           <a
-            class="underline underline-offset-4 transition-colors hover:text-amber-400"
+            class="underline underline-offset-4 transition-colors hover:text-amber-500"
             href="https://anda.ai"
             target="_blank">Anda.AI</a
           >
           <span class="mx-1">|</span>
           <a
-            class="underline underline-offset-4 transition-colors hover:text-amber-400"
+            class="underline underline-offset-4 transition-colors hover:text-amber-500"
             href="https://dmsg.net">dMsg.net</a
           >
           <span class="mx-1">|</span>
           <a
-            class="underline underline-offset-4 transition-colors hover:text-amber-400"
+            class="underline underline-offset-4 transition-colors hover:text-amber-500"
             href="https://1bridge.app/">1Bridge.app</a
           >
         </p>
