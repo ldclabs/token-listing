@@ -58,7 +58,7 @@
         /></a
       >
       <div>
-        <p class="text-muted font-serif text-lg tracking-widest"
+        <p class="text-gold hidden font-serif text-lg tracking-widest md:flex"
           >TokenList.ing</p
         >
         <p class="text-foreground hidden text-base font-medium md:flex">

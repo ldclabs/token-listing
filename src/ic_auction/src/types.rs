@@ -86,6 +86,7 @@ pub struct StateInfo {
     pub governance_canister: Option<Principal>,
     pub auction_config: Option<AuctionConfig>,
     pub finalize_output: Option<FinalizeOutput>,
+    pub payment_requirements_extra: Option<String>,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]

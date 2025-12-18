@@ -131,6 +131,7 @@ export interface StateInfo {
   'paying_public_keys' : Array<Uint8Array | number[]>,
   'token_name' : string,
   'finalize_output' : [] | [FinalizeOutput],
+  'payment_requirements_extra' : [] | [string],
   'total_withdrawn_currency' : bigint,
   'restricted_countries' : Array<string>,
   'currency_program_id' : [] | [string],
@@ -174,6 +175,7 @@ export interface _SERVICE {
   'admin_set_currency' : ActorMethod<[TokenInput], Result_1>,
   'admin_set_finalize' : ActorMethod<[FinalizeKind], Result_1>,
   'admin_set_paying_public_keys' : ActorMethod<[Array<string>], Result_1>,
+  'admin_set_payment_requirements_extra' : ActorMethod<[string], Result_1>,
   'admin_set_project' : ActorMethod<[ProjectInput], Result_1>,
   'admin_set_providers' : ActorMethod<[Array<string>], Result_1>,
   'admin_set_token' : ActorMethod<[TokenInput], Result_1>,
@@ -198,6 +200,10 @@ export interface _SERVICE {
   'validate_admin_set_finalize' : ActorMethod<[FinalizeKind], Result_10>,
   'validate_admin_set_paying_public_keys' : ActorMethod<
     [Array<string>],
+    Result_10
+  >,
+  'validate_admin_set_payment_requirements_extra' : ActorMethod<
+    [string],
     Result_10
   >,
   'validate_admin_set_project' : ActorMethod<[ProjectInput], Result_10>,

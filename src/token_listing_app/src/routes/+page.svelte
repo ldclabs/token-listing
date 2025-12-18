@@ -272,7 +272,7 @@
           class="border-border-subtle text-muted bg-surface inline-flex items-center gap-3 rounded-full border px-2 py-1 text-xs font-semibold md:px-4 md:py-2"
         >
           <a
-            class="flex flex-row items-center gap-1 text-amber-500 transition hover:text-amber-700"
+            class="text-gold hover:text-gold-foreground flex flex-row items-center gap-1 transition"
             href="https://dashboard.internetcomputer.org/sns/d7wvo-iiaaa-aaaaq-aacsq-cai"
             target="_blank"
             rel="noreferrer"
@@ -292,7 +292,7 @@
           </a>
           <span class="">|</span>
           <a
-            class="flex flex-row items-center gap-1 text-indigo-500 transition hover:text-indigo-700"
+            class="flex flex-row items-center gap-1 text-indigo-600 transition hover:text-indigo-400"
             href="https://nns.ic0.app/proposals/?u=d7wvo-iiaaa-aaaaq-aacsq-cai"
             target="_blank"
             rel="noreferrer"

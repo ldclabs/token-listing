@@ -18,6 +18,8 @@
   --color-surface-hover: rgba(0, 0, 0, 0.05);
   --color-accent: #0a0a0f;
   --color-accent-foreground: #ffffff;
+  --color-gold: #e49e00;
+  --color-gold-foreground: #ffd700;
 }
 
 @layer base {
@@ -45,6 +47,8 @@
     --color-surface-hover: rgba(255, 255, 255, 0.05);
     --color-accent: #ffffff;
     --color-accent-foreground: #0a0a0f;
+    --color-gold: #e49e00;
+    --color-gold-foreground: #ffd700;
   }
 }
 
@@ -443,7 +447,7 @@ html.dark .glass-border,
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, #8b5cf6 0%, #d97706 50%, #fbbf24 100%);
+  background: linear-gradient(135deg, #8b5cf6 0%, #d97706 50%, #ffd700 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;

@@ -280,10 +280,6 @@ impl Auction {
         now_ms > self.cfg.end_time
     }
 
-    pub fn is_biddable(&self, now_ms: u64) -> bool {
-        now_ms + self.cfg.min_bid_duration < self.cfg.end_time
-    }
-
     pub fn currency_raised(&self) -> u128 {
         if self.is_graduated() {
             self.cumulative_demand_raised / self.price_precision

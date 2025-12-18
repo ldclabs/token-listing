@@ -19,5 +19,5 @@
   class="flex-cow inline-flex items-center justify-center gap-2 transition disabled:cursor-not-allowed {selfClass}"
 >
   {@render children()}
-  <Spinner class="size-5 {spinnerClass} {isLoading ? '' : 'hidden'}" />
+  <Spinner class="size-4 {spinnerClass} {isLoading ? '' : 'hidden'}" />
 </button>

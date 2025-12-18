@@ -1,5 +1,6 @@
 use ic_auth_types::{ByteBufB64, deterministic_cbor_into_vec};
 use ic_ed25519::PublicKey;
+use serde_json::{Map, Value};
 
 use crate::{
     helper::{format_error, msg_caller, sha3_256},
@@ -78,7 +79,7 @@ fn x402_payment(amount: u128, verify_only: bool) -> Result<types::X402PaymentOut
         let (network, pay_to) = match &s.chain {
             types::Chain::Icp(1) => ("icp:1".to_string(), s.icp_address.to_string()),
             types::Chain::Sol(0) => (
-                "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1sK6u9hC4BXj".to_string(),
+                "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1".to_string(),
                 s.sol_address.to_string(),
             ),
             types::Chain::Sol(1) => (
@@ -86,9 +87,14 @@ fn x402_payment(amount: u128, verify_only: bool) -> Result<types::X402PaymentOut
                 s.sol_address.to_string(),
             ),
             types::Chain::Evm(8453) => ("eip155:8453".to_string(), s.evm_address.to_string()),
-            types::Chain::Evm(84532) => ("eip155:8453".to_string(), s.evm_address.to_string()),
+            types::Chain::Evm(84532) => ("eip155:84532".to_string(), s.evm_address.to_string()),
             other => return Err(format!("{:?} is not supported yet", other)),
         };
+
+        let extra: Option<Map<String, Value>> = s
+            .payment_requirements_extra
+            .as_ref()
+            .map(|s| serde_json::from_str(s).unwrap());
 
         let pr = types::PaymentRequirements {
             scheme: "exact".to_string(),
@@ -97,7 +103,7 @@ fn x402_payment(amount: u128, verify_only: bool) -> Result<types::X402PaymentOut
             asset: s.currency.to_string(),
             pay_to,
             max_timeout_seconds: 120,
-            extra: None,
+            extra,
         };
         let nonce_seed =
             deterministic_cbor_into_vec(&(verify_only, &caller, timestamp, &pr, &s.nonce_iv))?;
@@ -183,7 +189,7 @@ fn x402_bind_address(input: types::PayingResultInput) -> Result<(), String> {
 async fn x402_deposit_currency(input: types::PayingResultInput) -> Result<u128, String> {
     let caller = msg_caller()?;
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    let settle_response = store::state::with(|s| {
+    let (settle_response, amount) = store::state::with(|s| {
         let mut verified = false;
         for pk_bytes in &s.paying_public_keys {
             let pk = PublicKey::deserialize_raw(&pk_bytes.0).map_err(format_error)?;
@@ -209,7 +215,7 @@ async fn x402_deposit_currency(input: types::PayingResultInput) -> Result<u128, 
         }
 
         let nonce_seed = deterministic_cbor_into_vec(&(
-            true,
+            false,
             &caller,
             input.timestamp,
             &pv.payment_requirements,
@@ -219,16 +225,21 @@ async fn x402_deposit_currency(input: types::PayingResultInput) -> Result<u128, 
         if nonce != pv.nonce {
             return Err("nonce mismatch".to_string());
         }
+        let amount: u128 = pv
+            .payment_requirements
+            .amount
+            .parse()
+            .map_err(|_| "invalid amount in payment requirements".to_string())?;
 
-        Ok(pv.settle_response)
+        Ok((pv.settle_response, amount))
     })?;
 
-    store::state::deposit_currency(
+    store::state::x402_deposit_currency(
         caller,
         settle_response.payer.unwrap(),
         settle_response.transaction,
+        amount,
         now_ms,
-        true,
     )
     .await
 }
@@ -260,7 +271,7 @@ fn claim_all() -> Result<Vec<types::BidInfo>, String> {
 async fn deposit_currency(input: types::DepositInput) -> Result<u128, String> {
     let caller = msg_caller()?;
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    store::state::deposit_currency(caller, input.sender, input.txid, now_ms, false).await
+    store::state::deposit_currency(caller, input.sender, input.txid, now_ms).await
 }
 
 // Withdraw currency from the auction contract

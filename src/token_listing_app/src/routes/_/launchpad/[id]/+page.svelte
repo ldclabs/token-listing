@@ -4,22 +4,19 @@
     AuctionConfig,
     AuctionInfo,
     BidInfo,
-    DepositTxInfo,
     StateInfo,
-    UserInfo,
-    WithdrawTxInfo,
-    X402PaymentOutput
+    UserInfo
   } from '$declarations/ic_auction/ic_auction.did'
   import { icAuctionActor } from '$lib/canisters/icAuction'
   import { tokenListingActor } from '$lib/canisters/tokenListing'
   import CanisterModal from '$lib/components/CanisterModal.svelte'
   import CCAModal from '$lib/components/CCAModal.svelte'
   import Header from '$lib/components/Header.svelte'
+  import UserFundsModal from '$lib/components/UserFundsModal.svelte'
   import { TOKEN_LISTING } from '$lib/constants'
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
   import InformationLine from '$lib/icons/information-line.svelte'
   import Settings4Line from '$lib/icons/settings-4-line.svelte'
-  import { x402Settle } from '$lib/services/paying'
   import { authStore, EventLogin } from '$lib/stores/auth.svelte'
   import { showModal } from '$lib/stores/modal.svelte'
   import { toastRun, triggerToast } from '$lib/stores/toast.svelte'
@@ -41,14 +38,6 @@
     type TokenInfo
   } from '$lib/utils/token'
   import { Principal } from '@dfinity/principal'
-  import {
-    base64ToBytes,
-    base64ToString,
-    payingKit,
-    type PaymentRequired,
-    type PaymentRequirements
-  } from '@ldclabs/1paying-kit'
-  import { decode, encode, rfc8949EncodeOptions } from 'cborg'
   import { onDestroy, onMount, tick } from 'svelte'
 
   const listingActor = tokenListingActor(TOKEN_LISTING)
@@ -70,20 +59,11 @@
   let grouped = $state<Array<[bigint, bigint]>>([])
   let tokenInfo = $state<TokenInfo>(PANDAToken)
   let currencyInfo = $state<TokenInfo>(ICPToken)
-  let x402Payment = $state<
-    (X402PaymentOutput & { paymentRequired: PaymentRequired }) | null
-  >(null)
-  let payReq = $state<{
-    payUrl: string
-    txid: string
-  } | null>(null)
 
   const tokenDisplay = $derived.by(() => new TokenDisplay(tokenInfo, 0n))
   const currencyDisplay = $derived.by(() => new TokenDisplay(currencyInfo, 0n))
 
   let myBids = $state<BidInfo[]>([])
-  let myDeposits = $state<DepositTxInfo[]>([])
-  let myWithdraws = $state<WithdrawTxInfo[]>([])
 
   // Inputs
   let floorPrice = $state(ICPToken.one)
@@ -110,9 +90,6 @@
     return 10n ** BigInt(val)
   })
   let groupedPrecision = $state('')
-
-  let withdrawCurrencyRecipient = $state('')
-  let withdrawTokenRecipient = $state('')
 
   const phase = $derived.by(() => {
     if (!auctionCfg) return 'unconfigured' as const
@@ -183,8 +160,6 @@
         bound_addresses: []
       }
       myBids = []
-      myDeposits = []
-      myWithdraws = []
       return
     }
     const infoRes = await actor.my_info()
@@ -192,18 +167,6 @@
 
     const bidsRes = await actor.my_bids()
     myBids = unwrapResult(bidsRes, 'failed to fetch my bids')
-
-    const depRes = await actor.my_deposits()
-    myDeposits = unwrapResult(depRes, 'failed to fetch my deposits')
-
-    const wdRes = await actor.my_withdraws()
-    myWithdraws = unwrapResult(wdRes, 'failed to fetch my withdraws')
-
-    await tick()
-    if (myInfo.bound_addresses[0]) {
-      withdrawCurrencyRecipient = myInfo.bound_addresses[0]
-      withdrawTokenRecipient = myInfo.bound_addresses[0]
-    }
   }
 
   let isSigningIn = $state(false)
@@ -235,6 +198,11 @@
             0n,
             `The highest bid is ${currencyDisplay.displayValue(auctionCfg.max_amount)} ${currencyInfo.symbol}`
           ]
+        if (amt > myInfo.currency_amount)
+          return [
+            0n,
+            `You only have ${currencyDisplay.displayValue(myInfo.currency_amount)} ${currencyInfo.symbol} available`
+          ]
       }
       return [amt, '']
     } catch (e) {
@@ -254,14 +222,6 @@
       bidMaxPrice = currencyDisplay.displayValue(
         priceLimitAtomic + priceLimitAtomic / 10n // add 10% buffer
       )
-      const x402 = await actor.x402_payment(bidAmountUnits, false)
-      const res = unwrapResult(
-        x402,
-        'failed to estimate x402 payment'
-      ) as X402PaymentOutput & { paymentRequired: PaymentRequired }
-      res.paymentRequired = decode(res.x402 as Uint8Array)
-      x402Payment = res
-      payReq = await payingKit.getPayUrl(res.paymentRequired)
     }).finally(() => {
       isEstimating = false
     })
@@ -292,6 +252,7 @@
       bidAmountErr === '' &&
       bidMaxPriceErr === '' &&
       bidAmountUnits > 0n &&
+      bidAmountUnits <= myInfo.currency_amount &&
       bidMaxPriceUnits > 0n &&
       (phase == 'prebid' || phase == 'bidding')
     )
@@ -301,47 +262,19 @@
     if (!stateInfo || !auctionCfg || !auctionInfo) {
       throw new Error('auction not ready')
     }
-    if (!isBidable || !x402Payment || !payReq) return
-    const payWindow = window.open(payReq.payUrl, '1paying-checkout')
+    if (!isBidable || isBidding) return
+    isBidding = true
     toastRun(async () => {
-      if (!isBidable || !x402Payment || !payReq) return
-
-      const paymentPayload = await payingKit.waitForPaymentPayload(payReq!.txid)
-
-      if (payWindow && !payWindow.closed) {
-        // Close the payment window if it's still open
-        // We can not reuse the window for another payment due to browser security policies
-        // Error: Blocked a frame with origin "https://1paying-coffee.zensh.workers.dev" from accessing a cross-origin frame.
-        payWindow.close()
-      }
-
-      const x402Res = await x402Settle({
-        paymentRequirements: x402Payment.paymentRequired
-          .accepts[0] as PaymentRequirements,
-        paymentPayload: JSON.parse(base64ToString(paymentPayload)),
-        nonce: x402Payment.nonce
-      })
-
-      triggerToast({ type: 'success', message: 'Payment successful' })
-
-      const depositRes = await actor.x402_deposit_currency({
-        result: encode(x402Res.result, rfc8949EncodeOptions),
-        signature: base64ToBytes(x402Res.signature),
-        timestamp: x402Payment.timestamp
-      })
-
-      unwrapResult(depositRes, 'failed to deposit currency via 1Paying')
-      triggerToast({ type: 'success', message: 'Deposit successful' })
-
       const res = await actor.submit_bid(bidAmountUnits, bidMaxPriceUnits)
       const bid = unwrapResult(res, 'submit bid failed')
       myBids.push(bid)
       triggerToast({ type: 'success', message: 'Bid has been submitted' })
-      bidAmount = ''
 
       await refreshAuction()
       await refreshMine()
     }).finally(() => {
+      bidAmount = ''
+      bidMaxPrice = ''
       isBidding = false
     })
   }
@@ -360,24 +293,11 @@
     await refreshMine()
   }
 
-  async function withdrawCurrency() {
-    const recipient = withdrawCurrencyRecipient.trim()
-    if (!recipient) throw new Error('Please fill in recipient')
-    const res = await actor.withdraw_currency({ recipient })
-    unwrapResult(res, 'withdraw currency failed')
-    triggerToast({ type: 'success', message: 'Currency withdrawal submitted' })
-    withdrawCurrencyRecipient = ''
-    await refreshMine()
-  }
-
-  async function withdrawToken() {
-    const recipient = withdrawTokenRecipient.trim()
-    if (!recipient) throw new Error('Please fill in recipient')
-    const res = await actor.withdraw_token({ recipient })
-    unwrapResult(res, 'withdraw token failed')
-    triggerToast({ type: 'success', message: 'Token withdrawal submitted' })
-    withdrawTokenRecipient = ''
-    await refreshMine()
+  function onBidAmountFocus() {
+    bidMaxPrice = '' // ensure re-estimation
+    if (bidAmount == '' && myInfo.currency_amount > 0n) {
+      bidAmount = currencyDisplay.displayValue(myInfo.currency_amount)
+    }
   }
 
   function onCCAModal() {
@@ -395,6 +315,19 @@
       size: 'xl',
       componentProps: {
         stateInfo
+      }
+    })
+  }
+
+  function onUserFundsModal() {
+    showModal({
+      title: 'My Funds',
+      component: UserFundsModal,
+      size: 'xl',
+      componentProps: {
+        stateInfo,
+        auction: actor,
+        myInfo
       }
     })
   }
@@ -449,11 +382,14 @@
       groupedPrecision = (floorGroupedPrecision * 5n).toString()
 
       await refreshAuction()
-      // await refreshMine()
-      authStore.addEventListener(EventLogin, refreshMine)
-      abortingQue.push(() => {
-        authStore.removeEventListener(EventLogin, refreshMine)
-      })
+      if (authStore.identity.isAuthenticated) {
+        await refreshMine()
+      } else {
+        authStore.addEventListener(EventLogin, refreshMine)
+        abortingQue.push(() => {
+          authStore.removeEventListener(EventLogin, refreshMine)
+        })
+      }
     }).abort
   })
 
@@ -583,7 +519,8 @@
 
             <div class="grid gap-3 sm:grid-cols-3">
               <div
-                class="border-border-subtle bg-surface rounded-lg border p-3"
+                class="border-border-subtle bg-surface group relative rounded-lg border p-3"
+                aria-label="Phase"
               >
                 <div
                   class="text-muted text-xs font-semibold tracking-wide uppercase"
@@ -591,6 +528,62 @@
                 >
                 <div class="mt-1 text-lg font-bold">
                   {phase}
+                </div>
+
+                <!-- Hover tooltip: show full phase flow -->
+                <div
+                  class=" bg-card pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-40 rounded-lg p-3 text-xs opacity-0 shadow transition-opacity group-hover:opacity-100"
+                  role="tooltip"
+                >
+                  <div
+                    class="text-muted mb-2 font-semibold tracking-wide uppercase"
+                  >
+                    All phases
+                  </div>
+                  <div class="space-y-1">
+                    <div
+                      class={phase === 'unconfigured'
+                        ? 'text-foreground font-semibold'
+                        : 'text-muted'}
+                    >
+                      unconfigured
+                    </div>
+                    <div
+                      class={phase === 'configured'
+                        ? 'text-foreground font-semibold'
+                        : 'text-muted'}
+                    >
+                      configured
+                    </div>
+                    <div
+                      class={phase === 'prebid'
+                        ? 'text-foreground font-semibold'
+                        : 'text-muted'}
+                    >
+                      prebid
+                    </div>
+                    <div
+                      class={phase === 'bidding'
+                        ? 'text-foreground font-semibold'
+                        : 'text-muted'}
+                    >
+                      bidding
+                    </div>
+                    <div
+                      class={phase === 'ending'
+                        ? 'text-foreground font-semibold'
+                        : 'text-muted'}
+                    >
+                      ending
+                    </div>
+                    <div
+                      class={phase === 'ended'
+                        ? 'text-foreground font-semibold'
+                        : 'text-muted'}
+                    >
+                      ended
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -719,9 +712,18 @@
                   </div>
                 </div>
                 <div class="flex items-center justify-between text-sm">
-                  <div class="text-muted">Total Supply</div>
+                  <div class="text-muted">Auction Supply</div>
                   <div class="font-semibold">
                     {tokenDisplay.displayValue(auctionCfg.total_supply)}
+                    {tokenDisplay.token.symbol}
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-sm">
+                  <div class="text-muted">Liquidity Supply</div>
+                  <div class="font-semibold">
+                    {tokenDisplay.displayValue(
+                      auctionCfg.liquidity_pool_amount
+                    )}
                     {tokenDisplay.token.symbol}
                   </div>
                 </div>
@@ -905,17 +907,31 @@
           {:else}
             <div class="mt-4 grid gap-3">
               <div>
-                <label
-                  class="text-muted text-xs font-semibold tracking-wide uppercase"
-                  for="bidAmount"
-                >
-                  Amount ({currencyInfo.symbol})
+                <label class="text-muted text-xs" for="bidAmount">
+                  <span class="font-semibold tracking-wide uppercase"
+                    >Amount</span
+                  >
+                  <span class=""
+                    >(Balance: {currencyDisplay.displayValue(
+                      myInfo.currency_amount
+                    )}
+                    {currencyInfo.symbol})</span
+                  >
+                  <button
+                    class="text-sm text-indigo-500 hover:text-indigo-700 disabled:cursor-not-allowed"
+                    onclick={onUserFundsModal}
+                    disabled={!stateInfo || !authStore.identity.isAuthenticated}
+                  >
+                    Deposit
+                  </button>
                 </label>
+
                 <input
                   id="bidAmount"
                   class="border-border-subtle bg-card mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                   placeholder={`e.g. ${currencyDisplay.displayValue(auctionCfg.min_amount)} ${currencyInfo.symbol}`}
                   bind:value={bidAmount}
+                  onfocus={onBidAmountFocus}
                   inputmode="decimal"
                 />
               </div>
@@ -1003,11 +1019,15 @@
               >Account</div
             >
             <div class="text-lg font-bold">My Activity</div>
-            <div class="text-muted text-sm"
-              >View bids, claim/refunds, and review transaction records.</div
-            >
           </div>
           <div class="flex items-center gap-2">
+            <button
+              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
+              onclick={onUserFundsModal}
+              disabled={!stateInfo || !authStore.identity.isAuthenticated}
+            >
+              My Funds
+            </button>
             <Button
               class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
               onclick={() => toastRun(claimAll, 'claim all failed')}
@@ -1019,258 +1039,82 @@
           </div>
         </div>
 
-        <div class="mt-6 grid gap-6 lg:grid-cols-3">
-          <div class="lg:col-span-2">
-            <div
-              class="text-muted mb-2 text-xs font-semibold tracking-wide uppercase"
-              >My Bids</div
-            >
-            {#if !auctionInfo || myBids.length === 0}
-              <div class="text-muted text-sm">No bids yet.</div>
-            {:else}
+        <div class="mt-6">
+          <div
+            class="text-muted mb-2 text-xs font-semibold tracking-wide uppercase"
+            >My Bids</div
+          >
+          {#if !auctionInfo || myBids.length === 0}
+            <div class="text-muted text-sm">No bids yet.</div>
+          {:else}
+            <div class="border-border-subtle overflow-hidden rounded-xl border">
               <div
-                class="border-border-subtle overflow-hidden rounded-xl border"
+                class="bg-surface grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold"
               >
-                <div
-                  class="bg-surface grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold"
-                >
-                  <div class="col-span-2">ID</div>
-                  <div class="col-span-3">Amount</div>
-                  <div class="col-span-3">Max Price</div>
-                  <div class="col-span-2">Status</div>
-                  <div class="col-span-2 text-right">Action</div>
-                </div>
-                {#each myBids as b (b.id)}
-                  {@const isOutbid = b.outbid_time.length === 1}
-                  {@const isClaimed = b.claim_time > 0n}
-                  {@const isClaimable =
-                    !isClaimed &&
-                    ((isOutbid && auctionInfo.is_graduated) ||
-                      phase == 'ended')}
-                  <div
-                    class="border-border-subtle grid grid-cols-12 gap-2 border-t px-3 py-2 text-xs"
-                  >
-                    <div class="col-span-2 font-semibold">{b.id.toString()}</div
-                    >
-                    <div class="col-span-3">
-                      {currencyDisplay.displayValue(b.amount)}
-                      {currencyInfo.symbol}
-                    </div>
-                    <div class="col-span-3"
-                      >{priceUnitsPerToken(b.max_price)}</div
-                    >
-                    <div class="col-span-2">
-                      {#if isClaimed}
-                        <span class="text-muted">claimed</span>
-                      {:else if isOutbid}
-                        <span class="text-muted">outbid</span>
-                      {:else}
-                        <span class="text-muted">active</span>
-                      {/if}
-                    </div>
-                    <div class="col-span-2 text-right">
-                      <Button
-                        class="border-border-subtle text-muted hover:border-foreground hover:text-foreground disabled:text-muted-foreground rounded-full border px-2 py-1 text-xs font-semibold {isClaimed
-                          ? 'invisible'
-                          : ''}"
-                        onclick={() =>
-                          toastRun(() => claimOne(b.id), 'claim failed')}
-                        disabled={!isClaimable}
-                      >
-                        Claim
-                      </Button>
-                    </div>
-                  </div>
-                  {#if b.tokens_filled > 0n || b.refund > 0n}
-                    <div
-                      class="border-border-subtle bg-surface grid grid-cols-12 gap-2 border-t px-3 py-2 text-xs"
-                    >
-                      <div class="text-muted col-span-12">
-                        Filled: <span class="text-foreground font-semibold"
-                          >{tokenDisplay.displayValue(b.tokens_filled)}
-                          {tokenInfo.symbol}</span
-                        >
-                        · Refund:
-                        <span class="text-foreground font-semibold"
-                          >{currencyDisplay.displayValue(b.refund)}
-                          {currencyInfo.symbol}</span
-                        >
-                      </div>
-                    </div>
-                  {/if}
-                {/each}
+                <div class="col-span-2">ID</div>
+                <div class="col-span-3">Amount</div>
+                <div class="col-span-3">Max Price</div>
+                <div class="col-span-2">Status</div>
+                <div class="col-span-2 text-right">Action</div>
               </div>
-            {/if}
-          </div>
-
-          <div>
-            <div
-              class="text-muted mb-2 text-xs font-semibold tracking-wide uppercase"
-              >Funds</div
-            >
-            <div class="space-y-4">
-              <div
-                class="border-border-subtle bg-surface rounded-xl border p-3"
-              >
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-semibold">Withdraw Currency</span>
-                  <span class="text-xs"
-                    >{currencyDisplay.displayValue(myInfo.currency_amount)}
-                    {currencyInfo.symbol}</span
-                  >
-                </div>
-                <div class="mt-3 space-y-2">
-                  <input
-                    class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-                    placeholder="recipient"
-                    bind:value={withdrawCurrencyRecipient}
-                  />
-                  <Button
-                    class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
-                    onclick={() =>
-                      toastRun(withdrawCurrency, 'withdraw failed')}
-                    disabled={myInfo.currency_amount == 0n ||
-                      !withdrawCurrencyRecipient}
-                  >
-                    Withdraw
-                  </Button>
-                </div>
-              </div>
-
-              {#if myInfo.token_amount > 0n}
+              {#each myBids as b (b.id)}
+                {@const isOutbid = b.outbid_time.length === 1}
+                {@const isClaimed = b.claim_time > 0n}
+                {@const isClaimable =
+                  !isClaimed &&
+                  ((isOutbid && auctionInfo.is_graduated) || phase == 'ended')}
                 <div
-                  class="border-border-subtle bg-surface rounded-xl border p-3"
+                  class="border-border-subtle grid grid-cols-12 gap-2 border-t px-3 py-2 text-xs"
                 >
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold">Withdraw Token</span>
-                    <span class="text-xs"
-                      >{tokenDisplay.displayValue(myInfo.token_amount)}
-                      {tokenInfo.symbol}</span
-                    >
+                  <div class="col-span-2 font-semibold">{b.id.toString()}</div>
+                  <div class="col-span-3">
+                    {currencyDisplay.displayValue(b.amount)}
+                    {currencyInfo.symbol}
                   </div>
-                  <div class="mt-3 space-y-2">
-                    <input
-                      class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-                      placeholder="recipient"
-                      bind:value={withdrawTokenRecipient}
-                    />
+                  <div class="col-span-3">{priceUnitsPerToken(b.max_price)}</div
+                  >
+                  <div class="col-span-2">
+                    {#if isClaimed}
+                      <span class="text-muted">claimed</span>
+                    {:else if isOutbid}
+                      <span class="text-muted">outbid</span>
+                    {:else}
+                      <span class="text-muted">active</span>
+                    {/if}
+                  </div>
+                  <div class="col-span-2 text-right">
                     <Button
-                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
-                      onclick={() => toastRun(withdrawToken, 'withdraw failed')}
-                      disabled={myInfo.token_amount == 0n ||
-                        !withdrawTokenRecipient}
+                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground disabled:text-muted-foreground rounded-full border px-2 py-1 text-xs font-semibold {isClaimed
+                        ? 'invisible'
+                        : ''}"
+                      onclick={() =>
+                        toastRun(() => claimOne(b.id), 'claim failed')}
+                      disabled={!isClaimable}
                     >
-                      Withdraw
+                      Claim
                     </Button>
                   </div>
                 </div>
-              {/if}
+                {#if b.tokens_filled > 0n || b.refund > 0n}
+                  <div
+                    class="border-border-subtle bg-surface grid grid-cols-12 gap-2 border-t px-3 py-2 text-xs"
+                  >
+                    <div class="text-muted col-span-12">
+                      Filled: <span class="text-foreground font-semibold"
+                        >{tokenDisplay.displayValue(b.tokens_filled)}
+                        {tokenInfo.symbol}</span
+                      >
+                      · Refund:
+                      <span class="text-foreground font-semibold"
+                        >{currencyDisplay.displayValue(b.refund)}
+                        {currencyInfo.symbol}</span
+                      >
+                    </div>
+                  </div>
+                {/if}
+              {/each}
             </div>
-          </div>
-        </div>
-
-        <div class="mt-8 grid gap-6 lg:grid-cols-2">
-          <div>
-            <div
-              class="text-muted mb-2 text-xs font-semibold tracking-wide uppercase"
-              >Deposits</div
-            >
-            {#if myDeposits.length === 0}
-              <div class="text-muted text-sm">No records yet.</div>
-            {:else}
-              <div
-                class="border-border-subtle overflow-hidden rounded-xl border"
-              >
-                {#each myDeposits as d (d.txid)}
-                  {@const txUrl = getTxUrl(stateInfo.chain, d.txid)}
-                  <div
-                    class="border-border-subtle border-t px-3 py-2 text-xs first:border-t-0"
-                  >
-                    <div class="flex items-center justify-between">
-                      <div class="font-semibold"
-                        >{#if txUrl}
-                          <a
-                            class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1"
-                            href={txUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {pruneAddress(d.txid, true)}
-                            <ArrowRightUpLine class="h-4 w-4" />
-                          </a>
-                        {:else}
-                          {pruneAddress(d.txid, true)}
-                        {/if}
-                      </div>
-                      <div class="text-muted">{formatDatetime(d.timestamp)}</div
-                      >
-                    </div>
-                    <div class="text-muted mt-1">
-                      {currencyDisplay.displayValue(d.amount)}
-                      {currencyInfo.symbol} · sender: {pruneAddress(d.sender)}
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </div>
-
-          <div>
-            <div
-              class="text-muted mb-2 text-xs font-semibold tracking-wide uppercase"
-              >Withdraws</div
-            >
-            {#if myWithdraws.length === 0}
-              <div class="text-muted text-sm">No records yet.</div>
-            {:else}
-              <div
-                class="border-border-subtle overflow-hidden rounded-xl border"
-              >
-                {#each myWithdraws as w (w.id)}
-                  {@const txUrl = getTxUrl(stateInfo.chain, w.txid)}
-                  <div
-                    class="border-border-subtle border-t px-3 py-2 text-xs first:border-t-0"
-                  >
-                    <div class="flex items-center justify-between">
-                      <div class="font-semibold">#{w.id.toString()}</div>
-                      <div class="text-muted">{formatDatetime(w.timestamp)}</div
-                      >
-                    </div>
-                    <div class="text-muted mt-1">
-                      {#if w.kind == 0}
-                        <span
-                          >{currencyDisplay.displayValue(w.amount)}
-                          {currencyInfo.symbol}</span
-                        >
-                      {:else}
-                        <span
-                          >{tokenDisplay.displayValue(w.amount)}
-                          {tokenInfo.symbol}</span
-                        >
-                      {/if}
-                      <span
-                        >{` · recipient:
-                        ${pruneAddress(w.recipient)} · `}
-                      </span>
-                      {#if txUrl}
-                        <a
-                          class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1"
-                          href={txUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {pruneAddress(w.txid, true)}
-                          <ArrowRightUpLine class="h-4 w-4" />
-                        </a>
-                      {:else}
-                        {pruneAddress(w.txid, true)}
-                      {/if}
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </div>
+          {/if}
         </div>
       </section>
     {/if}
@@ -1282,7 +1126,7 @@
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    line-clamp: 4;
-    -webkit-line-clamp: 4;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
   }
 </style>

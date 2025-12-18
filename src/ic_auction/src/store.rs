@@ -47,7 +47,6 @@ type Memory = VirtualMemory<DefaultMemoryImpl>;
 pub struct State {
     pub name: String,
     pub description: String,
-    #[serde(default)]
     pub detail: String,
     pub url: String,
     pub restricted_countries: Vec<String>,
@@ -96,6 +95,8 @@ pub struct State {
     pub auction_config: Option<AuctionConfig>,
     pub auction: Option<cca::Auction>,
     pub finalize_output: Option<FinalizeOutput>,
+    #[serde(default)]
+    pub payment_requirements_extra: Option<String>,
 }
 
 impl From<&State> for StateInfo {
@@ -135,6 +136,7 @@ impl From<&State> for StateInfo {
             governance_canister: s.governance_canister,
             finalize_output: s.finalize_output.clone(),
             auction_config: s.auction_config.clone(),
+            payment_requirements_extra: s.payment_requirements_extra.clone(),
         }
     }
 }
@@ -182,6 +184,7 @@ impl State {
             finalize_output: None,
             auction_config: None,
             auction: None,
+            payment_requirements_extra: None,
         }
     }
 }
@@ -842,24 +845,56 @@ pub mod state {
         })
     }
 
+    pub async fn x402_deposit_currency(
+        caller: Principal,
+        sender: String,
+        txid: String,
+        amount: u128,
+        now_ms: u64,
+    ) -> Result<u128, String> {
+        DEPOSITS.with_borrow_mut(|d| {
+            if d.contains_key(&txid) {
+                return Err("transaction already processed".to_string());
+            }
+
+            let tx = DepositTx {
+                user: caller,
+                sender: sender.clone(),
+                amount,
+                timestamp: now_ms,
+            };
+            d.insert(txid.clone(), tx.clone());
+            Ok(tx)
+        })?;
+
+        STATE.with_borrow_mut(|s| {
+            s.total_deposited_currency += amount;
+        });
+
+        USERS.with_borrow_mut(|u| {
+            let mut user = u.get(&caller).unwrap_or_default();
+            if !user.agreed_terms {
+                user.timestamp = now_ms;
+                user.agreed_terms = true;
+            }
+            user.bound_addresses.insert(sender.clone());
+            user.currency_amount += amount;
+            user.deposits.push(txid.clone());
+            let total_amount = user.currency_amount;
+            u.insert(caller, user);
+            Ok(total_amount)
+        })
+    }
+
     pub async fn deposit_currency(
         caller: Principal,
         sender: String,
         txid: String,
         now_ms: u64,
-        is_bound_address: bool,
     ) -> Result<u128, String> {
-        USERS.with_borrow_mut(|u| {
-            let mut info = u.get(&caller).unwrap_or_default();
-            if is_bound_address {
-                if info.bound_addresses.insert(sender.clone()) {
-                    if !info.agreed_terms {
-                        info.timestamp = now_ms;
-                        info.agreed_terms = true;
-                    }
-                    u.insert(caller, info);
-                }
-            } else if !info.bound_addresses.contains(&sender) {
+        USERS.with_borrow(|u| {
+            let info = u.get(&caller).unwrap_or_default();
+            if !info.bound_addresses.contains(&sender) {
                 return Err("sender address is not bound to user".to_string());
             }
 
@@ -867,17 +902,6 @@ pub mod state {
         })?;
 
         let chain = STATE.with_borrow_mut(|s| {
-            match &s.auction {
-                Some(auction) => {
-                    if !auction.is_biddable(now_ms) {
-                        return Err("auction is ending soon, deposits are not allowed".to_string());
-                    }
-                }
-                None => {
-                    return Err("auction is not ready".to_string());
-                }
-            }
-
             s.chain.parse_address(&sender)?;
             if let Some(ts) = s.pending_deposits.get(&caller)
                 && *ts + 20 * 1000 >= now_ms
@@ -950,22 +974,9 @@ pub mod state {
         now_ms: u64,
     ) -> Result<WithdrawTxInfo, String> {
         let (chain, token, decimals, program_id) = STATE.with_borrow(|s| {
-            match &s.auction {
-                Some(auction) => {
-                    if !auction.is_ended(now_ms) {
-                        return Err(
-                            "auction is not ended yet, withdrawals are not allowed".to_string()
-                        );
-                    }
-                }
-                None => {
-                    return Err("auction is not ready".to_string());
-                }
-            }
-
             s.chain.parse_address(&recipient)?;
 
-            Ok((
+            Ok::<_, String>((
                 s.chain.clone(),
                 s.currency.clone(),
                 s.currency_decimals,

@@ -1,6 +1,6 @@
-use std::str::FromStr;
-
 use ic_auth_types::ByteArrayB64;
+use serde_json::{Map, Value};
+use std::str::FromStr;
 use url::Url;
 
 use crate::{
@@ -160,6 +160,25 @@ fn validate_admin_set_providers(providers: Vec<String>) -> Result<String, String
         }
     }
     pretty_format(&(providers,))
+}
+
+#[ic_cdk::update(guard = "is_controller")]
+fn admin_set_payment_requirements_extra(payment_requirements_extra: String) -> Result<(), String> {
+    let _: Map<String, Value> =
+        serde_json::from_str(&payment_requirements_extra).map_err(format_error)?;
+    store::state::with_mut(|s| {
+        s.payment_requirements_extra = Some(payment_requirements_extra);
+        Ok(())
+    })
+}
+
+#[ic_cdk::update]
+fn validate_admin_set_payment_requirements_extra(
+    payment_requirements_extra: String,
+) -> Result<String, String> {
+    let _: Map<String, Value> =
+        serde_json::from_str(&payment_requirements_extra).map_err(format_error)?;
+    pretty_format(&(payment_requirements_extra,))
 }
 
 #[ic_cdk::update(guard = "is_controller")]

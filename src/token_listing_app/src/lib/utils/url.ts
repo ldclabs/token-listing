@@ -12,9 +12,10 @@ export function joinURL(
 ) {
   const url = new URL(baseURL)
   if (path) {
-    if (url.pathname.endsWith('/')) url.pathname = url.pathname.slice(0, -1)
-    if (!path.startsWith('/')) path = '/' + path
-    url.pathname += path
+    let pathname = url.pathname
+    if (!pathname.endsWith('/')) pathname += '/'
+    pathname += path.startsWith('/') ? path.slice(1) : path
+    url.pathname = pathname
   }
 
   toURLSearchParams(params ?? {}).forEach((value, key) => {

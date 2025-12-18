@@ -3,6 +3,7 @@ import { Actor, type ActorMethod, type ActorSubclass } from '@dfinity/agent'
 import type { IDL } from '@dfinity/candid'
 import type { Principal } from '@dfinity/principal'
 
+export { type ActorSubclass } from '@dfinity/agent'
 export function createActor<T = Record<string, ActorMethod>>({
   canisterId,
   idlFactory,
