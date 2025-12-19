@@ -269,10 +269,6 @@ impl Auction {
         // Iterate through all active bids (as currently stored in outbid_heap)
         for bid_order in self.outbid_heap.iter() {
             let price_range_key = (bid_order.max_price / precision) * precision;
-            ic_cdk::api::debug_print(format!(
-                "precision: {}, max_price: {}, price_range_key: {}",
-                precision, bid_order.max_price, price_range_key
-            ));
             let amount = price_buckets.entry(price_range_key).or_insert(0);
             *amount += bid_order.amount;
         }

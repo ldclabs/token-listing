@@ -46,6 +46,7 @@
     TokenDisplay,
     type TokenInfo
   } from '$lib/utils/token'
+  import { isActive } from '$lib/utils/window'
   import { Principal } from '@dfinity/principal'
   import { onDestroy, onMount, tick } from 'svelte'
 
@@ -478,12 +479,15 @@
       }
 
       timer = setInterval(() => {
-        if (phase == 'prebid' || phase == 'bidding' || phase == 'ending') {
+        if (
+          isActive() &&
+          (phase == 'prebid' || phase == 'bidding' || phase == 'ending')
+        ) {
           refreshAuction().catch((err) => {
             console.error('failed to refresh auction:', err)
           })
         }
-      }, 5000)
+      }, 10000)
       abortingQue.push(() => {
         if (timer) clearInterval(timer)
       })
