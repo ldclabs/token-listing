@@ -15,7 +15,12 @@
   import Button from '$lib/ui/Button.svelte'
   import TextClipboardButton from '$lib/ui/TextClipboardButton.svelte'
   import { getTxUrl } from '$lib/utils/chain'
-  import { formatDatetime, parseUnits, pruneAddress } from '$lib/utils/helper'
+  import {
+    formatDatetime,
+    parseUnits,
+    pruneAddress,
+    sleep
+  } from '$lib/utils/helper'
   import { TokenDisplay, type TokenInfo } from '$lib/utils/token'
   import {
     base64ToBytes,
@@ -31,11 +36,13 @@
   let {
     auction,
     stateInfo,
-    myInfo = $bindable()
+    myInfo = $bindable(),
+    onMyInfoChange
   }: {
     auction: AuctionService
     stateInfo: StateInfo
     myInfo: UserInfo
+    onMyInfoChange?: (next: UserInfo) => void
   } = $props()
 
   const tokenInfo = $derived<TokenInfo>({
@@ -80,7 +87,9 @@
       auction.my_withdraws()
     ])
 
-    myInfo = unwrapResult(infoRes, 'failed to fetch user info')
+    const _myInfo = unwrapResult(infoRes, 'failed to fetch user info')
+    myInfo = _myInfo
+    onMyInfoChange?.(_myInfo)
     myDeposits = unwrapResult(depRes, 'failed to fetch deposits')
     myWithdraws = unwrapResult(wdRes, 'failed to fetch withdraws')
   }
@@ -122,6 +131,7 @@
       })
       unwrapResult(bindRes, 'failed to bind address')
 
+      await sleep(2000)
       await refreshAll()
       triggerToast({ type: 'success', message: 'Address has been bound' })
     }).finally(() => {
@@ -202,13 +212,14 @@
       })
 
       unwrapResult(depositRes, 'failed to deposit currency via 1Paying')
+      triggerToast({ type: 'success', message: 'Currency has been deposited' })
       depositAmount = ''
-      await refreshAll()
       await payingKit.submitSettleResult(
         depositReq.txid,
         settled.result.settleResponse
       )
-      triggerToast({ type: 'success', message: 'Currency has been deposited' })
+      await sleep(2000)
+      await refreshAll()
     }).finally(() => {
       isPaying = false
       if (payWindow && !payWindow.closed) {
@@ -228,8 +239,9 @@
       if (!sender) throw new Error('Please fill in sender')
       const res = await auction.deposit_currency({ txid, sender })
       unwrapResult(res, 'deposit currency failed')
-      await refreshAll()
       triggerToast({ type: 'success', message: 'Currency has been deposited' })
+      await sleep(2000)
+      await refreshAll()
     }).finally(() => {
       isDepositingManually = false
       manualDepositTxid = ''
@@ -246,8 +258,9 @@
       if (!recipient) throw new Error('Please fill in recipient')
       const res = await auction.withdraw_currency({ recipient })
       unwrapResult(res, 'withdraw currency failed')
-      await refreshAll()
       triggerToast({ type: 'success', message: 'Currency has been withdrawn' })
+      await sleep(2000)
+      await refreshAll()
     }).finally(() => {
       isWithdrawingCurrency = false
       withdrawCurrencyRecipient = ''
@@ -264,8 +277,9 @@
       if (!recipient) throw new Error('Please fill in recipient')
       const res = await auction.withdraw_token({ recipient })
       unwrapResult(res, 'withdraw token failed')
-      await refreshAll()
       triggerToast({ type: 'success', message: 'Token has been withdrawn' })
+      await sleep(2000)
+      await refreshAll()
     }).finally(() => {
       isWithdrawingToken = false
       withdrawTokenRecipient = ''
@@ -273,9 +287,7 @@
   }
 
   onMount(() => {
-    return toastRun(async () => {
-      await refreshAll()
-    }).abort
+    return toastRun(refreshAll).abort
   })
 </script>
 

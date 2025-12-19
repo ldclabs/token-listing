@@ -96,7 +96,6 @@ export const idlFactory = ({ IDL }) => {
   const AuctionSnapshot = IDL.Record({
     'c' : IDL.Nat,
     'd' : IDL.Nat,
-    'f' : IDL.Nat,
     's' : IDL.Nat,
     't' : IDL.Nat64,
   });
@@ -131,6 +130,7 @@ export const idlFactory = ({ IDL }) => {
     'paying_public_keys' : IDL.Vec(IDL.Vec(IDL.Nat8)),
     'token_name' : IDL.Text,
     'finalize_output' : IDL.Opt(FinalizeOutput),
+    'payment_requirements_extra' : IDL.Opt(IDL.Text),
     'total_withdrawn_currency' : IDL.Nat,
     'restricted_countries' : IDL.Vec(IDL.Text),
     'currency_program_id' : IDL.Opt(IDL.Text),
@@ -183,6 +183,11 @@ export const idlFactory = ({ IDL }) => {
         [Result_1],
         [],
       ),
+    'admin_set_payment_requirements_extra' : IDL.Func(
+        [IDL.Text],
+        [Result_1],
+        [],
+      ),
     'admin_set_project' : IDL.Func([ProjectInput], [Result_1], []),
     'admin_set_providers' : IDL.Func([IDL.Vec(IDL.Text)], [Result_1], []),
     'admin_set_token' : IDL.Func([TokenInput], [Result_1], []),
@@ -215,6 +220,11 @@ export const idlFactory = ({ IDL }) => {
     'validate_admin_set_finalize' : IDL.Func([FinalizeKind], [Result_10], []),
     'validate_admin_set_paying_public_keys' : IDL.Func(
         [IDL.Vec(IDL.Text)],
+        [Result_10],
+        [],
+      ),
+    'validate_admin_set_payment_requirements_extra' : IDL.Func(
+        [IDL.Text],
         [Result_10],
         [],
       ),

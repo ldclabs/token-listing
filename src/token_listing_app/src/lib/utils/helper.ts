@@ -1,6 +1,10 @@
 import { Principal } from '@dfinity/principal'
 import { isAddress } from '@solana/kit'
 
+export async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export function pruneCanister(canisterId: string, long?: boolean) {
   if (long ?? globalThis.innerWidth >= 640) return canisterId
   return canisterId.slice(0, 7) + '...' + canisterId.slice(-5)

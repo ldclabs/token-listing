@@ -1,5 +1,5 @@
 type Theme = 'light' | 'dark'
-let themeValue = $state<Theme>('dark')
+let themeValue = $state<Theme>('light')
 
 const saveTheme = (value: Theme) => {
   themeValue = value
@@ -18,5 +18,5 @@ export const toggleTheme = () =>
   saveTheme(themeValue === 'dark' ? 'light' : 'dark')
 
 export function initTheme() {
-  saveTheme(localStorage['theme'] || 'dark')
+  saveTheme(localStorage['theme'] || 'light')
 }

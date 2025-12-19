@@ -19,7 +19,7 @@ type AuctionInfo = record {
   is_graduated : bool;
   cumulative_supply_released : nat;
 };
-type AuctionSnapshot = record { c : nat; d : nat; f : nat; s : nat; t : nat64 };
+type AuctionSnapshot = record { c : nat; d : nat; s : nat; t : nat64 };
 type BidInfo = record {
   id : nat64;
   tokens_filled : nat;
@@ -105,6 +105,7 @@ type StateInfo = record {
   paying_public_keys : vec blob;
   token_name : text;
   finalize_output : opt FinalizeOutput;
+  payment_requirements_extra : opt text;
   total_withdrawn_currency : nat;
   restricted_countries : vec text;
   currency_program_id : opt text;
@@ -148,6 +149,7 @@ service : (opt CanisterArgs) -> {
   admin_set_currency : (TokenInput) -> (Result_1);
   admin_set_finalize : (FinalizeKind) -> (Result_1);
   admin_set_paying_public_keys : (vec text) -> (Result_1);
+  admin_set_payment_requirements_extra : (text) -> (Result_1);
   admin_set_project : (ProjectInput) -> (Result_1);
   admin_set_providers : (vec text) -> (Result_1);
   admin_set_token : (TokenInput) -> (Result_1);
@@ -171,6 +173,7 @@ service : (opt CanisterArgs) -> {
   validate_admin_set_currency : (TokenInput) -> (Result_10);
   validate_admin_set_finalize : (FinalizeKind) -> (Result_10);
   validate_admin_set_paying_public_keys : (vec text) -> (Result_10);
+  validate_admin_set_payment_requirements_extra : (text) -> (Result_10);
   validate_admin_set_project : (ProjectInput) -> (Result_10);
   validate_admin_set_providers : (vec text) -> (Result_10);
   validate_admin_set_token : (TokenInput) -> (Result_10);

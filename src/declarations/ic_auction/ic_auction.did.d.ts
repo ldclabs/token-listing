@@ -26,7 +26,6 @@ export interface AuctionInfo {
 export interface AuctionSnapshot {
   'c' : bigint,
   'd' : bigint,
-  'f' : bigint,
   's' : bigint,
   't' : bigint,
 }

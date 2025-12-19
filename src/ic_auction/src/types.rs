@@ -200,9 +200,6 @@ pub struct AuctionSnapshot {
     // Current clearing price
     #[serde(rename = "c")]
     pub clearing_price: u128,
-    // Current total currency amount participating in the auction
-    #[serde(rename = "f")]
-    pub current_flow_rate: u128,
     // Cumulative currency raised
     #[serde(rename = "d")]
     pub cumulative_demand_raised: u128,

@@ -267,54 +267,31 @@
             <div class="mt-4">
               <svg
                 class="text-muted w-full"
-                viewBox="0 0 360 220"
+                viewBox="0 0 360 150"
                 fill="none"
-                aria-label="Integral CCA illustration: price path and accumulated token allocation"
+                aria-label="Integral CCA illustration: price path, time-weighted average, and accumulated token allocation"
                 role="img"
               >
-                <!-- Panels -->
+                <!-- Single panel -->
                 <rect
                   x="18"
                   y="14"
                   width="324"
-                  height="88"
-                  rx="10"
-                  class="fill-current"
-                  opacity="0.06"
-                />
-                <rect
-                  x="18"
-                  y="118"
-                  width="324"
-                  height="88"
+                  height="112"
                   rx="10"
                   class="fill-current"
                   opacity="0.06"
                 />
 
-                <!-- Axes (top: price vs time) -->
+                <!-- Axes (shared time axis) -->
                 <path
-                  d="M36 24 V96 H332"
+                  d="M36 24 V126 H332"
                   class="stroke-current"
                   stroke-width="1"
                   opacity="0.35"
                 />
                 <path
-                  d="M36 46 H332 M36 68 H332 M36 90 H332"
-                  class="stroke-current"
-                  stroke-width="1"
-                  opacity="0.12"
-                />
-
-                <!-- Axes (bottom: accumulated tokens vs time) -->
-                <path
-                  d="M36 128 V200 H332"
-                  class="stroke-current"
-                  stroke-width="1"
-                  opacity="0.35"
-                />
-                <path
-                  d="M36 150 H332 M36 172 H332 M36 194 H332"
+                  d="M36 46 H332 M36 68 H332 M36 90 H332 M36 112 H332"
                   class="stroke-current"
                   stroke-width="1"
                   opacity="0.12"
@@ -323,12 +300,12 @@
                 <!-- Price path area (integral) -->
                 <g class="text-purple-500/60">
                   <path
-                    d="M48 92 C 86 84, 108 56, 140 60 C 168 64, 188 80, 214 74 C 244 68, 268 44, 304 52 L304 96 L48 96 Z"
+                    d="M48 110 C 86 102, 108 64, 140 70 C 168 76, 188 96, 214 88 C 244 80, 268 54, 304 64 L304 126 L48 126 Z"
                     class="fill-current"
                     opacity="0.18"
                   />
                   <path
-                    d="M48 92 C 86 84, 108 56, 140 60 C 168 64, 188 80, 214 74 C 244 68, 268 44, 304 52"
+                    d="M48 110 C 86 102, 108 64, 140 70 C 168 76, 188 96, 214 88 C 244 80, 268 54, 304 64"
                     class="stroke-current"
                     stroke-width="2.5"
                     stroke-linecap="round"
@@ -338,7 +315,7 @@
                 <!-- Average price (time-weighted) guide line -->
                 <g class="text-amber-500/60">
                   <path
-                    d="M48 70 H332"
+                    d="M48 78 H332"
                     class="stroke-current"
                     stroke-width="2"
                     stroke-dasharray="6 4"
@@ -350,13 +327,13 @@
                 <!-- Accumulator / cumulative allocation curve -->
                 <g class="text-yellow-500/40">
                   <path
-                    d="M48 196 C 92 194, 118 186, 144 174 C 174 160, 196 152, 222 148 C 252 144, 276 138, 304 132"
+                    d="M48 99 C 92 90, 118 80, 144 68 C 174 55, 196 48, 222 40 C 252 31, 276 23, 304 15"
                     class="stroke-current"
                     stroke-width="2.5"
                     stroke-linecap="round"
                   />
                   <path
-                    d="M48 196 C 92 194, 118 186, 144 174 C 174 160, 196 152, 222 148 C 252 144, 276 138, 304 132 L304 200 L48 200 Z"
+                    d="M48 99 C 92 90, 118 80, 144 68 C 174 55, 196 48, 222 40 C 252 31, 276 23, 304 15 L304 126 L48 126 Z"
                     class="fill-current"
                     opacity="0.10"
                   />
@@ -370,21 +347,11 @@
                   font-size="10"
                   opacity="0.85"
                 >
-                  Price path P(t)
+                  Price path P(t) + Accumulator A(t)
                 </text>
-                <text
-                  x="36"
-                  y="120"
-                  class="fill-current"
-                  font-size="10"
-                  opacity="0.85"
-                >
-                  Accumulator A(t) (tokens received)
-                </text>
-
                 <text
                   x="252"
-                  y="66"
+                  y="74"
                   class="fill-current"
                   font-size="10"
                   opacity="0.85"
@@ -394,7 +361,7 @@
 
                 <text
                   x="284"
-                  y="214"
+                  y="144"
                   class="fill-current"
                   font-size="10"
                   opacity="0.7"

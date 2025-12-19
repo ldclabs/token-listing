@@ -125,7 +125,7 @@ impl PartialOrd for BidOrder {
 // Main struct: Auction State
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Auction {
-    cfg: AuctionConfig,
+    pub cfg: AuctionConfig,
     // 10 ** token_decimals
     one_token: u128,
     // Floor price per token, in currency atomic units
@@ -230,7 +230,7 @@ impl Auction {
             total_amount: self.total_amount,
             total_tokens_filled: self.total_tokens_filled,
             total_refunded: self.total_refunded,
-            cumulative_demand_raised: self.cumulative_demand_raised / self.price_precision,
+            cumulative_demand_raised: self.cumulative_demand_raised,
             cumulative_supply_released: self.cumulative_supply_released,
             is_graduated: self.is_graduated(),
             bids_count: self.next_bid_id - 1,
@@ -240,19 +240,20 @@ impl Auction {
             let dt = Nat::from(now_ms - self.last_update_time);
 
             if clearing_price > 0 {
-                let supply_delta = Nat::from(self.current_flow_rate)
-                    * dt.clone()
-                    * Nat::from(self.one_token * self.price_precision)
-                    / (Nat::from(RATE_PRECISION) * Nat::from(clearing_price));
+                let supply_delta =
+                    Nat::from(self.current_flow_rate) * dt.clone() * Nat::from(self.one_token)
+                        / (Nat::from(RATE_PRECISION) * Nat::from(clearing_price));
                 let supply_delta: u128 = supply_delta.0.try_into().expect("Supply delta overflow");
                 info.cumulative_supply_released += supply_delta;
             }
 
-            let demand_delta = Nat::from(self.current_flow_rate) * dt.clone()
-                / Nat::from(RATE_PRECISION * self.price_precision);
+            let demand_delta =
+                Nat::from(self.current_flow_rate) * dt.clone() / Nat::from(RATE_PRECISION);
             let demand_delta: u128 = demand_delta.0.try_into().expect("Demand delta overflow");
             info.cumulative_demand_raised += demand_delta;
         }
+
+        info.cumulative_demand_raised /= self.price_precision;
 
         info
     }
@@ -260,11 +261,18 @@ impl Auction {
     /// Get grouped bids information
     // Return: Vec<(price_range_start, total_amount_in_range)>
     pub fn get_grouped_bids(&self, precision: u128) -> Vec<(u128, u128)> {
-        let mut price_buckets: BTreeMap<u128, u128> = BTreeMap::new();
+        if precision == 0 {
+            return vec![];
+        }
 
-        // Iterate through all active bids
+        let mut price_buckets: BTreeMap<u128, u128> = BTreeMap::new();
+        // Iterate through all active bids (as currently stored in outbid_heap)
         for bid_order in self.outbid_heap.iter() {
             let price_range_key = (bid_order.max_price / precision) * precision;
+            ic_cdk::api::debug_print(format!(
+                "precision: {}, max_price: {}, price_range_key: {}",
+                precision, bid_order.max_price, price_range_key
+            ));
             let amount = price_buckets.entry(price_range_key).or_insert(0);
             *amount += bid_order.amount;
         }
@@ -557,7 +565,6 @@ impl Auction {
             AuctionSnapshot {
                 timestamp: now_ms,
                 clearing_price: clearing_price / self.price_precision,
-                current_flow_rate: self.current_flow_rate,
                 cumulative_demand_raised: self.cumulative_demand_raised / self.price_precision,
                 cumulative_supply_released: self.cumulative_supply_released,
             },

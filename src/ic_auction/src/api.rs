@@ -20,7 +20,7 @@ fn auction_info() -> Option<types::AuctionInfo> {
 
 #[ic_cdk::query]
 fn get_grouped_bids(precision: Option<u64>) -> Vec<(u128, u128)> {
-    store::state::get_grouped_bids(precision.unwrap_or(10) as u128)
+    store::state::get_grouped_bids(precision.unwrap_or(10).max(10) as u128)
 }
 
 #[ic_cdk::query]

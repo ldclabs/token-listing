@@ -96,7 +96,6 @@ export const idlFactory = ({ IDL }) => {
   const AuctionSnapshot = IDL.Record({
     'c' : IDL.Nat,
     'd' : IDL.Nat,
-    'f' : IDL.Nat,
     's' : IDL.Nat,
     't' : IDL.Nat64,
   });

@@ -19,7 +19,7 @@ type AuctionInfo = record {
   is_graduated : bool;
   cumulative_supply_released : nat;
 };
-type AuctionSnapshot = record { c : nat; d : nat; f : nat; s : nat; t : nat64 };
+type AuctionSnapshot = record { c : nat; d : nat; s : nat; t : nat64 };
 type BidInfo = record {
   id : nat64;
   tokens_filled : nat;

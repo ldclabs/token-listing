@@ -3,6 +3,7 @@
   import type {
     AuctionConfig,
     AuctionInfo,
+    AuctionSnapshot,
     BidInfo,
     StateInfo,
     UserInfo
@@ -12,8 +13,10 @@
   import CanisterModal from '$lib/components/CanisterModal.svelte'
   import CCAModal from '$lib/components/CCAModal.svelte'
   import Header from '$lib/components/Header.svelte'
+  import PriceDiscoveryChart from '$lib/components/PriceDiscoveryChart.svelte'
   import UserFundsModal from '$lib/components/UserFundsModal.svelte'
   import { TOKEN_LISTING } from '$lib/constants'
+  import ArrowDownSLine from '$lib/icons/arrow-down-s-line.svelte'
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
   import InformationLine from '$lib/icons/information-line.svelte'
   import Settings4Line from '$lib/icons/settings-4-line.svelte'
@@ -22,6 +25,7 @@
   import { toastRun, triggerToast } from '$lib/stores/toast.svelte'
   import { unwrapOption, unwrapResult } from '$lib/types/result'
   import Button from '$lib/ui/Button.svelte'
+  import Dropdown from '$lib/ui/Dropdown.svelte'
   import Spinner from '$lib/ui/Spinner.svelte'
   import {
     getAccountUrl,
@@ -29,7 +33,12 @@
     getTokenUrl,
     getTxUrl
   } from '$lib/utils/chain'
-  import { formatDatetime, parseUnits, pruneAddress } from '$lib/utils/helper'
+  import {
+    formatDatetime,
+    parseUnits,
+    pruneAddress,
+    sleep
+  } from '$lib/utils/helper'
   import { renderContent } from '$lib/utils/markdown'
   import {
     ICPToken,
@@ -57,6 +66,7 @@
     bound_addresses: []
   })
   let grouped = $state<Array<[bigint, bigint]>>([])
+  let snapshots = $state<Array<AuctionSnapshot>>([])
   let tokenInfo = $state<TokenInfo>(PANDAToken)
   let currencyInfo = $state<TokenInfo>(ICPToken)
 
@@ -89,8 +99,6 @@
     const val = Math.max(floorPrice.toString().length - 1, 1)
     return 10n ** BigInt(val)
   })
-  let groupedPrecision = $state('')
-
   const phase = $derived.by(() => {
     if (!auctionCfg) return 'unconfigured' as const
     if (!auctionInfo) return 'configured' as const
@@ -137,17 +145,87 @@
     return `${currencyDisplay.displayValue(priceAtomic)} ${currencyInfo.symbol}/${tokenInfo.symbol}`
   }
 
-  async function refreshAuction() {
-    const ai = unwrapOption(await actor.auction_info())
-    auctionInfo = ai
+  let openPriceBucket = $state(false)
+  let isLoadingBuckets = $state(false)
+  let groupedPrecision = $state(0n)
+  const handlePriceBucket = (precision: bigint) => {
+    openPriceBucket = false
+    if (isLoadingBuckets) return
+    groupedPrecision = precision
+    toastRun(refreshGrouped)
   }
 
   async function refreshGrouped() {
     try {
-      const precisionAtomic = BigInt(groupedPrecision)
-      console.log(groupedPrecision, precisionAtomic)
-      grouped = await actor.get_grouped_bids([precisionAtomic])
-    } catch {}
+      isLoadingBuckets = true
+      grouped = await actor.get_grouped_bids([groupedPrecision])
+    } finally {
+      isLoadingBuckets = false
+    }
+  }
+
+  let fromTimestamp = $state<bigint>(0n)
+  let isRefreshingSnapshots = $state(false)
+
+  function mergeSnapshots(next: AuctionSnapshot[]) {
+    if (next.length === 0) return
+
+    // Ensure chronological order from API.
+    next.sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0))
+
+    // De-duplicate/merge by timestamp.
+    const indexByT = new Map<bigint, number>()
+    for (let i = 0; i < snapshots.length; i++) {
+      const s = snapshots[i]
+      if (s) indexByT.set(s.t, i)
+    }
+
+    for (const s of next) {
+      const idx = indexByT.get(s.t)
+      if (idx === undefined) {
+        indexByT.set(s.t, snapshots.length)
+        snapshots.push(s)
+      } else {
+        snapshots[idx] = s
+      }
+    }
+
+    // Keep local list sorted (cheap, snapshots is bounded).
+    snapshots.sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0))
+  }
+
+  async function refreshSnapshot() {
+    if (isRefreshingSnapshots) return
+    isRefreshingSnapshots = true
+    try {
+      while (true) {
+        const start = fromTimestamp
+        const res = await actor.get_snapshots(start, 100n)
+        if (res.length === 0) break
+
+        // Filter out anything older than the requested start (defensive).
+        const filtered = res.filter((s) => s.t >= start)
+        mergeSnapshots(filtered)
+
+        // Advance cursor by the maximum timestamp actually observed.
+        let maxT = start
+        for (const s of filtered) if (s.t > maxT) maxT = s.t
+        fromTimestamp = maxT + 1n // next timestamp
+
+        if (res.length !== 100) break
+      }
+    } catch {
+    } finally {
+      isRefreshingSnapshots = false
+    }
+  }
+
+  async function refreshAuction() {
+    const ai = await actor.auction_info()
+    auctionInfo = unwrapOption(ai)
+
+    await refreshGrouped()
+    await refreshSnapshot()
   }
 
   async function refreshMine() {
@@ -212,15 +290,17 @@
 
   let isEstimating = $state(false)
   let bidMaxPriceLimit = $state(0n)
+  let estimateClearingPrice = $state('')
   function estimateMaxPrice() {
     toastRun(async () => {
       if (isEstimating || bidAmountUnits == 0n) return
       if (!stateInfo) throw new Error('state not ready')
-      const [_priceAtomic, priceLimitAtomic] =
+      const [priceAtomic, priceLimitAtomic] =
         await actor.estimate_max_price(bidAmountUnits)
       bidMaxPriceLimit = priceLimitAtomic
+      estimateClearingPrice = currencyDisplay.displayValue(priceAtomic)
       bidMaxPrice = currencyDisplay.displayValue(
-        priceLimitAtomic + priceLimitAtomic / 10n // add 10% buffer
+        priceLimitAtomic * 2n // add 100% buffer
       )
     }).finally(() => {
       isEstimating = false
@@ -270,11 +350,13 @@
       myBids.push(bid)
       triggerToast({ type: 'success', message: 'Bid has been submitted' })
 
+      await sleep(2000)
       await refreshAuction()
       await refreshMine()
     }).finally(() => {
       bidAmount = ''
       bidMaxPrice = ''
+      estimateClearingPrice = ''
       isBidding = false
     })
   }
@@ -283,6 +365,7 @@
     const res = await actor.claim(id)
     unwrapResult(res, 'claim failed')
     triggerToast({ type: 'success', message: 'Received/Refund completed' })
+    await sleep(2000)
     await refreshMine()
   }
 
@@ -290,11 +373,13 @@
     const res = await actor.claim_all()
     unwrapResult(res, 'claim all failed')
     triggerToast({ type: 'success', message: 'Received/Refund completed' })
+    await sleep(2000)
     await refreshMine()
   }
 
   function onBidAmountFocus() {
     bidMaxPrice = '' // ensure re-estimation
+    estimateClearingPrice = ''
     if (bidAmount == '' && myInfo.currency_amount > 0n) {
       bidAmount = currencyDisplay.displayValue(myInfo.currency_amount)
     }
@@ -327,7 +412,8 @@
       componentProps: {
         stateInfo,
         auction: actor,
-        myInfo
+        myInfo,
+        onMyInfoChange: (next: UserInfo) => (myInfo = next)
       }
     })
   }
@@ -379,7 +465,7 @@
       }
 
       await tick()
-      groupedPrecision = (floorGroupedPrecision * 5n).toString()
+      groupedPrecision = floorGroupedPrecision * 5n
 
       await refreshAuction()
       if (authStore.identity.isAuthenticated) {
@@ -390,6 +476,17 @@
           authStore.removeEventListener(EventLogin, refreshMine)
         })
       }
+
+      timer = setInterval(() => {
+        if (phase == 'prebid' || phase == 'bidding' || phase == 'ending') {
+          refreshAuction().catch((err) => {
+            console.error('failed to refresh auction:', err)
+          })
+        }
+      }, 5000)
+      abortingQue.push(() => {
+        if (timer) clearInterval(timer)
+      })
     }).abort
   })
 
@@ -397,6 +494,15 @@
     if (timer) clearInterval(timer)
   })
 </script>
+
+{#snippet priceBucketTrigger()}
+  <div class="flex min-w-0 items-center gap-1 text-sm">
+    <span class="font-medium"
+      >{currencyDisplay.displayValue(groupedPrecision)}</span
+    >
+    <ArrowDownSLine class="size-4" />
+  </div>
+{/snippet}
 
 <div class="relative flex min-h-screen flex-col overflow-x-hidden">
   <!-- Global decorative elements -->
@@ -592,9 +698,10 @@
               >
                 <div
                   class="text-muted text-xs font-semibold tracking-wide uppercase"
-                  >Bidders</div
+                  >Bids / Bidders</div
                 >
                 <div class="mt-1 text-lg font-bold">
+                  {auctionInfo ? auctionInfo.bids_count : '0'} /
                   {stateInfo.total_bidders}
                 </div>
               </div>
@@ -801,9 +908,11 @@
               </div>
             </div>
             <div class="border-border-subtle bg-surface rounded-lg border p-3">
-              <div class="text-muted text-xs">Bids</div>
+              <div class="text-muted text-xs">Total Committed</div>
               <div class="mt-1 text-base font-bold">
-                {auctionInfo ? auctionInfo.bids_count : '0'}
+                {auctionInfo
+                  ? `${currencyDisplay.displayValue(auctionInfo.total_amount)} ${currencyInfo.symbol}`
+                  : '—'}
               </div>
             </div>
           </div>
@@ -814,42 +923,90 @@
                 class="text-muted text-xs font-semibold tracking-wide uppercase"
                 >Demand Distribution</div
               >
-              <div class="flex items-center gap-2">
-                <label class="text-muted text-xs" for="groupedPrecision"
-                  >Bucket</label
+              <div class="flex items-center gap-1">
+                <span class="text-muted text-xs">Bucket</span>
+                <Dropdown
+                  open={openPriceBucket}
+                  trigger={priceBucketTrigger}
+                  triggerClass="px-0 py-2 duration-200 overflow-hidden disabled:cursor-not-allowed disabled:opacity-50"
+                  menuClass="top-full mt-0 w-32 rounded-xl border border-white/20 bg-card shadow"
                 >
-                <select
-                  id="groupedPrecision"
-                  class="border-border-subtle bg-card w-16 rounded-md border px-1 py-1 text-xs"
-                  bind:value={groupedPrecision}
-                  oninput={() => toastRun(refreshGrouped)}
-                >
-                  <option value={floorGroupedPrecision}
-                    >{currencyDisplay.displayValue(
-                      floorGroupedPrecision
-                    )}</option
-                  >
-                  <option value={floorGroupedPrecision * 5n}
-                    >{currencyDisplay.displayValue(
-                      floorGroupedPrecision * 5n
-                    )}</option
-                  >
-                  <option value={floorGroupedPrecision * 10n}
-                    >{currencyDisplay.displayValue(
-                      floorGroupedPrecision * 10n
-                    )}</option
-                  >
-                  <option value={floorGroupedPrecision * 50n}
-                    >{currencyDisplay.displayValue(
-                      floorGroupedPrecision * 50n
-                    )}</option
-                  >
-                  <option value={floorGroupedPrecision * 100n}
-                    >{currencyDisplay.displayValue(
-                      floorGroupedPrecision * 100n
-                    )}</option
-                  >
-                </select>
+                  <ul class="py-4">
+                    <li>
+                      <button
+                        disabled={groupedPrecision == floorGroupedPrecision}
+                        onclick={() => handlePriceBucket(floorGroupedPrecision)}
+                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span
+                          >{currencyDisplay.displayValue(
+                            floorGroupedPrecision
+                          )}</span
+                        >
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        disabled={groupedPrecision ==
+                          floorGroupedPrecision * 5n}
+                        onclick={() =>
+                          handlePriceBucket(floorGroupedPrecision * 5n)}
+                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span
+                          >{currencyDisplay.displayValue(
+                            floorGroupedPrecision * 5n
+                          )}</span
+                        >
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        disabled={groupedPrecision ==
+                          floorGroupedPrecision * 10n}
+                        onclick={() =>
+                          handlePriceBucket(floorGroupedPrecision * 10n)}
+                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span
+                          >{currencyDisplay.displayValue(
+                            floorGroupedPrecision * 10n
+                          )}</span
+                        >
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        disabled={groupedPrecision ==
+                          floorGroupedPrecision * 50n}
+                        onclick={() =>
+                          handlePriceBucket(floorGroupedPrecision * 50n)}
+                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span
+                          >{currencyDisplay.displayValue(
+                            floorGroupedPrecision * 50n
+                          )}</span
+                        >
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        disabled={groupedPrecision ==
+                          floorGroupedPrecision * 100n}
+                        onclick={() =>
+                          handlePriceBucket(floorGroupedPrecision * 100n)}
+                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span
+                          >{currencyDisplay.displayValue(
+                            floorGroupedPrecision * 100n
+                          )}</span
+                        >
+                      </button>
+                    </li>
+                  </ul>
+                </Dropdown>
                 <span class="text-muted text-xs"
                   >{currencyInfo.symbol}/{tokenInfo.symbol}</span
                 >
@@ -870,7 +1027,7 @@
                 {#each grouped as [p, a]}
                   <div class="flex items-center gap-3">
                     <div class="text-muted w-28 text-xs sm:w-32">
-                      ≤ {currencyDisplay.displayValue(p)}
+                      ≥ {currencyDisplay.displayValue(p)}
                     </div>
                     <div
                       class="bg-surface h-2 flex-1 overflow-hidden rounded-full"
@@ -932,6 +1089,7 @@
                   placeholder={`e.g. ${currencyDisplay.displayValue(auctionCfg.min_amount)} ${currencyInfo.symbol}`}
                   bind:value={bidAmount}
                   onfocus={onBidAmountFocus}
+                  disabled={phase != 'prebid' && phase != 'bidding'}
                   inputmode="decimal"
                 />
               </div>
@@ -952,6 +1110,7 @@
                   placeholder={`e.g. ${currencyDisplay.displayValue(auctionInfo ? auctionInfo.clearing_price * 2n : floorPrice)} ${currencyInfo.symbol}/${tokenInfo.symbol}`}
                   bind:value={bidMaxPrice}
                   onfocus={estimateMaxPrice}
+                  disabled={phase != 'prebid' && phase != 'bidding'}
                   inputmode="decimal"
                 />
               </div>
@@ -994,6 +1153,19 @@
                     {bidAmountErr || bidMaxPriceErr}
                   </p>
                 {:else}
+                  {#if estimateClearingPrice}
+                    <div
+                      class="border-border-subtle mb-2 flex items-center justify-between border-b pb-2"
+                    >
+                      <span class="text-muted font-semibold uppercase"
+                        >Estimated Clearing Price</span
+                      >
+                      <span class="font-bold text-indigo-500">
+                        {estimateClearingPrice}
+                        {currencyInfo.symbol}/{tokenInfo.symbol}
+                      </span>
+                    </div>
+                  {/if}
                   <p class="">
                     Bids are streamed linearly over the remaining time. Early
                     entry maximizes capital deployment. <b
@@ -1007,6 +1179,16 @@
           {/if}
         </div>
       </section>
+
+      <!-- Price Discovery Chart -->
+      <PriceDiscoveryChart
+        {snapshots}
+        {auctionInfo}
+        {auctionCfg}
+        {currencyInfo}
+        {currencyDisplay}
+        {priceUnitsPerToken}
+      />
 
       <!-- My activity -->
       <section class="glass-border rounded-xl p-4 md:p-6">
@@ -1073,13 +1255,15 @@
                   </div>
                   <div class="col-span-3">{priceUnitsPerToken(b.max_price)}</div
                   >
-                  <div class="col-span-2">
+                  <div class="text-muted col-span-2">
                     {#if isClaimed}
-                      <span class="text-muted">claimed</span>
+                      <span>claimed</span>
                     {:else if isOutbid}
-                      <span class="text-muted">outbid</span>
+                      <span>outbid</span>
+                    {:else if phase === 'ended'}
+                      <span>settled</span>
                     {:else}
-                      <span class="text-muted">active</span>
+                      <span>active</span>
                     {/if}
                   </div>
                   <div class="col-span-2 text-right">
