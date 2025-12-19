@@ -540,8 +540,9 @@
                   {/each}
                 </div>
                 <p class="text-muted-foreground text-xs">
-                  Price adjusts continuously as bids come in. Your final cost is
-                  the clearing price at auction end—same for everyone.
+                  Real-time price discovery. You accumulate tokens continuously
+                  at the current market price for as long as your bid remains
+                  active.
                 </p>
               </div>
             </div>

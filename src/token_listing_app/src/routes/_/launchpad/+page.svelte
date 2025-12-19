@@ -114,18 +114,314 @@
   <main
     class="relative z-10 mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-10"
   >
-    <section class="glass-border rounded-xl p-4 md:p-6">
-      <div class="flex items-end justify-between gap-4">
-        <div>
-          <div class="text-muted text-xs font-semibold tracking-wide uppercase">
-            Auctions
-          </div>
-          <div class="text-lg font-bold">Launchpad</div>
-          <div class="text-muted mt-1 text-sm">
-            Browse active and upcoming Continuous Clearing Auctions.
+    <section
+      class="glass-border relative overflow-hidden rounded-xl p-4 md:p-6"
+    >
+      <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div
+          class="absolute -top-24 -left-24 h-56 w-56 rounded-full bg-purple-500/10 blur-3xl"
+        ></div>
+        <div
+          class="absolute -right-24 -bottom-24 h-64 w-64 rounded-full bg-amber-500/10 blur-3xl"
+        ></div>
+      </div>
+
+      <div class="relative">
+        <div
+          class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"
+        >
+          <div class="min-w-0">
+            <div
+              class="text-muted text-xs font-semibold tracking-wide uppercase"
+            >
+              Launchpad
+            </div>
+            <div class="mt-1 text-lg font-bold md:text-2xl">
+              Token Launches, Finally Fair.
+            </div>
+            <div class="text-muted mt-2 max-w-2xl text-sm leading-relaxed">
+              Say goodbye to bot snipers, gas wars, and rushed decision-making.
+              Tokenlist.ing utilizes the Continuous Clearing Auction (CCA)
+              mechanism to democratize price discovery.
+            </div>
+            <div class="text-muted mt-2 max-w-2xl text-sm leading-relaxed">
+              Unlike traditional Fixed-Price or Dutch auctions where timing is
+              everything, CCA allows the market to find the true price naturally
+              over time.
+            </div>
+
+            <div class="mt-3 flex flex-wrap gap-2">
+              <span
+                class="border-border-subtle bg-surface text-muted inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+              >
+                Continuous Clearing Auction
+              </span>
+              <span
+                class="border-border-subtle bg-surface text-muted inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+              >
+                Bot Resistant
+              </span>
+              <span
+                class="border-border-subtle bg-surface text-muted inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+              >
+                Fully On Chain
+              </span>
+            </div>
           </div>
         </div>
-        <div class="text-muted text-xs">Showing {auctions.length} items</div>
+
+        <div class="mt-5 grid gap-3 lg:grid-cols-3">
+          <div class="border-border-subtle bg-surface rounded-lg border p-4">
+            <div class="text-xs font-semibold tracking-wide uppercase">
+              No Timing Games
+            </div>
+            <div class="text-muted mt-1 text-sm leading-relaxed">
+              Your entry price depends on valuation, not how fast you click.
+            </div>
+          </div>
+
+          <div class="border-border-subtle bg-surface rounded-lg border p-4">
+            <div class="text-xs font-semibold tracking-wide uppercase">
+              Bot Resistant
+            </div>
+            <div class="text-muted mt-1 text-sm leading-relaxed">
+              Sniping is mathematically impossible.
+            </div>
+          </div>
+
+          <div class="border-border-subtle bg-surface rounded-lg border p-4">
+            <div class="text-xs font-semibold tracking-wide uppercase">
+              Millisecond Precision
+            </div>
+            <div class="text-muted mt-1 text-sm leading-relaxed">
+              Powered by ICP, enjoying a seamless, real-time auction experience.
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 grid gap-3 md:grid-cols-2">
+          <div class="p-4">
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-xs font-semibold tracking-wide uppercase">
+                How CCA Works
+              </div>
+              <div
+                class="text-muted text-[10px] font-semibold tracking-wide uppercase"
+              >
+                Time-Weighted Allocation
+              </div>
+            </div>
+
+            <div class="mt-3 grid gap-2">
+              <div class="flex items-start gap-3">
+                <div
+                  class="border-border-subtle bg-surface text-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold"
+                >
+                  1
+                </div>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold">Place bids over time</div>
+                  <div class="text-muted mt-0.5 text-xs leading-relaxed">
+                    Decide based on valuation, not speed.
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-start gap-3">
+                <div
+                  class="border-border-subtle bg-surface text-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold"
+                >
+                  2
+                </div>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold">Demand accumulates</div>
+                  <div class="text-muted mt-0.5 text-xs leading-relaxed">
+                    The book aggregates naturally as participants join.
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-start gap-3">
+                <div
+                  class="border-border-subtle bg-surface text-muted flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold"
+                >
+                  3
+                </div>
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold">Market clears fairly</div>
+                  <div class="text-muted mt-0.5 text-xs leading-relaxed">
+                    Allocation is determined by accumulated participation.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4">
+            <div class="text-xs font-semibold tracking-wide uppercase">
+              Integral CCA (Accumulator)
+            </div>
+            <div class="text-muted mt-1 text-xs leading-relaxed">
+              Your effective entry is time-weighted by the price path:
+              allocation accumulates over time, not from the last-tick price.
+            </div>
+
+            <div class="mt-4">
+              <svg
+                class="text-muted w-full"
+                viewBox="0 0 360 220"
+                fill="none"
+                aria-label="Integral CCA illustration: price path and accumulated token allocation"
+                role="img"
+              >
+                <!-- Panels -->
+                <rect
+                  x="18"
+                  y="14"
+                  width="324"
+                  height="88"
+                  rx="10"
+                  class="fill-current"
+                  opacity="0.06"
+                />
+                <rect
+                  x="18"
+                  y="118"
+                  width="324"
+                  height="88"
+                  rx="10"
+                  class="fill-current"
+                  opacity="0.06"
+                />
+
+                <!-- Axes (top: price vs time) -->
+                <path
+                  d="M36 24 V96 H332"
+                  class="stroke-current"
+                  stroke-width="1"
+                  opacity="0.35"
+                />
+                <path
+                  d="M36 46 H332 M36 68 H332 M36 90 H332"
+                  class="stroke-current"
+                  stroke-width="1"
+                  opacity="0.12"
+                />
+
+                <!-- Axes (bottom: accumulated tokens vs time) -->
+                <path
+                  d="M36 128 V200 H332"
+                  class="stroke-current"
+                  stroke-width="1"
+                  opacity="0.35"
+                />
+                <path
+                  d="M36 150 H332 M36 172 H332 M36 194 H332"
+                  class="stroke-current"
+                  stroke-width="1"
+                  opacity="0.12"
+                />
+
+                <!-- Price path area (integral) -->
+                <g class="text-purple-500/60">
+                  <path
+                    d="M48 92 C 86 84, 108 56, 140 60 C 168 64, 188 80, 214 74 C 244 68, 268 44, 304 52 L304 96 L48 96 Z"
+                    class="fill-current"
+                    opacity="0.18"
+                  />
+                  <path
+                    d="M48 92 C 86 84, 108 56, 140 60 C 168 64, 188 80, 214 74 C 244 68, 268 44, 304 52"
+                    class="stroke-current"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                  />
+                </g>
+
+                <!-- Average price (time-weighted) guide line -->
+                <g class="text-amber-500/60">
+                  <path
+                    d="M48 70 H332"
+                    class="stroke-current"
+                    stroke-width="2"
+                    stroke-dasharray="6 4"
+                    stroke-linecap="round"
+                    opacity="0.9"
+                  />
+                </g>
+
+                <!-- Accumulator / cumulative allocation curve -->
+                <g class="text-yellow-500/40">
+                  <path
+                    d="M48 196 C 92 194, 118 186, 144 174 C 174 160, 196 152, 222 148 C 252 144, 276 138, 304 132"
+                    class="stroke-current"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M48 196 C 92 194, 118 186, 144 174 C 174 160, 196 152, 222 148 C 252 144, 276 138, 304 132 L304 200 L48 200 Z"
+                    class="fill-current"
+                    opacity="0.10"
+                  />
+                </g>
+
+                <!-- Labels -->
+                <text
+                  x="36"
+                  y="16"
+                  class="fill-current"
+                  font-size="10"
+                  opacity="0.85"
+                >
+                  Price path P(t)
+                </text>
+                <text
+                  x="36"
+                  y="120"
+                  class="fill-current"
+                  font-size="10"
+                  opacity="0.85"
+                >
+                  Accumulator A(t) (tokens received)
+                </text>
+
+                <text
+                  x="252"
+                  y="66"
+                  class="fill-current"
+                  font-size="10"
+                  opacity="0.85"
+                >
+                  Avg entry
+                </text>
+
+                <text
+                  x="284"
+                  y="214"
+                  class="fill-current"
+                  font-size="10"
+                  opacity="0.7"
+                >
+                  time →
+                </text>
+              </svg>
+
+              <div
+                class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-semibold tracking-wide uppercase"
+              >
+                <div class="text-muted inline-flex items-center gap-2">
+                  <span class="h-2 w-2 rounded-full bg-purple-500/40"></span>
+                  <span>Price Path</span>
+                </div>
+                <div class="text-muted inline-flex items-center gap-2">
+                  <span class="h-2 w-2 rounded-full bg-amber-500/40"></span>
+                  <span>Time-Weighted Avg</span>
+                </div>
+                <div class="text-muted inline-flex items-center gap-2">
+                  <span class="h-2 w-2 rounded-full bg-yellow-500/30"></span>
+                  <span>Accumulated Tokens</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 

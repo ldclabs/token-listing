@@ -1,159 +1,80 @@
-# Tokenlist.ing Continuous Clearing Auction (CCA)
+# Continuous Clearing Auction (CCA)
 
-**Language:** Rust
+### Overview
+The **Continuous Clearing Auction (CCA)** is a next-generation mechanism for token liquidity bootstrapping. Originally conceptualized and designed by **Uniswap Labs**, CCA generalizes the traditional uniform-price auction into continuous time.
 
-**Reference:** [Uniswap CCA](https://docs.uniswap.org/contracts/liquidity-launchpad/CCA)
-
-The **Tokenlist.ing Continuous Clearing Auction** is a high-precision, continuous-time token distribution mechanism designed for the Internet Computer. Unlike EVM-based implementations that rely on discrete blocks and tick-based approximations, this implementation leverages the computational capacity of ICP to achieve **millisecond-level precision** and **O(1) settlement complexity** using an accumulator-based mathematical model.
-
-## 1. Overview & Key Advantages
-
-This CCA implementation solves the liquidity bootstrapping problem by allowing the market to determine the fair price of a token over a continuous period.
-
-### Why this architecture is superior:
-*   **True Continuous Time:** State updates occur based on millisecond timestamps (`u64`), not discrete block numbers.
-*   **O(1) Complexity:** Uses a global accumulator (integral of price inverse) to calculate token fills. Claiming tokens requires constant time regardless of the number of auction steps or duration.
-*   **Reactive Outbidding:** Utilizes a Min-Heap to efficiently evict bidders whose `max_price` falls below the current clearing price, ensuring the auction always reflects valid demand.
-*   **Dynamic Supply Rate:** The system automatically recalibrates the supply release rate if tokens are under-sold, ensuring the target supply is distributed efficiently by the end of the auction.
-
-## 2. Mathematical Model
-
-The core logic replaces the discrete "Tick" system of Uniswap with a continuous flow model.
-
-### 2.1 Variables
-- $S_{total}$: Total Supply to distribute.
-- $T_{start}, T_{end}$: Auction duration.
-- $F(t)$: Current Global Flow Rate (Total Currency / ms) from all active bidders.
-- $R_{supply}(t)$: Supply Rate (Tokens / ms).
-- $P(t)$: Clearing Price at time $t$.
-
-### 2.2 Clearing Price & Flow
-The clearing price is derived dynamically from the ratio of Demand Flow to Supply Rate:
-
-$$ P(t) = \frac{F(t)}{R_{supply}(t)} $$
-
-Where the Supply Rate is linear but adaptive:
-
-$$ R_{supply}(t) = \frac{\text{Remaining Supply}}{T_{end} - t} $$
-
-### 2.3 Token Allocation (The Accumulator)
-To determine how many tokens a bidder receives, we integrate their contribution over time. Since a user's flow rate $f_u$ is constant while they are active, their tokens received ($Q_u$) is:
-
-$$ Q_u = \int_{t_{in}}^{t_{out}} \frac{f_u}{P(t)} dt = f_u \times \int_{t_{in}}^{t_{out}} \frac{1}{P(t)} dt $$
-
-We define the Global Accumulator $\Sigma$:
-
-$$ \Sigma(t) = \int_{0}^{t} \frac{1}{P(\tau)} d\tau $$
-
-Therefore, a user's filled amount is simply:
-
-$$ Q_u = f_u \times (\Sigma(t_{out}) - \Sigma(t_{in})) $$
-
-*This allows for extremely gas-efficient (cycle-efficient) calculations without iterating through history.*
-
-## 3. Lifecycle & Logic
-
-### 3.1 Configuration (`AuctionConfig`)
-The auction is initialized with strict parameters to prevent manipulation:
-*   `min_bid_duration`: Prevents last-second sniping by enforcing a minimum time exposure for capital.
-*   `required_currency_raised`: The "Graduation Threshold". If not met, the auction fails and refunds are enabled.
-*   `floor_price`: Implicitly defined by `required_currency_raised` / `total_supply`.
-
-### 3.2 Bidding (`submit_bid`)
-When a user submits a bid with Amount $A$ and Max Price $P_{max}$:
-1.  **Flow Calculation:** The bid is converted into a flow rate: $f_u = \frac{A}{T_{remaining}}$.
-2.  **State Update:** The global state (accumulators, total flow) is updated to the current nanosecond.
-3.  **Price Check:** The system verifies $P_{max}$ against the current market.
-4.  **Heap Insertion:** The bid is added to the `outbid_heap` (Min-Heap) sorted by price (lowest first).
-
-### 3.3 Outbidding Logic
-Every time the state updates or a new bid increases the Global Flow $F(t)$, the Clearing Price $P(t)$ rises.
-The system checks the bottom of the heap:
-*   If $P_{clearing} > Bidder_{min}.P_{max}$ :
-    1.  The bidder is **evicted**.
-    2.  Their flow $f_u$ is removed from $F(t)$.
-    3.  A snapshot of the accumulator is taken to fix their earnings up to that moment.
-    4.  The unspent portion of their currency is marked for refund.
-
-### 3.4 Settlement & Claiming (`claim`)
-After the auction ends (or if a user was outbid):
-*   **If Graduated:**
-    *   `Tokens = FlowRate * (Acc_End - Acc_Start)`
-    *   `Refund = OriginalAmount - (FlowRate * DurationActive)` (Refunds "dust" or unspent funds).
-*   **If Not Graduated:**
-    *   `Tokens = 0`
-    *   `Refund = OriginalAmount`
-
-## 4. Data Structures
-
-### `Auction` (Main State)
-Maintains the global variables including the "Accumulator per Share" (`acc_tokens_per_share`) which represents the integral of $1/P(t)$.
-
-```rust
-pub struct Auction {
-    // ... config ...
-    supply_rate: u128,          // R_supply
-    current_flow_rate: u128,    // F(t)
-    acc_tokens_per_share: u128, // The Global Accumulator (Sigma)
-    outbid_heap: BinaryHeap<BidOrder>, // For O(log N) access to lowest bids
-    // ... stats ...
-}
-```
-
-### `Bid` (User State)
-Stores snapshots to calculate deltas.
-
-```rust
-pub struct Bid {
-    amount: u128,
-    max_price: u128,
-    flow_rate: u128,       // User's contribution to pressure
-    acc_snapshot: u128,    // Value of Sigma when bid entered
-    outbid_time: Option<u64>, // When they were kicked out (if ever)
-    // ...
-}
-```
-
-## 5. Usage Example
-
-### Initialization
-```rust
-let config = AuctionConfig {
-    start_time: 1767225600000,
-    end_time: 1767484800000, // 3 days later
-    min_bid_duration: 300_000, // 5 minutes
-    token_decimals: 9,
-    total_supply: 100_000_000_000_000_000, // 100M tokens
-    min_amount: 100_000_000, // Min bid
-    max_amount: 10_000_000_000,
-    required_currency_raised: 500_000_000_000,
-};
-let mut auction = Auction::new(config);
-```
-
-### Submitting a Bid
-```rust
-// User bids 500 USDC with a max price limit
-let bid_info = auction.submit_bid(
-    &mut bid_storage,
-    500_000_000, // amount
-    2_000_000,   // max_price (e.g., 2.0 USDC/Token)
-    current_timestamp_ms
-)?;
-```
-
-### Checkpointing (View)
-Frontends can query `get_info()` to show the real-time clearing price and curve.
-
-### Claiming
-```rust
-// Call after auction ends or after being outbid
-let result = auction.claim(&mut bid_storage, bid_id, current_timestamp_ms)?;
-println!("Tokens: {}, Refund: {}", result.tokens_filled, result.refund);
-```
+At **Tokenlist.ing**, we have implemented this groundbreaking model using the high-performance architecture of the **Internet Computer (ICP)**, bringing mathematically perfect price discovery to the Solana, EVM, and ICP ecosystems via Chain Fusion.
 
 ---
 
-## Conclusion
+## 1. The Origin: Standing on the Shoulders of Giants
 
-This Rust implementation for ICP provides a robust, mathematically sound, and computationally efficient mechanism for fair price discovery. By utilizing continuous integral calculus rather than discrete approximation, it eliminates the precision loss and high gas costs associated with EVM-based auction implementations.
+Historically, token launches have suffered from "Timing Games":
+*   **Fixed-Price Sales:** Susceptible to bots and massive gas wars in the first block.
+*   **Dutch Auctions:** Force participants to play a game of "chicken," rushing to buy before others do.
+*   **Batched Auctions:** Vulnerable to last-second "sniping" and demand manipulation.
+
+In 2025, Uniswap introduced the **CCA** model to solve these fundamental flaws. It shifts the paradigm from "Discrete Time" (Block-by-Block) to "Continuous Time" (Flow-based), ensuring that **valuation matters more than timing**.
+
+> *Tokenlist.ing is the first platform to implement a production-ready CCA protocol that bridges liquidity across non-EVM chains like Solana and ICP.*
+
+---
+
+## 2. Core Mechanics
+
+### How It Works
+Unlike a standard trade where you swap X currency for Y tokens instantly, a CCA interaction is a flow over time.
+
+1.  **Bid Spreading:** When you place a bid, your capital isn't spent all at once. Instead, it is distributed linearly over the remaining duration of the auction.
+2.  **Continuous Clearing:** The auction calculates a clearing price every millisecond based on the aggregate demand (Total Flow Rate) vs. the available supply (Supply Release Rate).
+3.  **Uniform Fairness:** Every participant active during the same time window clears at the exact same price.
+
+### The Algorithm: From Blocks to Accumulators
+Tokenlist.ing leverages an **Accumulator-based Mathematical Model** to achieve $O(1)$ settlement complexity.
+
+Instead of iterating through history to calculate your tokens, we track the global integral of the price inverse:
+
+$$ \text{Tokens Received} = \text{User Flow Rate} \times \int_{t_{start}}^{t_{end}} \frac{1}{P(t)} dt $$
+
+This means your final allocation is determined by the **average market price** during your participation, mathematically smoothing out volatility.
+
+---
+
+## 3. The Tokenlist.ing Advantage
+
+While Uniswap designed CCA for the Ethereum Virtual Machine (EVM), our implementation on the **Internet Computer (ICP)** unlocks the full potential of this model:
+
+| Feature              | EVM Implementations    | Tokenlist.ing (ICP Implementation)    |
+| :------------------- | :--------------------- | :------------------------------------ |
+| **Time Resolution**  | Limited by Block Time  | **Real-time (Millisecond Precision)** |
+| **Curve Smoothness** | Step-function (jagged) | **True Continuous Curve (smooth)**    |
+| **Computation**      | Gas-constrained loops  | **High-performance compute**          |
+| **Cross-Chain**      | Mostly Single-chain    | **Chain Fusion (Solana + EVM + ICP)** |
+
+By decoupling the logic from the limitations of EVM block times, we offer the smoothest and most precise price discovery curve in DeFi.
+
+---
+
+## 4. Key Terminology
+
+*   **Flow Rate:** The speed at which your currency is being converted into tokens per second.
+*   **Clearing Price:** The current market price derived from Total Demand divided by Supply Release Rate.
+*   **Decaying Max Price:** A protection mechanism. If the market price exceeds your defined `Max Price`, your bid automatically pauses (Outbid), protecting you from overpaying.
+
+---
+
+## 5. References & Further Reading
+
+We encourage users to explore the original research behind this mechanism to understand why it is the future of fair launches.
+
+*   **Uniswap CCA Whitepaper:** [Read the full paper (PDF)](https://docs.uniswap.org/assets/files/whitepaper_cca-fc8b989c3a5b11f6fcd199f6c6837a77.pdf)
+    *   *The foundational academic paper detailing the game-theory and math behind CCA.*
+*   **Uniswap Documentation:** [Liquidity Launchpad / CCA](https://docs.uniswap.org/contracts/liquidity-launchpad/CCA)
+    *   *Official documentation from the Uniswap team.*
+*   **Tokenlist.ing Repository:** [github.com/ldclabs/token-listing](https://github.com/ldclabs/token-listing)
+    *   *Our open-source implementation verifying the logic and security.*
+
+---
+
+**Ready to participate?**
+Enter the launchpad and experience the first true Continuous Clearing Auction on [Tokenlist.ing](https://tokenlist.ing).
