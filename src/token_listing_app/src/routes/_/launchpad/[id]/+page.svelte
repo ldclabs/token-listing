@@ -534,93 +534,116 @@
     </div>
   {/if}
   <main
-    class="relative z-10 mx-auto w-full max-w-6xl space-y-6 px-4 py-6 md:px-8 md:py-10"
+    class="relative z-10 mx-auto w-full max-w-6xl space-y-8 px-4 py-8 md:px-8 md:py-12"
   >
     {#if !stateInfo}
       <div
-        class="glass-border flex items-center justify-center rounded-xl p-10"
+        class="glass-border flex h-64 items-center justify-center rounded-2xl"
       >
-        <Spinner class="h-6 w-6" />
+        <Spinner class="h-8 w-8 text-indigo-500" />
       </div>
     {:else}
-      <!-- Top summary -->
-      <section class="grid gap-4 lg:grid-cols-3">
+      <!-- Project Hero Section -->
+      <section class="grid gap-6 lg:grid-cols-3">
         <div
-          class="glass-border relative overflow-hidden rounded-xl p-4 md:p-6 lg:col-span-2"
+          class="glass-border relative overflow-hidden rounded-3xl p-6 md:p-8 lg:col-span-2"
         >
           <div
             class="pointer-events-none absolute inset-0 opacity-40"
             aria-hidden="true"
           >
             <div
-              class="animate-pulse-glow absolute -top-10 -right-10 h-40 w-40 rounded-full bg-purple-500/10 blur-3xl"
+              class="animate-pulse-glow absolute -top-20 -right-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-[100px]"
             ></div>
             <div
-              class="animate-pulse-glow absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-amber-500/10 blur-3xl"
+              class="animate-pulse-glow absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-amber-500/10 blur-[100px]"
             ></div>
           </div>
 
-          <div class="relative space-y-4">
-            <div class="flex flex-col gap-3 sm:items-start sm:justify-between">
-              <div class="flex w-full flex-row items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span
-                    class="text-muted text-xs font-semibold tracking-wide uppercase"
-                    >Project</span
+          <div class="relative space-y-6">
+            <div class="flex flex-col gap-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div
+                    class="bg-surface ring-border-subtle h-14 w-14 overflow-hidden rounded-2xl shadow-inner ring-1"
                   >
+                    {#if stateInfo.token_logo_url}
+                      <img
+                        class="h-full w-full object-cover"
+                        src={stateInfo.token_logo_url}
+                        alt={stateInfo.token_symbol}
+                      />
+                    {/if}
+                  </div>
+                  <div>
+                    <div
+                      class="text-xs font-bold tracking-[0.2em] text-indigo-500 uppercase"
+                    >
+                      Project
+                    </div>
+                    <h1 class="font-serif text-3xl font-bold tracking-tight">
+                      {stateInfo.name || 'Auction'}
+                      <span class="text-muted font-medium"
+                        >· {stateInfo.token_symbol}</span
+                      >
+                    </h1>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
                   {#if stateInfo.url}
                     <a
-                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold tracking-wide uppercase"
+                      class="glass-border bg-surface/50 hover:bg-surface text-muted hover:text-foreground flex h-10 w-10 items-center justify-center rounded-xl transition-all"
                       href={stateInfo.url}
                       target="_blank"
                       rel="noreferrer"
+                      title="Website"
                     >
-                      Website
-                      <ArrowRightUpLine class="h-4 w-4" />
+                      <ArrowRightUpLine class="h-5 w-5" />
                     </a>
                   {/if}
-                </div>
-                <div class="flex items-center gap-2">
                   <button
-                    class="border-border-subtle text-muted hover:border-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold tracking-wide uppercase"
+                    class="glass-border bg-surface/50 hover:bg-surface text-muted hover:text-foreground flex h-10 w-10 items-center justify-center rounded-xl transition-all"
                     onclick={onCCAModal}
-                    ><InformationLine class="h-4 w-4" />
-                    CCA
+                    title="CCA Info"
+                  >
+                    <InformationLine class="h-5 w-5" />
                   </button>
                   <button
-                    class="border-border-subtle text-muted hover:border-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-1 py-1 text-xs font-semibold tracking-wide uppercase"
+                    class="glass-border bg-surface/50 hover:bg-surface text-muted hover:text-foreground flex h-10 w-10 items-center justify-center rounded-xl transition-all"
                     onclick={onCanisterModal}
-                    ><Settings4Line class="h-4 w-4" />
+                    title="Contract Settings"
+                  >
+                    <Settings4Line class="h-5 w-5" />
                   </button>
                 </div>
               </div>
-              <div class="text-xl font-bold">
-                {stateInfo.name || 'Auction'}
-                <span class="text-muted font-semibold"
-                  >· {stateInfo.token_symbol}</span
-                >
+
+              <div class="max-w-2xl">
+                {#key detailText}
+                  <MarkdownContent content={detailText} />
+                {/key}
               </div>
-              {#key detailText}
-                <MarkdownContent content={detailText} />
-              {/key}
             </div>
 
-            <div class="grid gap-3 sm:grid-cols-3">
+            <div class="grid gap-4 sm:grid-cols-3">
               <Tooltip
                 containerClass="w-full"
-                contentClass="bg-card w-64 rounded-xl p-4 shadow-xl border border-white/10"
+                contentClass="bg-card w-64 rounded-2xl p-5 shadow-2xl border border-white/10 backdrop-blur-xl"
               >
                 {#snippet trigger()}
                   <div
-                    class="border-border-subtle bg-surface relative rounded-lg border p-3 transition-colors hover:border-indigo-500/50"
+                    class="glass-border bg-surface/40 group hover:bg-surface/60 relative rounded-2xl p-4 transition-all"
                     aria-label="Phase"
                   >
                     <div class="flex items-center justify-between">
                       <div
-                        class="text-muted text-xs font-semibold tracking-wide uppercase"
+                        class="text-muted text-xs font-bold tracking-widest uppercase"
                         >Phase</div
                       >
-                      <InformationLine class="text-muted h-3.5 w-3.5" />
+                      <InformationLine
+                        class="text-muted h-3.5 w-3.5 transition-colors group-hover:text-indigo-500"
+                      />
                     </div>
                     <div class="mt-1 text-lg font-bold capitalize">
                       {phase.replace('-', ' ')}
@@ -628,7 +651,7 @@
                   </div>
                 {/snippet}
                 <div
-                  class="text-muted mb-4 text-xs font-bold tracking-widest uppercase"
+                  class="text-muted mb-5 text-xs font-bold tracking-[0.2em] uppercase"
                 >
                   Auction Lifecycle
                 </div>
@@ -643,8 +666,8 @@
                         'ending',
                         'ended'
                       ].indexOf(phase) > i}
-                    <div class="relative flex items-start gap-4 pb-5 last:pb-0">
-                      {#if i !== 5}
+                    <div class="relative flex items-start gap-4 pb-6 last:pb-0">
+                      {#if i !== 4}
                         <div
                           class="absolute top-5 left-[9px] h-full w-0.5 {isPast
                             ? 'bg-indigo-500/50'
@@ -652,8 +675,8 @@
                         ></div>
                       {/if}
                       <div
-                        class="relative z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all duration-300 {isCurrent
-                          ? 'border-indigo-500 bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.6)]'
+                        class="relative z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all duration-500 {isCurrent
+                          ? 'border-indigo-500 bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]'
                           : isPast
                             ? 'border-indigo-500 bg-indigo-500'
                             : 'border-muted bg-surface'}"
@@ -669,7 +692,7 @@
                       </div>
                       <div class="flex min-h-5 flex-col justify-center">
                         <span
-                          class="text-sm leading-5 font-bold capitalize transition-colors {isCurrent
+                          class="text-sm font-bold capitalize transition-colors {isCurrent
                             ? 'text-foreground'
                             : isPast
                               ? 'text-muted'
@@ -679,7 +702,7 @@
                         </span>
                         {#if isCurrent}
                           <span
-                            class="text-[10px] leading-tight font-black tracking-wider text-indigo-500 uppercase"
+                            class="text-[9px] font-black tracking-widest text-indigo-500 uppercase"
                             >Current Phase</span
                           >
                         {/if}
@@ -689,27 +712,28 @@
                 </div>
               </Tooltip>
 
-              <div
-                class="border-border-subtle bg-surface rounded-lg border p-3"
-              >
+              <div class="glass-border bg-surface/40 rounded-2xl p-4">
                 <div
-                  class="text-muted text-xs font-semibold tracking-wide uppercase"
+                  class="text-muted text-xs font-bold tracking-widest uppercase"
                   >Bids / Bidders</div
                 >
                 <div class="mt-1 text-lg font-bold">
-                  {auctionInfo?.bids_count || 0} /
+                  {auctionInfo?.bids_count || 0}
+                  <span class="text-muted text-sm font-medium">/</span>
                   {auctionInfo?.total_bidders || stateInfo.total_bidders}
                 </div>
               </div>
-              <div
-                class="border-border-subtle bg-surface rounded-lg border p-3"
-              >
+              <div class="glass-border bg-surface/40 rounded-2xl p-4">
                 <div
-                  class="text-muted text-xs font-semibold tracking-wide uppercase"
+                  class="text-muted text-xs font-bold tracking-widest uppercase"
                   >Graduated</div
                 >
                 <div class="mt-1 text-lg font-bold">
-                  {auctionInfo?.is_graduated ? 'Yes' : 'No'}
+                  {#if auctionInfo?.is_graduated}
+                    <span class="text-emerald-500">Yes</span>
+                  {:else}
+                    <span class="text-muted">No</span>
+                  {/if}
                 </div>
               </div>
             </div>
@@ -717,222 +741,214 @@
             {#if stateInfo.finalize_output.length > 0}
               {@const txid = stateInfo.finalize_output[0]?.txid || ''}
               {@const txUrl = getTxUrl(stateInfo.chain, txid)}
-              <div class="text-md font-semibold">
-                {#if txUrl}
-                  <a
-                    class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1"
-                    href={txUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    📝 Finalize Transaction: {txid}
-                    <ArrowRightUpLine class="h-4 w-4" />
-                  </a>
-                {:else}
-                  <span>📝 Finalize Transaction: {txid}</span>
-                {/if}
+              <div
+                class="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3"
+              >
+                <div class="flex items-center gap-2 text-sm font-bold">
+                  <span class="text-emerald-500">Finalized</span>
+                  {#if txUrl}
+                    <a
+                      class="text-muted hover:text-foreground flex items-center gap-1 transition-colors"
+                      href={txUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      TX: {pruneAddress(txid, true)}
+                      <ArrowRightUpLine class="h-3.5 w-3.5" />
+                    </a>
+                  {:else}
+                    <span class="text-muted"
+                      >TX: {pruneAddress(txid, true)}</span
+                    >
+                  {/if}
+                </div>
               </div>
             {:else if stateInfo.restricted_countries.length > 0}
-              <div class="text-muted text-xs">
-                ⚠️ Excluded Persons:{' '}
-                {stateInfo.restricted_countries
-                  .map((p) => pruneAddress(p, false))
-                  .join(', ')}
+              <div
+                class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3"
+              >
+                <p class="text-muted text-xs leading-relaxed">
+                  <strong class="text-amber-500 uppercase"
+                    >Excluded Persons:</strong
+                  >
+                  {stateInfo.restricted_countries
+                    .map((p) => pruneAddress(p, false))
+                    .join(', ')}
+                </p>
               </div>
             {/if}
           </div>
         </div>
 
-        <div class="glass-border rounded-xl p-4 md:p-6">
-          <div class="space-y-4">
-            <div
-              class="text-muted text-xs font-semibold tracking-wide uppercase"
-              >Targets</div
-            >
-            {#if auctionCfg}
-              {@const finalizeKind = getFinalizeKind()}
-              <div class="space-y-2">
-                <div class="flex items-center justify-between text-sm">
-                  <div class="text-muted">Currency</div>
-                  <a
-                    class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1 font-semibold"
-                    href={getTokenUrl(
-                      stateInfo.chain,
-                      currencyDisplay.token.address
-                    )}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {currencyInfo.symbol}
-                    {pruneAddress(currencyDisplay.token.address, false)}
-                    <ArrowRightUpLine class="h-4 w-4" />
-                  </a>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                  <div class="text-muted">Token</div>
-                  <a
-                    class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1 font-semibold"
-                    href={getTokenUrl(
-                      stateInfo.chain,
-                      tokenDisplay.token.address
-                    )}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {tokenInfo.symbol}
-                    {pruneAddress(tokenDisplay.token.address, false)}
-                    <ArrowRightUpLine class="h-4 w-4" />
-                  </a>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                  <div class="text-muted">Graduation Threshold</div>
-                  <div class="font-semibold">
+        <!-- Targets Card -->
+        <div class="glass-border bg-surface/30 flex flex-col rounded-3xl p-6">
+          <div
+            class="text-muted mb-6 text-xs font-bold tracking-widest uppercase"
+            >Auction Targets</div
+          >
+          {#if auctionCfg}
+            {@const finalizeKind = getFinalizeKind()}
+            <div class="flex-1 space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="text-muted text-xs font-medium">Currency</div>
+                <a
+                  class="flex items-center gap-1.5 text-sm font-bold transition-colors hover:text-indigo-500"
+                  href={getTokenUrl(
+                    stateInfo.chain,
+                    currencyDisplay.token.address
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {currencyInfo.symbol}
+                  <ArrowRightUpLine class="text-muted h-3.5 w-3.5" />
+                </a>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="text-muted text-xs font-medium">Token</div>
+                <a
+                  class="flex items-center gap-1.5 text-sm font-bold transition-colors hover:text-indigo-500"
+                  href={getTokenUrl(
+                    stateInfo.chain,
+                    tokenDisplay.token.address
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {tokenInfo.symbol}
+                  <ArrowRightUpLine class="text-muted h-3.5 w-3.5" />
+                </a>
+              </div>
+              <div class="border-border-subtle border-t pt-4">
+                <div class="flex items-center justify-between">
+                  <div class="text-muted text-xs font-medium">Graduation</div>
+                  <div class="text-sm font-bold">
                     {currencyDisplay.displayValue(
                       auctionCfg.required_currency_raised
                     )}
-                    {currencyDisplay.token.symbol}
-                  </div>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                  <div class="text-muted">Auction Supply</div>
-                  <div class="font-semibold">
-                    {tokenDisplay.displayValue(auctionCfg.total_supply)}
-                    {tokenDisplay.token.symbol}
-                  </div>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                  <div class="text-muted">Liquidity Supply</div>
-                  <div class="font-semibold">
-                    {tokenDisplay.displayValue(
-                      auctionCfg.liquidity_pool_amount
-                    )}
-                    {tokenDisplay.token.symbol}
-                  </div>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                  <div class="text-muted">Min/Max Bid</div>
-                  <div class="font-semibold">
-                    {currencyDisplay.displayValue(
-                      auctionCfg.min_amount
-                    )}–{currencyDisplay.displayValue(auctionCfg.max_amount)}
-                    {currencyDisplay.token.symbol}
-                  </div>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                  <div class="text-muted">Finalize</div>
-                  <div class="font-semibold">
-                    {#if finalizeKind[1]}
-                      <a
-                        class=" inline-flex items-center gap-1 text-indigo-500 hover:text-indigo-700"
-                        href={finalizeKind[1]}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {finalizeKind[0]}
-                        <ArrowRightUpLine class="h-4 w-4" />
-                      </a>
-                    {:else}
-                      <span>{finalizeKind[0]}</span>
-                    {/if}
+                    <span class="text-muted font-medium"
+                      >{currencyDisplay.token.symbol}</span
+                    >
                   </div>
                 </div>
               </div>
+              <div class="flex items-center justify-between">
+                <div class="text-muted text-xs font-medium">Supply</div>
+                <div class="text-sm font-bold">
+                  {tokenDisplay.displayValue(auctionCfg.total_supply)}
+                  <span class="text-muted font-medium"
+                    >{tokenDisplay.token.symbol}</span
+                  >
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="text-muted text-xs font-medium">Min/Max Bid</div>
+                <div class="text-sm font-bold">
+                  {currencyDisplay.displayValue(auctionCfg.min_amount)}
+                  <span class="text-muted mx-1 font-normal">~</span>
+                  {currencyDisplay.displayValue(auctionCfg.max_amount)}
+                </div>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="text-muted text-xs font-medium">Finalize</div>
+                <div class="text-right text-sm font-bold">
+                  {#if finalizeKind[1]}
+                    <a
+                      class="text-indigo-500 transition-colors hover:text-indigo-400"
+                      href={finalizeKind[1]}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {finalizeKind[0]}
+                    </a>
+                  {:else}
+                    <span>{finalizeKind[0]}</span>
+                  {/if}
+                </div>
+              </div>
+            </div>
 
-              <div class="mt-6 space-y-2">
-                <div class="flex items-center justify-between text-xs">
-                  <div class="text-muted"
-                    >{formatDatetime(auctionCfg.start_time)} → {formatDatetime(
-                      auctionCfg.end_time
-                    )}</div
-                  >
-                  <div class="text-muted"
-                    >{Math.round(progress(auctionCfg) * 100)}%</div
-                  >
+            <div class="mt-8 space-y-3">
+              <div class="flex items-center justify-between text-xs">
+                <div class="text-muted font-bold tracking-wider uppercase">
+                  {formatDatetime(auctionCfg.start_time)} →<br />
+                  {formatDatetime(auctionCfg.end_time)}
                 </div>
-                <div class="bg-surface h-2 overflow-hidden rounded-full">
-                  <div
-                    class="h-2 rounded-full bg-linear-to-r from-purple-500 via-amber-500 to-yellow-400"
-                    style={`width:${Math.round(progress(auctionCfg) * 100)}%`}
-                  ></div>
-                </div>
+                <div class="font-black text-indigo-500"
+                  >{Math.round(progress(auctionCfg) * 100)}%</div
+                >
               </div>
-            {:else}
-              <div class="text-muted text-sm">Auction unconfigured</div>
-            {/if}
-          </div>
+              <div
+                class="bg-surface h-2 overflow-hidden rounded-full shadow-inner"
+              >
+                <div
+                  class="h-full rounded-full bg-linear-to-r from-indigo-500 via-purple-500 to-amber-500 transition-all duration-1000"
+                  style={`width:${Math.round(progress(auctionCfg) * 100)}%`}
+                ></div>
+              </div>
+            </div>
+          {:else}
+            <div class="flex flex-1 items-center justify-center">
+              <p class="text-muted text-sm italic">Auction unconfigured</p>
+            </div>
+          {/if}
         </div>
       </section>
 
-      <!-- Live stats + bidding -->
-      <section class="grid gap-4 lg:grid-cols-2">
-        <div class="glass-border rounded-xl p-4 md:p-6">
+      <!-- Live Stats & Bidding Section -->
+      <section class="grid gap-6 lg:grid-cols-2">
+        <!-- Live Stats Card -->
+        <div class="glass-border bg-surface/30 rounded-3xl p-6 md:p-8">
           <div class="flex items-center justify-between">
             <div class="space-y-1">
               <div
-                class="text-muted text-xs font-semibold tracking-wide uppercase"
+                class="text-xs font-bold tracking-widest text-indigo-500 uppercase"
                 >Live Stats</div
               >
-              <div class="text-lg font-bold">Market Clearing</div>
+              <h2 class="text-xl font-bold tracking-tight">Market Clearing</h2>
             </div>
           </div>
 
-          <div class="mt-4 grid gap-3 sm:grid-cols-2">
-            <div class="border-border-subtle bg-surface rounded-lg border p-3">
-              <div class="text-muted text-xs">Cumulative Raised</div>
-              <div class="mt-1 text-base font-bold">
-                {auctionInfo
-                  ? `${currencyDisplay.displayValue(auctionInfo.cumulative_demand_raised)} ${currencyInfo.symbol}`
-                  : '—'}
+          <div class="mt-6 grid gap-4 sm:grid-cols-2">
+            {#each [{ label: 'Cumulative Raised', value: auctionInfo ? `${currencyDisplay.displayValue(auctionInfo.cumulative_demand_raised)} ${currencyInfo.symbol}` : '—' }, { label: 'Supply Released', value: auctionInfo ? `${tokenDisplay.displayValue(auctionInfo.cumulative_supply_released)} ${tokenInfo.symbol}` : '—' }, { label: 'Clearing Price', value: auctionInfo ? priceUnitsPerToken(auctionInfo.clearing_price) : priceUnitsPerToken(floorPrice) }, { label: 'Total Committed', value: auctionInfo ? `${currencyDisplay.displayValue(auctionInfo.total_amount)} ${currencyInfo.symbol}` : '—' }] as stat}
+              <div
+                class="glass-border bg-surface/40 hover:bg-surface/60 rounded-2xl p-4 transition-colors"
+              >
+                <div
+                  class="text-muted text-xs font-bold tracking-widest uppercase"
+                  >{stat.label}</div
+                >
+                <div class="mt-1 text-base font-bold tracking-tight">
+                  {stat.value}
+                </div>
               </div>
-            </div>
-            <div class="border-border-subtle bg-surface rounded-lg border p-3">
-              <div class="text-muted text-xs">Supply Released</div>
-              <div class="mt-1 text-base font-bold">
-                {auctionInfo
-                  ? `${tokenDisplay.displayValue(auctionInfo.cumulative_supply_released)} ${tokenInfo.symbol}`
-                  : '—'}
-              </div>
-            </div>
-            <div class="border-border-subtle bg-surface rounded-lg border p-3">
-              <div class="text-muted text-xs">Clearing Price</div>
-              <div class="mt-1 text-base font-bold">
-                {auctionInfo
-                  ? priceUnitsPerToken(auctionInfo.clearing_price)
-                  : priceUnitsPerToken(floorPrice)}
-              </div>
-            </div>
-            <div class="border-border-subtle bg-surface rounded-lg border p-3">
-              <div class="text-muted text-xs">Total Committed</div>
-              <div class="mt-1 text-base font-bold">
-                {auctionInfo
-                  ? `${currencyDisplay.displayValue(auctionInfo.total_amount)} ${currencyInfo.symbol}`
-                  : '—'}
-              </div>
-            </div>
+            {/each}
           </div>
 
-          <div class="mt-4">
+          <div class="mt-8">
             <div class="flex items-center justify-between">
               <div
-                class="text-muted text-xs font-semibold tracking-wide uppercase"
+                class="text-muted text-xs font-bold tracking-widest uppercase"
                 >Demand Distribution</div
               >
-              <div class="flex items-center gap-1">
-                <span class="text-muted text-xs">Bucket</span>
+              <div class="flex items-center gap-2">
+                <span class="text-muted text-xs font-bold uppercase"
+                  >Bucket</span
+                >
                 <Dropdown
                   open={openPriceBucket}
                   trigger={priceBucketTrigger}
-                  triggerClass="px-0 py-2 duration-200 overflow-hidden disabled:cursor-not-allowed disabled:opacity-50"
-                  menuClass="top-full mt-0 w-32 rounded-xl border border-white/20 bg-card shadow"
+                  triggerClass="px-2 py-1 bg-surface/50 rounded-lg border border-border-subtle hover:border-indigo-500/50 transition-colors"
+                  menuClass="top-full mt-2 w-32 rounded-xl border border-white/10 bg-card/95 shadow-2xl backdrop-blur-xl"
                 >
-                  <ul class="py-4">
+                  <ul class="py-2">
                     {#each [1n, 5n, 10n, 50n, 100n] as multiplier}
                       {@const precision = floorGroupedPrecision * multiplier}
                       <li>
                         <button
                           disabled={groupedPrecision == precision}
                           onclick={() => handlePriceBucket(precision)}
-                          class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                          class="w-full px-4 py-2 text-left text-sm transition-colors hover:bg-indigo-500/10 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-30"
                         >
                           <span>{currencyDisplay.displayValue(precision)}</span>
                         </button>
@@ -940,39 +956,39 @@
                     {/each}
                   </ul>
                 </Dropdown>
-                <span class="text-muted text-xs"
-                  >{currencyInfo.symbol}/{tokenInfo.symbol}</span
-                >
               </div>
             </div>
 
             {#if grouped.length === 0}
-              <div class="text-muted mt-3 text-sm"
-                >No visualized data (no active bids or overly detailed
-                information)</div
+              <div
+                class="bg-surface/20 mt-4 rounded-2xl border border-dashed border-white/5 py-10 text-center"
               >
+                <p class="text-muted text-sm italic">No visualized data yet</p>
+              </div>
             {:else}
               {@const maxBucket = grouped.reduce(
                 (m, x) => (x[1] > m ? x[1] : m),
                 0n
               )}
-              <div class="mt-3 space-y-2">
+              <div class="mt-6 space-y-4">
                 {#each grouped as [p, a]}
-                  <div class="flex items-center gap-3">
-                    <div class="text-muted w-28 text-xs sm:w-32">
-                      ≥ {currencyDisplay.displayValue(p)}
+                  <div class="group space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="text-muted font-bold uppercase"
+                        >≥ {currencyDisplay.displayValue(p)}</span
+                      >
+                      <span class="font-bold"
+                        >{currencyDisplay.displayValue(a)}
+                        {currencyInfo.symbol}</span
+                      >
                     </div>
                     <div
-                      class="bg-surface h-2 flex-1 overflow-hidden rounded-full"
+                      class="bg-surface h-2 overflow-hidden rounded-full shadow-inner"
                     >
                       <div
-                        class="h-2 rounded-full bg-linear-to-r from-purple-500 via-amber-500 to-yellow-400"
+                        class="h-full rounded-full bg-linear-to-r from-indigo-500 to-purple-500 transition-all duration-1000 group-hover:from-indigo-400 group-hover:to-purple-400"
                         style={`width:${maxBucket === 0n ? 0 : Number((a * 100n) / maxBucket)}%`}
                       ></div>
-                    </div>
-                    <div class="w-32 text-right text-xs font-semibold">
-                      {currencyDisplay.displayValue(a)}
-                      {currencyInfo.symbol}
                     </div>
                   </div>
                 {/each}
@@ -981,39 +997,39 @@
           </div>
         </div>
 
-        <div class="glass-border rounded-xl p-4 md:p-6">
+        <!-- Bidding Card -->
+        <div class="glass-border bg-surface/30 rounded-3xl p-6 md:p-8">
           <div class="space-y-1">
             <div
-              class="text-muted text-xs font-semibold tracking-wide uppercase"
-              >Bid</div
+              class="text-xs font-bold tracking-widest text-indigo-500 uppercase"
+              >Participation</div
             >
-            <div class="text-lg font-bold">Place a Bid</div>
+            <h2 class="text-xl font-bold tracking-tight">Place a Bid</h2>
           </div>
 
           {#if !auctionInfo || !auctionCfg}
-            <div class="text-muted mt-4 text-sm"
-              >The auction has not been set up yet</div
-            >
+            <div class="flex h-64 items-center justify-center">
+              <p class="text-muted text-sm italic">Auction not ready</p>
+            </div>
           {:else}
-            <div class="mt-4 space-y-4">
+            <div class="mt-6 space-y-6">
               <div
-                class="bg-surface/50 border-border-subtle flex items-center justify-between rounded-xl border px-4 py-3"
+                class="flex items-center justify-between rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4"
               >
                 <div class="space-y-0.5">
                   <div
-                    class="text-muted text-[10px] font-bold tracking-wide uppercase"
+                    class="text-muted text-xs font-bold tracking-widest uppercase"
                     >Available Balance</div
                   >
-                  <div class="text-sm font-bold">
+                  <div class="text-lg font-bold tracking-tight">
                     {currencyDisplay.displayValue(myInfo.currency_amount)}
-                    {currencyInfo.symbol}
+                    <span class="text-muted text-sm font-medium"
+                      >{currencyInfo.symbol}</span
+                    >
                   </div>
                 </div>
                 <button
-                  class="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase transition-colors disabled:opacity-50 {phase ===
-                    'ending' || phase === 'ended'
-                    ? 'bg-surface border-border-subtle text-muted hover:text-foreground border'
-                    : 'bg-indigo-500 text-white hover:bg-indigo-600'}"
+                  class="rounded-xl bg-indigo-500 px-4 py-2 text-xs font-bold text-white uppercase shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-600 disabled:opacity-50"
                   onclick={onUserFundsModal}
                   disabled={!stateInfo || !authStore.identity.isAuthenticated}
                 >
@@ -1023,150 +1039,168 @@
                 </button>
               </div>
 
-              <div class="grid gap-3">
-                <div>
+              <div class="space-y-5">
+                <div class="space-y-2">
                   <label
-                    class="text-muted text-xs font-semibold tracking-wide uppercase"
+                    class="text-muted text-xs font-bold tracking-widest uppercase"
                     for="bidAmount"
                   >
-                    Amount
+                    Bid Amount
                   </label>
-                  <div class="relative mt-1">
+                  <div class="relative">
                     <input
                       id="bidAmount"
-                      class="border-border-subtle bg-card transition-focus focus:border-foreground w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
-                      placeholder={`Min: ${currencyDisplay.displayValue(auctionCfg.min_amount)} ${currencyInfo.symbol}`}
+                      class="bg-surface/50 border-border-subtle w-full rounded-2xl border px-5 py-4 text-base font-bold transition-all focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none"
+                      placeholder={`Min: ${currencyDisplay.displayValue(auctionCfg.min_amount)}`}
                       bind:value={bidAmount}
                       onfocus={onBidAmountFocus}
                       disabled={phase != 'pre-bidding' && phase != 'bidding'}
                       inputmode="decimal"
                     />
-                    <button
-                      class="text-muted hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 text-[10px] font-bold uppercase transition-colors disabled:opacity-30"
-                      onclick={() =>
-                        (bidAmount = currencyDisplay.displayValue(
-                          myInfo.currency_amount
-                        ))}
-                      disabled={myInfo.currency_amount === 0n ||
-                        (phase !== 'pre-bidding' && phase !== 'bidding')}
+                    <div
+                      class="absolute top-1/2 right-4 flex -translate-y-1/2 items-center gap-3"
                     >
-                      Max
-                    </button>
+                      <span class="text-muted text-sm font-bold"
+                        >{currencyInfo.symbol}</span
+                      >
+                      <button
+                        class="text-xs font-black text-indigo-500 uppercase transition-colors hover:text-indigo-400 disabled:opacity-30"
+                        onclick={() =>
+                          (bidAmount = currencyDisplay.displayValue(
+                            myInfo.currency_amount
+                          ))}
+                        disabled={myInfo.currency_amount === 0n ||
+                          (phase !== 'pre-bidding' && phase !== 'bidding')}
+                      >
+                        Max
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div>
+                <div class="space-y-2">
                   <label
-                    class="text-muted text-xs font-semibold tracking-wide uppercase"
+                    class="text-muted text-xs font-bold tracking-widest uppercase"
                     for="bidMaxPrice"
                   >
-                    Max Price
+                    Max Price Limit
                   </label>
-                  <div class="mt-1">
+                  <div class="relative">
                     <input
                       id="bidMaxPrice"
-                      class="border-border-subtle bg-card transition-focus focus:border-foreground w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
-                      placeholder={`e.g. ${currencyDisplay.displayValue(auctionInfo ? auctionInfo.clearing_price * 2n : floorPrice)} ${currencyInfo.symbol}/${tokenInfo.symbol}`}
+                      class="bg-surface/50 border-border-subtle w-full rounded-2xl border px-5 py-4 text-base font-bold transition-all focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none"
+                      placeholder="0.00"
                       bind:value={bidMaxPrice}
                       onfocus={estimateMaxPrice}
                       disabled={phase != 'pre-bidding' && phase != 'bidding'}
                       inputmode="decimal"
                     />
-                    <p class="text-muted mt-1.5 text-[10px]">
-                      {`(The maximum ${currencyInfo.symbol} price per 1 ${tokenInfo.symbol})`}
-                    </p>
+                    <div
+                      class="absolute top-1/2 right-4 -translate-y-1/2 text-sm font-bold"
+                    >
+                      <span class="text-muted"
+                        >{currencyInfo.symbol}/{tokenInfo.symbol}</span
+                      >
+                    </div>
                   </div>
+                  <p class="text-muted px-1 text-xs leading-relaxed">
+                    The maximum price you are willing to pay per token. If the
+                    clearing price exceeds this, you will be outbid.
+                  </p>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="pt-2">
                   {#if phase === 'ending' || phase === 'ended'}
                     <div
-                      class="bg-surface border-border-subtle text-muted flex flex-1 items-center justify-center gap-2 rounded-full border py-2.5 text-xs font-bold tracking-wide uppercase"
+                      class="bg-surface/50 border-border-subtle text-muted flex w-full items-center justify-center gap-3 rounded-2xl border py-4 text-sm font-bold tracking-widest uppercase"
                     >
-                      <span class="relative flex h-2 w-2">
+                      <span class="relative flex h-2.5 w-2.5">
                         <span
                           class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"
                         ></span>
                         <span
-                          class="relative inline-flex h-2 w-2 rounded-full bg-red-500"
+                          class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500"
                         ></span>
                       </span>
-                      {phase === 'ending'
-                        ? 'Bidding Closed (Ending)'
-                        : 'Auction Ended'}
+                      {phase === 'ending' ? 'Bidding Closed' : 'Auction Ended'}
                     </div>
                   {:else}
-                    <Button
-                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-4 py-2 text-xs font-semibold tracking-wide uppercase transition-colors"
-                      onclick={estimateMaxPrice}
-                      isLoading={isEstimating}
-                      disabled={bidAmountUnits == 0n}
-                    >
-                      Estimate
-                    </Button>
+                    <div class="flex gap-3">
+                      <Button
+                        class="glass-border bg-surface/50 hover:bg-surface text-muted hover:text-foreground rounded-2xl px-6 py-4 text-xs font-bold tracking-widest uppercase transition-all"
+                        onclick={estimateMaxPrice}
+                        isLoading={isEstimating}
+                        disabled={bidAmountUnits == 0n}
+                      >
+                        Estimate
+                      </Button>
 
-                    {#if authStore.identity.isAuthenticated}
-                      {#if myInfo.currency_amount < auctionCfg.min_amount || bidAmountUnits > myInfo.currency_amount}
-                        <Button
-                          class="flex-1 rounded-full bg-indigo-500 px-4 py-2 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-indigo-600 disabled:opacity-50"
-                          onclick={onUserFundsModal}
-                        >
-                          Deposit to Bid
-                        </Button>
+                      {#if authStore.identity.isAuthenticated}
+                        {#if myInfo.currency_amount < auctionCfg.min_amount || bidAmountUnits > myInfo.currency_amount}
+                          <Button
+                            class="flex-1 rounded-2xl bg-indigo-500 px-6 py-4 text-xs font-bold tracking-widest text-white uppercase shadow-lg shadow-indigo-500/25 transition-all hover:bg-indigo-600"
+                            onclick={onUserFundsModal}
+                          >
+                            Deposit to Bid
+                          </Button>
+                        {:else}
+                          <Button
+                            class="bg-foreground text-background flex-1 rounded-2xl px-6 py-4 text-xs font-bold tracking-widest uppercase shadow-xl transition-all hover:opacity-90"
+                            onclick={submitBid}
+                            isLoading={isBidding}
+                            disabled={!isBidable}
+                          >
+                            Submit Bid
+                          </Button>
+                        {/if}
                       {:else}
                         <Button
-                          class="bg-foreground text-background flex-1 rounded-full px-4 py-2 text-xs font-semibold tracking-wide uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
-                          onclick={submitBid}
-                          isLoading={isBidding}
-                          disabled={!isBidable}
+                          class="bg-foreground text-background flex-1 rounded-2xl px-6 py-4 text-xs font-bold tracking-widest uppercase shadow-xl transition-all hover:opacity-90"
+                          onclick={onSignWith}
+                          isLoading={isSigningIn}
                         >
-                          Submit Bid
+                          Sign in to Participate
                         </Button>
                       {/if}
-                    {:else}
-                      <Button
-                        class="bg-foreground text-background flex-1 rounded-full px-4 py-2 text-xs font-semibold tracking-wide uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
-                        onclick={onSignWith}
-                        isLoading={isSigningIn}
-                      >
-                        Sign in
-                      </Button>
-                    {/if}
+                    </div>
                   {/if}
                 </div>
 
-                <div
-                  class="border-border-subtle bg-surface rounded-xl border p-3 text-xs"
-                >
-                  {#if bidAmountErr || bidMaxPriceErr}
-                    <p class="text-red-500">
-                      {bidAmountErr || bidMaxPriceErr}
-                    </p>
-                  {:else}
-                    {#if estimateClearingPrice}
-                      <div
-                        class="border-border-subtle mb-2 flex items-center justify-between border-b pb-2"
-                      >
-                        <span class="text-muted font-semibold uppercase"
-                          >Estimated Clearing Price</span
+                {#if bidAmountErr || bidMaxPriceErr || estimateClearingPrice}
+                  <div
+                    class="animate-in fade-in slide-in-from-top-2 rounded-2xl p-4 transition-all {bidAmountErr ||
+                    bidMaxPriceErr
+                      ? 'border border-red-500/20 bg-red-500/5'
+                      : 'border border-indigo-500/20 bg-indigo-500/5'}"
+                  >
+                    {#if bidAmountErr || bidMaxPriceErr}
+                      <p class="text-xs font-bold text-red-500">
+                        {bidAmountErr || bidMaxPriceErr}
+                      </p>
+                    {:else if estimateClearingPrice}
+                      <div class="flex items-center justify-between">
+                        <span
+                          class="text-muted text-xs font-bold tracking-widest uppercase"
+                          >Est. Clearing Price</span
                         >
-                        <span class="font-bold text-indigo-500">
+                        <span class="text-sm font-black text-indigo-500">
                           {estimateClearingPrice}
                           {currencyInfo.symbol}/{tokenInfo.symbol}
                         </span>
                       </div>
                     {/if}
-                    <p class="text-muted leading-relaxed">
-                      Bids are streamed linearly over the remaining time. Early
-                      entry maximizes capital deployment. <b
-                        class="text-foreground"
-                        >Note that bids cannot be manually cancelled</b
-                      >, but if the clearing price exceeds your max price, you
-                      will be automatically
-                      <b class="text-foreground">outbid</b> and unspent funds are
-                      refundable.
-                    </p>
-                  {/if}
+                  </div>
+                {/if}
+
+                <div class="bg-surface/30 rounded-2xl p-4">
+                  <p class="text-muted text-xs leading-relaxed">
+                    <strong class="text-foreground font-bold"
+                      >Fair Launch Protocol:</strong
+                    >
+                    Bids are streamed linearly. Early entry maximizes your allocation.
+                    Bids are final and cannot be cancelled, but unspent funds are
+                    always refundable if you are outbid.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1175,37 +1209,39 @@
       </section>
 
       <!-- Price Discovery Chart -->
-      <PriceDiscoveryChart
-        {snapshots}
-        {auctionInfo}
-        {auctionCfg}
-        {currencyInfo}
-        {currencyDisplay}
-        {priceUnitsPerToken}
-      />
+      <div class="glass-border bg-surface/20 rounded-3xl p-2 md:p-4">
+        <PriceDiscoveryChart
+          {snapshots}
+          {auctionInfo}
+          {auctionCfg}
+          {currencyInfo}
+          {currencyDisplay}
+          {priceUnitsPerToken}
+        />
+      </div>
 
-      <!-- My activity -->
-      <section class="glass-border rounded-xl p-4 md:p-6">
+      <!-- My Activity Section -->
+      <section class="glass-border bg-surface/30 rounded-3xl p-6 md:p-8">
         <div
-          class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
+          class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
             <div
-              class="text-muted text-[10px] font-bold tracking-wider uppercase"
+              class="text-xs font-bold tracking-widest text-indigo-500 uppercase"
               >Account</div
             >
-            <div class="text-xl font-bold">My Activity</div>
+            <h2 class="text-2xl font-bold tracking-tight">My Activity</h2>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-3">
             <button
-              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-4 py-2 text-[10px] font-bold tracking-wider uppercase transition-colors"
+              class="glass-border bg-surface/50 hover:bg-surface text-muted hover:text-foreground rounded-xl px-5 py-2.5 text-xs font-bold tracking-widest uppercase transition-all"
               onclick={onUserFundsModal}
               disabled={!stateInfo || !authStore.identity.isAuthenticated}
             >
               My Funds
             </button>
             <Button
-              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-4 py-2 text-[10px] font-bold tracking-wider uppercase transition-colors"
+              class="bg-foreground text-background rounded-xl px-5 py-2.5 text-xs font-bold tracking-widest uppercase shadow-lg transition-all hover:opacity-90"
               onclick={() => toastRun(claimAll, 'claim all failed')}
               disabled={!authStore.identity.isAuthenticated ||
                 myBids.length === 0}
@@ -1216,112 +1252,130 @@
         </div>
 
         <div class="mt-8">
-          <div
-            class="text-muted mb-3 text-[10px] font-bold tracking-wider uppercase"
-            >My Bids</div
-          >
           {#if !auctionInfo || myBids.length === 0}
             <div
-              class="bg-surface/50 border-border-subtle rounded-xl border border-dashed py-8 text-center"
+              class="bg-surface/20 rounded-2xl border border-dashed border-white/5 py-16 text-center"
             >
-              <p class="text-muted text-sm">No bids yet.</p>
+              <p class="text-muted text-sm italic"
+                >No participation history found.</p
+              >
             </div>
           {:else}
-            <div class="border-border-subtle overflow-hidden rounded-xl border">
-              <div
-                class="bg-surface/80 grid grid-cols-12 gap-2 px-4 py-3 text-[10px] font-bold tracking-wider uppercase"
-              >
-                <div class="col-span-2">ID</div>
-                <div class="col-span-3">Amount</div>
-                <div class="col-span-3">Max Price</div>
-                <div class="col-span-2">Status</div>
-                <div class="col-span-2 text-right">Action</div>
+            <div class="glass-border overflow-hidden rounded-2xl">
+              <div class="overflow-x-auto">
+                <table class="w-full border-collapse text-left">
+                  <thead>
+                    <tr
+                      class="bg-surface/50 text-muted text-xs font-bold tracking-widest uppercase"
+                    >
+                      <th class="px-6 py-4">ID</th>
+                      <th class="px-6 py-4">Amount</th>
+                      <th class="px-6 py-4">Max Price</th>
+                      <th class="px-6 py-4">Status</th>
+                      <th class="px-6 py-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-white/5">
+                    {#each myBids as b (b.id)}
+                      {@const isOutbid = b.outbid_time.length === 1}
+                      {@const isClaimed = b.claim_time > 0n}
+                      {@const isClaimable =
+                        !isClaimed &&
+                        ((isOutbid && auctionInfo.is_graduated) ||
+                          phase == 'ended')}
+                      <tr class="hover:bg-surface/40 group transition-colors">
+                        <td class="px-6 py-4">
+                          <span
+                            class="font-mono text-xs font-bold text-indigo-500"
+                            >#{b.id.toString()}</span
+                          >
+                        </td>
+                        <td class="px-6 py-4">
+                          <div class="text-sm font-bold">
+                            {currencyDisplay.displayValue(b.amount)}
+                            <span class="text-muted text-xs font-medium"
+                              >{currencyInfo.symbol}</span
+                            >
+                          </div>
+                        </td>
+                        <td class="px-6 py-4">
+                          <div class="text-muted text-xs font-medium">
+                            {priceUnitsPerToken(b.max_price)}
+                          </div>
+                        </td>
+                        <td class="px-6 py-4">
+                          {#if isClaimed}
+                            <span
+                              class="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-bold text-emerald-500 uppercase"
+                            >
+                              Claimed
+                            </span>
+                          {:else if isOutbid}
+                            <span
+                              class="inline-flex items-center rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-bold text-red-500 uppercase"
+                            >
+                              Outbid
+                            </span>
+                          {:else if phase === 'ended'}
+                            <span
+                              class="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-bold text-indigo-500 uppercase"
+                            >
+                              Settled
+                            </span>
+                          {:else}
+                            <span
+                              class="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-500 uppercase"
+                            >
+                              Active
+                            </span>
+                          {/if}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                          {#if !isClaimed}
+                            <Button
+                              class="glass-border bg-surface/50 hover:bg-surface text-muted hover:text-foreground rounded-lg px-3 py-1.5 text-xs font-bold uppercase transition-all disabled:opacity-30"
+                              onclick={() =>
+                                toastRun(() => claimOne(b.id), 'claim failed')}
+                              disabled={!isClaimable}
+                            >
+                              Claim
+                            </Button>
+                          {/if}
+                        </td>
+                      </tr>
+                      {#if b.tokens_filled > 0n || b.refund > 0n}
+                        <tr class="bg-indigo-500/[0.02]">
+                          <td colspan="5" class="px-6 py-3">
+                            <div class="flex items-center gap-6 text-xs">
+                              <div class="flex items-center gap-2">
+                                <span
+                                  class="text-muted font-bold tracking-widest uppercase"
+                                  >Filled</span
+                                >
+                                <span class="text-foreground font-black">
+                                  {tokenDisplay.displayValue(b.tokens_filled)}
+                                  {tokenInfo.symbol}
+                                </span>
+                              </div>
+                              <div class="h-3 w-px bg-white/10"></div>
+                              <div class="flex items-center gap-2">
+                                <span
+                                  class="text-muted font-bold tracking-widest uppercase"
+                                  >Refund</span
+                                >
+                                <span class="text-foreground font-black">
+                                  {currencyDisplay.displayValue(b.refund)}
+                                  {currencyInfo.symbol}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      {/if}
+                    {/each}
+                  </tbody>
+                </table>
               </div>
-              {#each myBids as b (b.id)}
-                {@const isOutbid = b.outbid_time.length === 1}
-                {@const isClaimed = b.claim_time > 0n}
-                {@const isClaimable =
-                  !isClaimed &&
-                  ((isOutbid && auctionInfo.is_graduated) || phase == 'ended')}
-                <div
-                  class="border-border-subtle hover:bg-surface/30 grid grid-cols-12 items-center gap-2 border-t px-4 py-3 text-xs transition-colors"
-                >
-                  <div class="col-span-2 font-mono font-medium text-indigo-500"
-                    >#{b.id.toString()}</div
-                  >
-                  <div class="col-span-3 font-semibold">
-                    {currencyDisplay.displayValue(b.amount)}
-                    <span class="text-muted font-normal"
-                      >{currencyInfo.symbol}</span
-                    >
-                  </div>
-                  <div class="col-span-3 font-medium"
-                    >{priceUnitsPerToken(b.max_price)}</div
-                  >
-                  <div class="col-span-2">
-                    {#if isClaimed}
-                      <span
-                        class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-500 uppercase"
-                        >claimed</span
-                      >
-                    {:else if isOutbid}
-                      <span
-                        class="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-500 uppercase"
-                        >outbid</span
-                      >
-                    {:else if phase === 'ended'}
-                      <span
-                        class="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-500 uppercase"
-                        >settled</span
-                      >
-                    {:else}
-                      <span
-                        class="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-500 uppercase"
-                        >active</span
-                      >
-                    {/if}
-                  </div>
-                  <div class="col-span-2 text-right">
-                    <Button
-                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground disabled:text-muted-foreground rounded-full border px-3 py-1 text-[10px] font-bold uppercase transition-colors {isClaimed
-                        ? 'invisible'
-                        : ''}"
-                      onclick={() =>
-                        toastRun(() => claimOne(b.id), 'claim failed')}
-                      disabled={!isClaimable}
-                    >
-                      Claim
-                    </Button>
-                  </div>
-                </div>
-                {#if b.tokens_filled > 0n || b.refund > 0n}
-                  <div
-                    class="border-border-subtle bg-surface/50 grid grid-cols-12 gap-2 border-t px-4 py-2.5 text-[10px]"
-                  >
-                    <div class="text-muted col-span-12 flex items-center gap-3">
-                      <div class="flex items-center gap-1.5">
-                        <span class="font-bold tracking-tight uppercase"
-                          >Filled:</span
-                        >
-                        <span class="text-foreground font-bold"
-                          >{tokenDisplay.displayValue(b.tokens_filled)}
-                          {tokenInfo.symbol}</span
-                        >
-                      </div>
-                      <span class="text-border-subtle">|</span>
-                      <div class="flex items-center gap-1.5">
-                        <span class="font-bold tracking-tight uppercase"
-                          >Refund:</span
-                        >
-                        <span class="text-foreground font-bold"
-                          >{currencyDisplay.displayValue(b.refund)}
-                          {currencyInfo.symbol}</span
-                        >
-                      </div>
-                    </div>
-                  </div>
-                {/if}
-              {/each}
             </div>
           {/if}
         </div>

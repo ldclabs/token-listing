@@ -266,70 +266,73 @@
     class="relative z-10 mx-auto mt-10 max-w-6xl space-y-10 px-4 md:mt-20 md:px-8"
   >
     <!-- Hero Section -->
-    <section class="grid gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-      <div class="space-y-8">
+    <section class="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+      <div class="relative space-y-10">
         <div
-          class="border-border-subtle text-muted bg-surface inline-flex items-center gap-3 rounded-full border px-2 py-1 text-xs font-semibold md:px-4 md:py-2"
+          class="border-border-subtle bg-surface/50 inline-flex items-center gap-3 rounded-full border px-3 py-1.5 text-xs font-bold tracking-wider uppercase backdrop-blur-sm md:px-5 md:py-2"
         >
           <a
-            class="text-gold hover:text-gold-foreground flex flex-row items-center gap-1 transition"
+            class="flex flex-row items-center gap-1.5 text-indigo-500 transition-colors hover:text-indigo-400"
             href="https://dashboard.internetcomputer.org/sns/d7wvo-iiaaa-aaaaq-aacsq-cai"
             target="_blank"
             rel="noreferrer"
           >
-            <span class="">Fully Onchain</span>
-            <span class="*:size-4"><ArrowRightUpLine /></span>
+            <span>Fully Onchain</span>
+            <span class="*:size-3.5"><ArrowRightUpLine /></span>
           </a>
-          <span class="">|</span>
+          <span class="text-border-subtle">|</span>
           <a
-            class="hover:text-foreground flex flex-row items-center gap-1 transition"
+            class="text-muted hover:text-foreground flex flex-row items-center gap-1.5 transition-colors"
             href="https://github.com/ldclabs/token-listing"
             target="_blank"
             rel="noreferrer"
           >
-            <span class="">Open Source</span>
-            <span class="*:size-4"><ArrowRightUpLine /></span>
+            <span>Open Source</span>
+            <span class="*:size-3.5"><ArrowRightUpLine /></span>
           </a>
-          <span class="">|</span>
+          <span class="text-border-subtle">|</span>
           <a
-            class="flex flex-row items-center gap-1 text-indigo-600 transition hover:text-indigo-400"
+            class="flex flex-row items-center gap-1.5 text-amber-600 transition-colors hover:text-amber-500"
             href="https://nns.ic0.app/proposals/?u=d7wvo-iiaaa-aaaaq-aacsq-cai"
             target="_blank"
             rel="noreferrer"
           >
-            <span class="">SNS DAO Governance</span>
-            <span class="*:size-4"><ArrowRightUpLine /></span>
+            <span>SNS DAO</span>
+            <span class="*:size-3.5"><ArrowRightUpLine /></span>
           </a>
         </div>
 
         <div class="space-y-6">
           <h1
-            class="font-serif text-4xl leading-[1.1] font-semibold sm:text-5xl lg:text-6xl"
+            class="font-serif text-5xl leading-[1.05] font-bold tracking-tight sm:text-6xl lg:text-7xl"
           >
             Launch tokens <span class="gradient-text">fairly</span>.<br
               class="hidden sm:block"
             />
             Store metadata <span class="gradient-text">forever</span>.
           </h1>
-          <p class="text-muted max-w-2xl text-lg leading-relaxed">
-            tokenlist.ing is where projects come to launch. Our <strong
-              class="text-foreground">Continuous Clearing Auction</strong
+          <p class="text-muted max-w-2xl text-lg leading-relaxed md:text-xl">
+            tokenlist.ing is the premier launchpad for sovereign projects. Our <strong
+              class="text-foreground font-semibold"
+              >Continuous Clearing Auction</strong
             >
-            eliminates bots and sniping, while permanent on-chain storage keeps your
-            token's identity alive across every chain.
+            neutralizes bots, while permanent on-chain storage ensures your token's
+            legacy across the multi-chain web.
           </p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-4">
+        <div class="flex flex-wrap items-center gap-5">
           <a
-            class="group bg-accent text-accent-foreground relative overflow-hidden rounded-full px-6 py-3 text-sm font-semibold tracking-wide uppercase transition-all hover:-translate-y-0.5 hover:shadow-lg"
+            class="group bg-foreground text-background relative overflow-hidden rounded-full px-8 py-4 text-xs font-bold tracking-widest uppercase transition-all hover:-translate-y-1 hover:shadow-xl active:translate-y-0"
             href="#launchpad"
           >
             <span class="relative z-10">How CCA works</span>
-            <div class="shimmer absolute inset-0"></div>
+            <div
+              class="absolute inset-0 translate-y-full bg-indigo-600 transition-transform duration-300 group-hover:translate-y-0"
+            ></div>
           </a>
           <a
-            class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-6 py-3 text-sm font-semibold transition-all hover:scale-105"
+            class="border-border-subtle text-muted hover:border-foreground hover:text-foreground hover:bg-surface/50 rounded-full border px-8 py-4 text-xs font-bold tracking-widest uppercase transition-all"
             href="#features"
           >
             All features
@@ -341,468 +344,423 @@
       <div class="relative">
         {#if latest}
           <a
-            class="animated-border glass-border from-surface-hover relative block overflow-hidden rounded-xl bg-linear-to-b via-transparent to-transparent p-4 transition-transform md:p-8"
+            class="glass-border group bg-surface/30 relative block overflow-hidden rounded-2xl p-1 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl"
             href={latest.href}
           >
-            <div class="text-muted flex items-center justify-between text-sm">
-              <span>Latest auction</span>
-              <span class="flex items-center gap-1.5">
-                {#if latest.isActive}
-                  <span class="relative flex h-2 w-2">
-                    <span
-                      class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
-                    ></span>
-                    <span
-                      class="relative inline-flex h-2 w-2 rounded-full bg-green-500"
-                    ></span>
-                  </span>
-                {:else}
-                  <span class="relative flex h-2 w-2">
-                    <span
-                      class="bg-border-subtle relative inline-flex h-2 w-2 rounded-full"
-                    ></span>
-                  </span>
-                {/if}
-                {latest.status}
-              </span>
-            </div>
-
-            <div class="mt-6 flex items-start justify-between gap-4">
-              <div class="flex min-w-0 items-center gap-3">
-                <div
-                  class="bg-surface relative h-10 w-10 shrink-0 overflow-hidden rounded-full"
-                >
-                  {#if latest.a.token_logo_url}
-                    <img
-                      class="h-full w-full object-cover"
-                      src={latest.a.token_logo_url}
-                      alt={latest.a.token_symbol}
-                      loading="lazy"
-                    />
-                  {/if}
-                </div>
-                <div class="min-w-0">
-                  <p class="truncate font-semibold">
-                    {latest.a.name || latest.a.token_symbol}
-                  </p>
-                  <p class="text-muted-foreground truncate text-xs">
-                    {latest.a.token_symbol}/{latest.a.currency_symbol} · {latest.chain}{#if latest.a.is_graduated}
-                      {' · Graduated'}
-                    {/if}
-                  </p>
-                </div>
-              </div>
-
-              <span
-                class="text-muted-foreground shrink-0 text-xs font-semibold underline underline-offset-4"
-                >View →</span
-              >
-            </div>
-
-            <div class="mt-8 space-y-6">
-              {#if latest.total_demand_raised > 0n}
-                <div class="grid grid-cols-1 gap-4">
-                  <div>
-                    <p
-                      class="text-muted-foreground text-xs tracking-widest uppercase"
-                    >
-                      Current price
-                    </p>
-                    <p class="font-mono text-3xl font-medium">
-                      <span class="gradient-text"
-                        >{latest.clearingPriceValue}</span
-                      >
-                      {latest.currency.symbol}
-                    </p>
-                  </div>
-                  <div>
-                    <p
-                      class="text-muted-foreground text-xs tracking-widest uppercase"
-                    >
-                      Total raised
-                    </p>
-                    <p class="font-mono text-3xl font-medium">
-                      <span class="gradient-text">{latest.raised}</span>
-                      {latest.currency.symbol}
-                    </p>
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <p
-                      class="text-muted-foreground text-xs tracking-widest uppercase"
-                    >
-                      Required to graduate
-                    </p>
-                    <p class="font-mono text-xl font-medium">
-                      <span class="">{latest.requiredCurrency}</span>
-                      {latest.currency.symbol}
-                    </p>
-                  </div>
-                  <div>
-                    <p
-                      class="text-muted-foreground text-xs tracking-widest uppercase"
-                    >
-                      Bids
-                    </p>
-                    <p class="text-muted font-mono text-xl"
-                      >{latest.participants}</p
-                    >
-                  </div>
-                </div>
-              {:else}
-                <div class="grid grid-cols-1 gap-4">
-                  <div>
-                    <p
-                      class="text-muted-foreground text-xs tracking-widest uppercase"
-                    >
-                      Current price
-                    </p>
-                    <p class="font-mono text-3xl font-medium">
-                      <span class="gradient-text"
-                        >{latest.clearingPriceValue}</span
-                      >
-                      {latest.currency.symbol}
-                    </p>
-                  </div>
-                  <div>
-                    <p
-                      class="text-muted-foreground text-xs tracking-widest uppercase"
-                    >
-                      Required to graduate
-                    </p>
-                    <p class="font-mono text-3xl font-medium">
-                      <span class="gradient-text"
-                        >{latest.requiredCurrency}</span
-                      >
-                      {latest.currency.symbol}
-                    </p>
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <p
-                      class="text-muted-foreground text-xs tracking-widest uppercase"
-                    >
-                      Total raised
-                    </p>
-                    <p class="text-muted font-mono text-xl">{latest.raised}</p>
-                  </div>
-                  <div>
-                    <p
-                      class="text-muted-foreground text-xs tracking-widest uppercase"
-                    >
-                      Bids
-                    </p>
-                    <p class="text-muted font-mono text-xl"
-                      >{latest.participants}</p
-                    >
-                  </div>
-                </div>
-              {/if}
-
-              <div class="bg-border-subtle h-px w-full"></div>
-
-              <div>
-                <p
-                  class="text-muted-foreground text-xs tracking-widest uppercase"
-                >
-                  {#if latest.status === 'Upcoming'}
-                    Starts in
-                  {:else}
-                    Time remaining
-                  {/if}
-                </p>
-                <p class="text-muted font-mono text-xl">
-                  {#if latest.status === 'Ended'}
-                    Ended
-                  {:else}
-                    {latest.remaining}
-                  {/if}
-                </p>
-                <p class="text-muted-foreground mt-2 text-xs">
-                  {formatDatetime(latest.a.start_time)} → {formatDatetime(
-                    latest.a.end_time
-                  )}
-                </p>
-              </div>
-
-              <!-- Mini chart visualization -->
-              <div class="bg-surface rounded-xl p-4">
-                <div class="mb-2 flex h-16 items-end justify-between gap-1">
-                  {#each [30, 45, 35, 60, 55, 70, 65, 80, 75, 90, 85, 100] as height}
-                    <div
-                      class="flex-1 rounded-t bg-linear-to-t from-purple-500/40 to-amber-500/80 transition-all hover:from-purple-500/60 hover:to-amber-400"
-                      style="height: {height}%;"
-                    ></div>
-                  {/each}
-                </div>
-                <p class="text-muted-foreground text-xs">
-                  Real-time price discovery. You accumulate tokens continuously
-                  at the current market price for as long as your bid remains
-                  active.
-                </p>
-              </div>
-            </div>
-
             <div
-              class="animate-pulse-glow absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-amber-500/20 blur-2xl"
+              class="relative overflow-hidden rounded-[calc(1rem-1px)] p-6 md:p-8"
+            >
+              <div class="flex items-center justify-between">
+                <div
+                  class="rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-bold tracking-wider text-indigo-500 uppercase"
+                >
+                  Latest Auction
+                </div>
+                <div class="flex items-center gap-2">
+                  {#if latest.isActive}
+                    <span class="relative flex h-2 w-2">
+                      <span
+                        class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
+                      ></span>
+                      <span
+                        class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"
+                      ></span>
+                    </span>
+                  {:else}
+                    <span class="bg-border-subtle h-2 w-2 rounded-full"></span>
+                  {/if}
+                  <span
+                    class="text-muted text-xs font-bold tracking-wider uppercase"
+                    >{latest.status}</span
+                  >
+                </div>
+              </div>
+
+              <div class="mt-10 flex items-center justify-between gap-4">
+                <div class="flex min-w-0 items-center gap-4">
+                  <div
+                    class="bg-surface ring-border-subtle relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl shadow-inner ring-1"
+                  >
+                    {#if latest.a.token_logo_url}
+                      <img
+                        class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        src={latest.a.token_logo_url}
+                        alt={latest.a.token_symbol}
+                        loading="lazy"
+                      />
+                    {/if}
+                  </div>
+                  <div class="min-w-0">
+                    <h3 class="truncate text-xl font-bold tracking-tight">
+                      {latest.a.name || latest.a.token_symbol}
+                    </h3>
+                    <div
+                      class="text-muted mt-1 flex items-center gap-2 text-xs font-medium"
+                    >
+                      <span class="text-indigo-500"
+                        >{latest.a.token_symbol}</span
+                      >
+                      <span class="text-border-subtle">/</span>
+                      <span>{latest.a.currency_symbol}</span>
+                      <span class="text-border-subtle">·</span>
+                      <span
+                        class="bg-surface rounded px-1.5 py-0.5 text-xs uppercase"
+                        >{latest.chain}</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div
+                  class="bg-surface border-border-subtle flex h-10 w-10 items-center justify-center rounded-full border transition-colors group-hover:border-indigo-500 group-hover:text-indigo-500"
+                >
+                  <ArrowRightUpLine />
+                </div>
+              </div>
+
+              <div class="mt-10 grid gap-8">
+                <div class="grid grid-cols-2 gap-6">
+                  <div class="space-y-1">
+                    <p
+                      class="text-muted text-xs font-bold tracking-widest uppercase"
+                    >
+                      Current Price
+                    </p>
+                    <div class="flex items-baseline gap-1.5">
+                      <span
+                        class="font-mono text-3xl font-bold tracking-tighter text-indigo-500"
+                        >{latest.clearingPriceValue}</span
+                      >
+                      <span class="text-muted text-sm font-bold uppercase"
+                        >{latest.currency.symbol}</span
+                      >
+                    </div>
+                  </div>
+                  <div class="space-y-1">
+                    <p
+                      class="text-muted text-xs font-bold tracking-widest uppercase"
+                    >
+                      Total Raised
+                    </p>
+                    <div class="flex items-baseline gap-1.5">
+                      <span
+                        class="font-mono text-3xl font-bold tracking-tighter"
+                        >{latest.raised}</span
+                      >
+                      <span class="text-muted text-sm font-bold uppercase"
+                        >{latest.currency.symbol}</span
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  class="border-border-subtle grid grid-cols-2 gap-6 border-t pt-6"
+                >
+                  <div class="space-y-1">
+                    <p
+                      class="text-muted text-xs font-bold tracking-widest uppercase"
+                    >
+                      Goal
+                    </p>
+                    <p class="font-mono text-lg font-semibold">
+                      {latest.requiredCurrency}
+                      <span class="text-muted text-xs font-bold uppercase"
+                        >{latest.currency.symbol}</span
+                      >
+                    </p>
+                  </div>
+                  <div class="space-y-1">
+                    <p
+                      class="text-muted text-xs font-bold tracking-widest uppercase"
+                    >
+                      Participants
+                    </p>
+                    <p class="font-mono text-lg font-semibold"
+                      >{latest.participants}</p
+                    >
+                  </div>
+                </div>
+
+                <div class="bg-surface/50 rounded-2xl p-5">
+                  <div class="flex items-center justify-between">
+                    <p
+                      class="text-muted text-xs font-bold tracking-widest uppercase"
+                    >
+                      {#if latest.status === 'Upcoming'}
+                        Starts In
+                      {:else}
+                        Time Remaining
+                      {/if}
+                    </p>
+                    <p class="font-mono text-sm font-bold text-indigo-500">
+                      {#if latest.status === 'Ended'}
+                        Auction Ended
+                      {:else}
+                        {latest.remaining}
+                      {/if}
+                    </p>
+                  </div>
+                  <div
+                    class="mt-3 flex h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10"
+                  >
+                    <div
+                      class="bg-linear-to-r from-indigo-500 to-purple-500 transition-all duration-1000"
+                      style="width: 65%"
+                    ></div>
+                  </div>
+                  <p class="text-muted mt-3 text-xs font-medium">
+                    {formatDatetime(latest.a.start_time)} → {formatDatetime(
+                      latest.a.end_time
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Decorative glow -->
+            <div
+              class="animate-pulse-glow absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl"
               aria-hidden="true"
             ></div>
           </a>
         {:else}
           <div
-            class="animated-border glass-border from-surface-hover relative overflow-hidden rounded-xl bg-linear-to-b via-transparent to-transparent p-4 md:p-8"
+            class="glass-border bg-surface/30 relative animate-pulse overflow-hidden rounded-2xl p-8"
           >
-            <div class="text-muted flex items-center justify-between text-sm">
-              <span>Live auction preview</span>
-              <span class="flex items-center gap-1.5">
-                <span class="relative flex h-2 w-2">
-                  <span
-                    class="bg-border-subtle relative inline-flex h-2 w-2 rounded-full"
-                  ></span>
-                </span>
-                Loading…
-              </span>
-            </div>
-
-            <div class="mt-8 space-y-6">
-              <div>
-                <p
-                  class="text-muted-foreground text-xs tracking-widest uppercase"
-                >
-                  Current price
-                </p>
-                <p class="font-mono text-3xl font-medium">
-                  <span class="gradient-text">—</span>
-                </p>
-              </div>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <p
-                    class="text-muted-foreground text-xs tracking-widest uppercase"
-                  >
-                    Total raised
-                  </p>
-                  <p class="text-muted font-mono text-xl">—</p>
-                </div>
-                <div>
-                  <p
-                    class="text-muted-foreground text-xs tracking-widest uppercase"
-                  >
-                    Bids
-                  </p>
-                  <p class="text-muted font-mono text-xl">—</p>
-                </div>
-              </div>
-
-              <div class="bg-border-subtle h-px w-full"></div>
-
-              <div>
-                <p
-                  class="text-muted-foreground text-xs tracking-widest uppercase"
-                >
-                  Time remaining
-                </p>
-                <p class="text-muted font-mono text-xl">—</p>
+            <div class="bg-surface mb-8 h-4 w-24 rounded"></div>
+            <div class="mb-10 flex items-center gap-4">
+              <div class="bg-surface h-14 w-14 rounded-2xl"></div>
+              <div class="space-y-2">
+                <div class="bg-surface h-6 w-32 rounded"></div>
+                <div class="bg-surface h-4 w-24 rounded"></div>
               </div>
             </div>
-
-            <div
-              class="animate-pulse-glow absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-amber-500/20 blur-2xl"
-              aria-hidden="true"
-            ></div>
+            <div class="grid grid-cols-2 gap-8">
+              <div class="space-y-2">
+                <div class="bg-surface h-3 w-16 rounded"></div>
+                <div class="bg-surface h-8 w-24 rounded"></div>
+              </div>
+              <div class="space-y-2">
+                <div class="bg-surface h-3 w-16 rounded"></div>
+                <div class="bg-surface h-8 w-24 rounded"></div>
+              </div>
+            </div>
           </div>
         {/if}
       </div>
     </section>
 
     <!-- Features Section -->
-    <section id="features" class="space-y-8 pt-10 md:pt-20">
+    <section id="features" class="space-y-12 pt-20 md:pt-32">
       <div
         class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
       >
-        <div>
-          <p class="text-muted-foreground text-sm tracking-widest uppercase">
-            Platform
+        <div class="space-y-2">
+          <p
+            class="text-xs font-bold tracking-[0.2em] text-indigo-500 uppercase"
+          >
+            Platform Pillars
           </p>
-          <h2 class="mt-2 font-serif text-3xl font-semibold sm:text-4xl">
+          <h2 class="font-serif text-4xl font-bold tracking-tight sm:text-5xl">
             Everything tokens need
           </h2>
         </div>
         <a
-          class="text-muted hover:text-foreground text-sm font-semibold underline underline-offset-4"
+          class="text-muted hover:text-foreground text-xs font-bold tracking-wider uppercase underline underline-offset-8 transition-colors"
           href="#cta"
         >
           Request access →
         </a>
       </div>
 
-      <div class="stagger-fade-in grid gap-5 md:grid-cols-2">
+      <div class="grid gap-6 md:grid-cols-2">
         {#each pillars as item, i (i)}
           <div
-            class="glass-border group relative overflow-hidden rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg md:p-8"
+            class="glass-border group bg-surface/30 hover:bg-surface/50 relative overflow-hidden rounded-2xl p-8 transition-all duration-500 hover:-translate-y-1.5 hover:shadow-2xl"
           >
             <div
-              class="bg-surface-hover absolute top-0 right-0 h-24 w-24 translate-x-8 -translate-y-4 rounded-full blur-2xl transition-all duration-500 group-hover:bg-amber-500/10"
+              class="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-indigo-500/5 blur-3xl transition-colors duration-500 group-hover:bg-indigo-500/10"
             ></div>
 
-            <!-- Icon -->
-            <div
-              class="absolute top-4 right-4 text-4xl opacity-20 transition-all duration-300 group-hover:scale-110 group-hover:opacity-40 md:top-8 md:right-8"
-            >
-              {item.icon}
+            <div class="relative space-y-6">
+              <div class="flex items-center justify-between">
+                <div
+                  class="bg-surface border-border-subtle flex h-12 w-12 items-center justify-center rounded-xl border text-2xl shadow-sm transition-transform duration-500 group-hover:scale-110"
+                >
+                  {item.icon}
+                </div>
+                <div
+                  class="text-muted border-border-subtle rounded-full border px-3 py-1 text-xs font-bold tracking-widest uppercase"
+                >
+                  {item.tag}
+                </div>
+              </div>
+              <div class="space-y-3">
+                <h3 class="text-2xl font-bold tracking-tight">{item.title}</h3>
+                <p class="text-muted text-base leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
             </div>
-
-            <div
-              class="border-border-subtle bg-surface text-muted mb-4 inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-bold tracking-widest uppercase transition-colors group-hover:border-amber-500/50 group-hover:text-amber-500"
-            >
-              {item.tag}
-            </div>
-            <h3 class="text-xl font-semibold">{item.title}</h3>
-            <p class="text-muted mt-3 text-sm leading-relaxed">
-              {item.desc}
-            </p>
           </div>
         {/each}
       </div>
     </section>
 
     <!-- CCA Launchpad Section -->
-    <section id="launchpad" class="pt-10 md:pt-20">
+    <section id="launchpad" class="pt-20 md:pt-32">
       <div
-        class="border-border-subtle bg-surface relative space-y-10 overflow-hidden rounded-xl border p-4 md:p-8"
+        class="glass-border bg-surface/20 relative space-y-16 overflow-hidden rounded-3xl p-8 md:p-16"
       >
         <!-- Decorative background -->
         <div class="pointer-events-none absolute inset-0" aria-hidden="true">
           <div
-            class="animate-float-slow absolute -top-20 -right-20 h-64 w-64 rounded-full bg-purple-500/5 blur-3xl"
+            class="animate-float-slow absolute -top-40 -right-40 h-96 w-96 rounded-full bg-indigo-500/5 blur-[100px]"
           ></div>
           <div
-            class="animate-float absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-amber-500/5 blur-3xl"
+            class="animate-float absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-amber-500/5 blur-[100px]"
           ></div>
         </div>
 
         <div
-          class="relative flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+          class="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between"
         >
-          <div>
-            <p class="text-muted text-sm tracking-widest uppercase">
+          <div class="max-w-3xl space-y-6">
+            <p
+              class="text-xs font-bold tracking-[0.2em] text-amber-500 uppercase"
+            >
               Continuous Clearing Auction
             </p>
-            <h2 class="mt-2 font-serif text-3xl font-semibold sm:text-4xl">
+            <h2
+              class="font-serif text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl"
+            >
               A <span class="gradient-text">better</span> way to launch
             </h2>
-            <p class="text-muted mt-4 max-w-2xl">
+            <p class="text-muted text-lg leading-relaxed md:text-xl">
               Traditional token sales are a race—bots win, regular users lose.
               CCA flips the script by spreading every bid across the entire
-              auction. The result? <strong class="text-foreground"
+              auction. The result? <strong class="text-foreground font-semibold"
                 >Fair prices determined by real demand, not transaction timing.</strong
               >
             </p>
           </div>
           <a
-            class="text-muted hover:text-foreground inline-flex items-center gap-2 text-sm font-semibold underline underline-offset-4"
+            class="text-muted hover:text-foreground inline-flex items-center gap-2 text-xs font-bold tracking-wider uppercase underline underline-offset-8 transition-colors"
             href="https://github.com/ldclabs/token-listing/blob/main/docs/cca.md"
           >
             Read the whitepaper ↗
           </a>
         </div>
 
-        <div
-          class="stagger-fade-in relative grid gap-4 sm:grid-cols-2 lg:grid-cols-5"
-        >
+        <div class="relative grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
           {#each steps as step, i}
             <div
-              class="glass-border group flex flex-col gap-3 rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+              class="glass-border group bg-surface/40 hover:bg-surface/60 relative flex flex-col gap-5 rounded-2xl p-6 transition-all duration-500 hover:-translate-y-2 hover:shadow-xl"
             >
               <div
-                class="flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br from-purple-500 to-amber-500 text-xs font-bold text-white shadow-lg transition-transform group-hover:scale-110"
+                class="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 text-sm font-bold text-white shadow-lg transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3"
               >
                 {i + 1}
               </div>
-              <h3 class="font-semibold">{step.title}</h3>
-              <p class="text-muted text-xs leading-relaxed">{step.body}</p>
+              <div class="space-y-2">
+                <h3 class="text-lg font-bold tracking-tight">{step.title}</h3>
+                <p class="text-muted text-sm leading-relaxed">{step.body}</p>
+              </div>
 
-              <!-- Connector line (except last item) -->
               {#if i < steps.length - 1}
                 <div
-                  class="absolute top-1/2 right-0 hidden h-px w-4 bg-linear-to-r from-amber-500/50 to-transparent lg:block"
-                  style="transform: translateX(100%);"
+                  class="bg-border-subtle absolute top-1/2 -right-3 hidden h-px w-6 lg:block"
                 ></div>
               {/if}
             </div>
           {/each}
         </div>
 
-        <div class="relative grid gap-6 md:grid-cols-2">
+        <div class="relative grid gap-8 md:grid-cols-2">
           <div
-            class="glass-border rounded-xl p-4 transition-all duration-300 hover:shadow-lg"
+            class="glass-border group rounded-2xl bg-indigo-500/5 p-8 transition-all duration-500 hover:bg-indigo-500/10"
           >
-            <p
-              class="text-muted flex items-center gap-2 text-sm tracking-widest uppercase"
-            >
-              <span class="text-xl">🚀</span>
-              For projects
-            </p>
-            <ul class="text-muted mt-4 space-y-3 text-sm">
-              <li class="flex items-start gap-2">
-                <span class="text-green-500">✓</span>
-                <span
-                  ><strong class="text-foreground">Predictable outcomes</strong> —
-                  know your minimum raise before you start</span
-                >
-              </li>
-              <li class="flex items-start gap-2">
-                <span class="text-green-500">✓</span>
-                <span
-                  ><strong class="text-foreground">Instant liquidity</strong> — auction
-                  proceeds seed your trading pool automatically</span
-                >
-              </li>
-              <li class="flex items-start gap-2">
-                <span class="text-green-500">✓</span>
-                <span
-                  ><strong class="text-foreground">Credible distribution</strong
-                  > — prove to your community that insiders didn't front-run</span
-                >
-              </li>
+            <div class="flex items-center gap-4">
+              <div
+                class="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500/20 text-xl"
+              >
+                🚀
+              </div>
+              <p
+                class="text-xs font-bold tracking-widest text-indigo-500 uppercase"
+              >
+                For Projects
+              </p>
+            </div>
+            <ul class="mt-8 space-y-4">
+              {#each [['Predictable outcomes', 'know your minimum raise before you start'], ['Instant liquidity', 'auction proceeds seed your trading pool automatically'], ['Credible distribution', "prove to your community that insiders didn't front-run"]] as [title, desc]}
+                <li class="flex items-start gap-3">
+                  <span class="mt-1 text-indigo-500">
+                    <svg
+                      class="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="3"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </span>
+                  <p class="text-muted text-sm leading-relaxed">
+                    <strong class="text-foreground font-semibold"
+                      >{title}</strong
+                    >
+                    — {desc}
+                  </p>
+                </li>
+              {/each}
             </ul>
           </div>
           <div
-            class="glass-border rounded-xl p-4 transition-all duration-300 hover:shadow-lg"
+            class="glass-border group rounded-2xl bg-amber-500/5 p-8 transition-all duration-500 hover:bg-amber-500/10"
           >
-            <p
-              class="text-muted flex items-center gap-2 text-sm tracking-widest uppercase"
-            >
-              <span class="text-xl">👥</span>
-              For participants
-            </p>
-            <ul class="text-muted mt-4 space-y-3 text-sm">
-              <li class="flex items-start gap-2">
-                <span class="text-green-500">✓</span>
-                <span
-                  ><strong class="text-foreground">No timing pressure</strong> — bid
-                  early, bid late, same fair treatment</span
-                >
-              </li>
-              <li class="flex items-start gap-2">
-                <span class="text-green-500">✓</span>
-                <span
-                  ><strong class="text-foreground">Set your max price</strong> — if
-                  clearing exceeds your limit, you get refunded</span
-                >
-              </li>
-              <li class="flex items-start gap-2">
-                <span class="text-green-500">✓</span>
-                <span
-                  ><strong class="text-foreground">Full refund guarantee</strong
-                  > — failed auctions return 100% of funds</span
-                >
-              </li>
+            <div class="flex items-center gap-4">
+              <div
+                class="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/20 text-xl"
+              >
+                👥
+              </div>
+              <p
+                class="text-xs font-bold tracking-widest text-amber-500 uppercase"
+              >
+                For Participants
+              </p>
+            </div>
+            <ul class="mt-8 space-y-4">
+              {#each [['No timing pressure', 'bid early, bid late, same fair treatment'], ['Set your max price', 'if clearing exceeds your limit, you get refunded'], ['Full refund guarantee', 'failed auctions return 100% of funds']] as [title, desc]}
+                <li class="flex items-start gap-3">
+                  <span class="mt-1 text-amber-500">
+                    <svg
+                      class="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="3"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </span>
+                  <p class="text-muted text-sm leading-relaxed">
+                    <strong class="text-foreground font-semibold"
+                      >{title}</strong
+                    >
+                    — {desc}
+                  </p>
+                </li>
+              {/each}
             </ul>
           </div>
         </div>
@@ -810,118 +768,88 @@
     </section>
 
     <!-- Chains Section -->
-    <section id="chains" class="space-y-8 pt-10 md:pt-20">
+    <section id="chains" class="space-y-12 pt-20 md:pt-32">
       <div
         class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
       >
-        <div>
-          <p class="text-muted-foreground text-sm tracking-widest uppercase">
+        <div class="space-y-2">
+          <p
+            class="text-xs font-bold tracking-[0.2em] text-indigo-500 uppercase"
+          >
             Multi-chain
           </p>
-          <h2 class="mt-2 font-serif text-3xl font-semibold sm:text-4xl">
+          <h2 class="font-serif text-4xl font-bold tracking-tight sm:text-5xl">
             One platform, <span class="gradient-text">every chain</span>
           </h2>
         </div>
-        <p class="text-muted text-sm">
+        <p class="text-muted text-sm font-medium">
           Powered by ICP's Chain-Key & HTTPs-Outcall capabilities
         </p>
       </div>
 
-      <div class="stagger-fade-in grid gap-4 md:grid-cols-4">
+      <div class="grid gap-4 md:grid-cols-4">
         {#each chains as chain}
           <div
-            class="glass-border group overflow-hidden rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+            class="glass-border group bg-surface/30 hover:bg-surface/50 relative overflow-hidden rounded-2xl p-6 transition-all duration-500 hover:-translate-y-1.5 hover:shadow-xl"
           >
             <!-- Gradient accent bar -->
             <div
-              class="absolute top-0 right-0 left-0 h-1 bg-linear-to-r {chain.color} opacity-0 transition-opacity group-hover:opacity-100"
+              class="absolute top-0 right-0 left-0 h-1 bg-linear-to-r {chain.color} opacity-20 transition-opacity duration-500 group-hover:opacity-100"
             ></div>
 
             <div class="flex items-center justify-between">
-              <span class="font-semibold">{chain.name}</span>
-              <span
-                class="text-muted-foreground transition-transform group-hover:translate-x-1"
-                >→</span
+              <span class="text-lg font-bold tracking-tight">{chain.name}</span>
+              <div
+                class="text-muted transition-transform duration-500 group-hover:translate-x-1 group-hover:text-indigo-500"
               >
+                <ArrowRightUpLine />
+              </div>
             </div>
-            <p class="text-muted mt-2 text-xs">{chain.note}</p>
+            <p class="text-muted mt-3 text-xs leading-relaxed font-medium"
+              >{chain.note}</p
+            >
           </div>
         {/each}
       </div>
 
-      <div class="glass-border relative overflow-hidden rounded-xl p-4 md:p-8">
-        <!-- Chain connection visualization -->
-        <div
-          class="pointer-events-none absolute inset-0 flex items-center justify-center opacity-5"
-          aria-hidden="true"
-        >
-          <svg class="h-full w-full" viewBox="0 0 400 200">
-            <circle
-              cx="100"
-              cy="100"
-              r="60"
-              stroke="currentColor"
-              fill="none"
-              stroke-width="1"
-            />
-            <circle
-              cx="200"
-              cy="100"
-              r="80"
-              stroke="currentColor"
-              fill="none"
-              stroke-width="1"
-            />
-            <circle
-              cx="300"
-              cy="100"
-              r="60"
-              stroke="currentColor"
-              fill="none"
-              stroke-width="1"
-            />
-            <line
-              x1="160"
-              y1="100"
-              x2="120"
-              y2="100"
-              stroke="currentColor"
-              stroke-width="1"
-            />
-            <line
-              x1="280"
-              y1="100"
-              x2="240"
-              y2="100"
-              stroke="currentColor"
-              stroke-width="1"
-            />
-          </svg>
-        </div>
-
-        <div class="relative grid gap-6 md:grid-cols-2">
-          <div>
-            <p
-              class="text-muted flex items-center gap-2 text-sm tracking-widest uppercase"
-            >
-              <span class="text-xl">⚙️</span>
-              How it works
-            </p>
-            <p class="text-muted mt-2 text-sm">
+      <div
+        class="glass-border bg-surface/20 relative overflow-hidden rounded-3xl p-8 md:p-12"
+      >
+        <div class="relative grid gap-12 md:grid-cols-2">
+          <div class="space-y-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500"
+              >
+                ⚙️
+              </div>
+              <p
+                class="text-xs font-bold tracking-widest text-indigo-500 uppercase"
+              >
+                How it works
+              </p>
+            </div>
+            <p class="text-muted text-base leading-relaxed">
               ICP acts as the coordination layer—storing metadata, running
               auctions, and managing cross-chain state. Your tokens exist
               natively on their target chains, with ICP ensuring everything
               stays in sync.
             </p>
           </div>
-          <div>
-            <p
-              class="text-muted flex items-center gap-2 text-sm tracking-widest uppercase"
-            >
-              <span class="text-xl">🛠️</span>
-              Developer tools
-            </p>
-            <p class="text-muted mt-2 text-sm">
+          <div class="space-y-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-500"
+              >
+                🛠️
+              </div>
+              <p
+                class="text-xs font-bold tracking-widest text-amber-500 uppercase"
+              >
+                Developer tools
+              </p>
+            </div>
+            <p class="text-muted text-base leading-relaxed">
               SDKs for TypeScript, Rust, and Motoko. REST APIs for metadata
               queries. Webhooks for auction events. Build on tokenlist.ing
               without learning new paradigms.
@@ -932,36 +860,40 @@
     </section>
 
     <!-- FAQ Section -->
-    <section id="faq" class="pt-10 md:pt-20">
+    <section id="faq" class="pt-20 md:pt-32">
       <div
-        class="border-border-subtle bg-surface space-y-6 rounded-xl border p-4 md:p-8"
+        class="glass-border bg-surface/20 space-y-12 rounded-3xl p-8 md:p-16"
       >
-        <div class="flex items-center justify-between">
-          <h2 class="font-serif text-2xl font-semibold sm:text-3xl">
+        <div
+          class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
+        >
+          <h2 class="font-serif text-4xl font-bold tracking-tight sm:text-5xl">
             Frequently asked questions
           </h2>
           <a
-            class="text-muted hover:text-foreground text-sm underline underline-offset-4"
+            class="text-muted hover:text-foreground text-xs font-bold tracking-wider uppercase underline underline-offset-8 transition-colors"
             href="mailto:hello@tokenlist.ing"
           >
             More questions?
           </a>
         </div>
-        <div class="stagger-fade-in space-y-4">
+        <div class="grid gap-4">
           {#each faqs as item, i (i)}
             <div
-              class="glass-border group rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+              class="glass-border group bg-surface/40 hover:bg-surface/60 rounded-2xl p-6 transition-all duration-500"
             >
-              <p class="text-foreground flex items-start gap-3 font-semibold">
+              <div class="flex items-start gap-4">
                 <span
-                  class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-purple-500 to-amber-500 text-xs text-white"
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-indigo-500 to-purple-600 text-xs font-bold text-white shadow-md"
                   >{i + 1}</span
                 >
-                {item.q}
-              </p>
-              <p class="text-muted mt-2 pl-9 text-sm leading-relaxed"
-                >{item.a}</p
-              >
+                <div class="space-y-3">
+                  <h3 class="text-foreground text-lg font-bold tracking-tight">
+                    {item.q}
+                  </h3>
+                  <p class="text-muted text-base leading-relaxed">{item.a}</p>
+                </div>
+              </div>
             </div>
           {/each}
         </div>
@@ -971,43 +903,50 @@
     <!-- CTA Section -->
     <section
       id="cta"
-      class="animated-border relative overflow-hidden rounded-xl p-4 pt-10 text-center md:p-8 md:pt-20"
+      class="bg-foreground relative mt-20 overflow-hidden rounded-3xl px-8 py-20 text-center md:mt-32 md:py-32"
     >
       <!-- Animated background -->
-      <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+      <div
+        class="pointer-events-none absolute inset-0 opacity-20"
+        aria-hidden="true"
+      >
         <div
-          class="animate-float-slow absolute top-10 left-10 h-32 w-32 rounded-full bg-purple-500/10 blur-2xl"
+          class="animate-float-slow absolute -top-20 -left-20 h-96 w-96 rounded-full bg-indigo-400 blur-[100px]"
         ></div>
         <div
-          class="animate-float absolute right-10 bottom-10 h-40 w-40 rounded-full bg-amber-500/10 blur-2xl"
-        ></div>
-        <div
-          class="animate-float-reverse absolute top-1/2 left-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-yellow-500/10 blur-2xl"
+          class="animate-float absolute -right-20 -bottom-20 h-96 w-96 rounded-full bg-amber-400 blur-[100px]"
         ></div>
       </div>
 
-      <div class="relative">
-        <p class="text-muted text-sm tracking-widest uppercase">
-          Early access
-        </p>
-        <h2 class="mt-3 font-serif text-3xl font-semibold sm:text-4xl">
-          Ready to launch <span class="gradient-text">fairly</span>?
-        </h2>
-        <p class="text-muted mx-auto mt-4 max-w-2xl text-sm">
-          We're onboarding the first wave of projects now. Tell us about your
-          token, your community, and your timeline—we'll help you configure the
-          perfect launch.
-        </p>
-        <div class="mt-8 flex flex-wrap justify-center gap-4">
+      <div class="relative z-10 mx-auto max-w-3xl space-y-10">
+        <div class="space-y-4">
+          <p
+            class="text-xs font-bold tracking-[0.3em] text-indigo-400 uppercase"
+          >
+            Early Access
+          </p>
+          <h2
+            class="text-background font-serif text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl"
+          >
+            Ready to launch <span class="text-indigo-400">fairly</span>?
+          </h2>
+          <p
+            class="text-background/70 mx-auto max-w-2xl text-lg leading-relaxed"
+          >
+            We're onboarding the first wave of projects now. Tell us about your
+            token, your community, and your timeline—we'll help you configure
+            the perfect launch.
+          </p>
+        </div>
+        <div class="flex flex-wrap justify-center gap-6">
           <a
-            class="group bg-accent text-accent-foreground relative overflow-hidden rounded-full px-6 py-3 text-sm font-semibold tracking-wide uppercase transition-all hover:-translate-y-0.5 hover:shadow-lg"
+            class="group relative overflow-hidden rounded-full bg-indigo-500 px-10 py-5 text-xs font-bold tracking-widest text-white uppercase transition-all hover:-translate-y-1 hover:bg-indigo-600 hover:shadow-2xl active:translate-y-0"
             href="https://x.com/ICPandaDAO"
           >
             <span class="relative z-10">Get in touch</span>
-            <div class="shimmer absolute inset-0"></div>
           </a>
           <a
-            class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-6 py-3 text-sm font-semibold transition-all hover:scale-105"
+            class="border-background/20 text-background hover:border-background hover:bg-background/5 rounded-full border px-10 py-5 text-xs font-bold tracking-widest uppercase transition-all"
             href="https://github.com/ldclabs/token-listing/blob/main/docs/cca.md"
           >
             Read the docs

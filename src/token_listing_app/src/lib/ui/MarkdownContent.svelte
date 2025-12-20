@@ -23,15 +23,17 @@
     >
       {@html result[0]}
     </div>
-    {#if isLong}
-      <button
-        class="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-indigo-500 uppercase hover:text-indigo-700"
-        onclick={() => (isExpanded = !isExpanded)}
-        type="button"
-      >
-        {isExpanded ? 'Show less' : 'Show more'}
-      </button>
-    {/if}
+    <div class="flex justify-end">
+      {#if isLong}
+        <button
+          class="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-indigo-500 uppercase hover:text-indigo-700"
+          onclick={() => (isExpanded = !isExpanded)}
+          type="button"
+        >
+          {isExpanded ? 'Show less' : 'Show more'}
+        </button>
+      {/if}
+    </div>
   </div>
 {:else}
   <div class="md-content w-full text-pretty wrap-break-word">—</div>
