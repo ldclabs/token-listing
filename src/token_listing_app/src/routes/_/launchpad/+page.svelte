@@ -216,18 +216,32 @@
                 {a.description || 'No description provided.'}
               </p>
 
-              <div class="mt-6 grid grid-cols-2 gap-3">
-                {#each [{ label: 'Raised', value: displayRaised(a) }, { label: 'Released', value: displayReleased(a) }, { label: 'Price', value: displayClearingPrice(a) }, { label: 'Required', value: displayRequired(a) }] as stat}
-                  <div class="bg-surface/50 rounded-xl p-3">
-                    <p
-                      class="text-muted text-xs font-bold tracking-widest uppercase"
-                      >{stat.label}</p
-                    >
-                    <p class="mt-1 truncate text-sm font-bold tracking-tight"
-                      >{stat.value}</p
+              <div class="mt-6 space-y-4">
+                <div class="bg-surface/50 rounded-xl p-4">
+                  <p
+                    class="text-muted text-xs font-bold tracking-widest uppercase"
+                    >Total Raised</p
+                  >
+                  <div class="mt-1 flex items-baseline gap-2">
+                    <span class="truncate text-2xl font-bold tracking-tight"
+                      >{displayRaised(a)}</span
                     >
                   </div>
-                {/each}
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  {#each [{ label: 'Current Price', value: displayClearingPrice(a) }, { label: 'Bidders / Bids', value: `0 / ${a.bids_count}` }, { label: 'Goal', value: displayRequired(a) }, { label: 'Released', value: displayReleased(a) }] as stat}
+                    <div class="bg-surface/50 rounded-xl p-3">
+                      <p
+                        class="text-muted text-xs font-bold tracking-widest uppercase"
+                        >{stat.label}</p
+                      >
+                      <p class="mt-1 truncate text-sm font-bold tracking-tight"
+                        >{stat.value}</p
+                      >
+                    </div>
+                  {/each}
+                </div>
               </div>
 
               <div

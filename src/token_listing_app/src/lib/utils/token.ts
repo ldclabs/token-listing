@@ -174,7 +174,7 @@ export class TokenDisplay {
     this.one = 10n ** this.decimals
     this.formater = new Intl.NumberFormat(locale, {
       minimumFractionDigits: 1,
-      maximumFractionDigits: 6,
+      maximumFractionDigits: 4,
       roundingMode: 'floor'
     } as Intl.NumberFormatOptions)
     this.amount = amount

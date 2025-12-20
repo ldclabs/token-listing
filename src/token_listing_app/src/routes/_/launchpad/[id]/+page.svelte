@@ -57,7 +57,7 @@
   let canister = $state('kfzgd-diaaa-aaaap-an56q-cai')
   const actor = $derived(icAuctionActor(canister))
 
-  let now = $state(Date.now())
+  let nowMs = $state(Date.now())
   let isListed = $state(true)
   let stateInfo = $state<StateInfo | null>(null)
   let auctionCfg = $state<AuctionConfig | null>(null)
@@ -96,7 +96,7 @@
     if (!auctionCfg) return 'unconfigured' as const
     if (!auctionInfo) return 'configured' as const
 
-    const n = BigInt(Math.max(Date.now(), now))
+    const n = BigInt(Math.max(Date.now(), nowMs))
     if (n < auctionCfg.start_time) return 'pre-bidding' as const
     if (n + auctionCfg.min_bid_duration < auctionCfg.end_time)
       return 'bidding' as const
@@ -123,7 +123,7 @@
 
   function progress(cfg: AuctionConfig | null): number {
     if (!cfg) return 0
-    const n = BigInt(Math.max(Date.now(), now))
+    const n = BigInt(Math.max(Date.now(), nowMs))
     const start = cfg.start_time
     const end = cfg.end_time
     if (end <= start) return 0
@@ -471,7 +471,7 @@
       }
 
       timer = setInterval(() => {
-        now = Date.now()
+        nowMs = Date.now()
         if (
           isActive() &&
           (phase == 'pre-bidding' || phase == 'bidding' || phase == 'ending')
@@ -487,12 +487,14 @@
       }, 10000)
       abortingQue.push(() => {
         if (timer) clearInterval(timer)
+        timer = null
       })
     }).abort
   })
 
   onDestroy(() => {
     if (timer) clearInterval(timer)
+    timer = null
   })
 </script>
 
@@ -563,25 +565,27 @@
           <div class="relative space-y-6">
             <div class="flex flex-col gap-4">
               <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
+                <div class="flex min-w-0 items-center gap-3">
                   <div
-                    class="bg-surface ring-border-subtle h-14 w-14 overflow-hidden rounded-2xl shadow-inner ring-1"
+                    class="bg-surface ring-border-subtle h-14 w-14 shrink-0 overflow-hidden rounded-2xl shadow-inner ring-1"
                   >
                     {#if stateInfo.token_logo_url}
                       <img
-                        class="h-full w-full object-cover"
+                        class="h-full w-full object-contain p-2"
                         src={stateInfo.token_logo_url}
                         alt={stateInfo.token_symbol}
                       />
                     {/if}
                   </div>
-                  <div>
+                  <div class="min-w-0">
                     <div
-                      class="text-xs font-bold tracking-[0.2em] text-indigo-500 uppercase"
+                      class="text-[10px] font-bold tracking-[0.2em] text-indigo-500 uppercase sm:text-xs"
                     >
                       Project
                     </div>
-                    <h1 class="font-serif text-3xl font-bold tracking-tight">
+                    <h1
+                      class="truncate font-serif text-2xl font-bold tracking-tight sm:text-3xl"
+                    >
                       {stateInfo.name || 'Auction'}
                       <span class="text-muted font-medium"
                         >· {stateInfo.token_symbol}</span
@@ -590,7 +594,7 @@
                   </div>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex shrink-0 items-center gap-2">
                   {#if stateInfo.url}
                     <a
                       class="glass-border bg-surface/50 hover:bg-surface text-muted hover:text-foreground flex h-10 w-10 items-center justify-center rounded-xl transition-all"
@@ -715,12 +719,12 @@
               <div class="glass-border bg-surface/40 rounded-2xl p-4">
                 <div
                   class="text-muted text-xs font-bold tracking-widest uppercase"
-                  >Bids / Bidders</div
+                  >Bidders / Bids</div
                 >
-                <div class="mt-1 text-lg font-bold">
-                  {auctionInfo?.bids_count || 0}
-                  <span class="text-muted text-sm font-medium">/</span>
+                <div class="mt-1 truncate text-lg font-bold">
                   {auctionInfo?.total_bidders || stateInfo.total_bidders}
+                  <span class="text-muted text-sm font-medium">/</span>
+                  {auctionInfo?.bids_count || 0}
                 </div>
               </div>
               <div class="glass-border bg-surface/40 rounded-2xl p-4">
@@ -918,7 +922,7 @@
                   class="text-muted text-xs font-bold tracking-widest uppercase"
                   >{stat.label}</div
                 >
-                <div class="mt-1 text-base font-bold tracking-tight">
+                <div class="mt-1 truncate text-base font-bold tracking-tight">
                   {stat.value}
                 </div>
               </div>
@@ -1344,7 +1348,7 @@
                         </td>
                       </tr>
                       {#if b.tokens_filled > 0n || b.refund > 0n}
-                        <tr class="bg-indigo-500/[0.02]">
+                        <tr class="bg-indigo-500/2">
                           <td colspan="5" class="px-6 py-3">
                             <div class="flex items-center gap-6 text-xs">
                               <div class="flex items-center gap-2">

@@ -1,15 +1,19 @@
 <script lang="ts">
+  import type { AuctionInfo as Auction } from '$declarations/ic_auction/ic_auction.did'
   import type {
     AuctionId,
     AuctionInfo
   } from '$declarations/token_listing_canister/token_listing_canister.did'
+  import { icAuctionActor } from '$lib/canisters/icAuction'
   import { tokenListingActor } from '$lib/canisters/tokenListing'
   import { TOKEN_LISTING } from '$lib/constants'
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
   import { getTheme } from '$lib/stores/theme.svelte'
+  import { toastRun } from '$lib/stores/toast.svelte'
   import { chainLabel } from '$lib/utils/chain'
   import { formatDatetime } from '$lib/utils/helper'
   import { TokenDisplay, type TokenInfo } from '$lib/utils/token'
+  import { isActive } from '$lib/utils/window'
   import Header from '$src/lib/components/Header.svelte'
   import { onDestroy, onMount } from 'svelte'
 
@@ -17,9 +21,9 @@
   const listingActor = tokenListingActor(TOKEN_LISTING)
 
   let latestAuction = $state<AuctionInfo | null>(null)
+  let auction = $state<Auction | null>(null)
 
   let nowMs = $state(Date.now())
-  let nowTimer: number | null = null
 
   function auctionIdText(id: AuctionId): string {
     if ('Icp' in id) return id.Icp
@@ -74,15 +78,24 @@
   const latest = $derived.by(() => {
     if (!latestAuction) return null
     const a = latestAuction
+    const au = auction
     const token = tokenInfoFromAuction(a)
     const currency = currencyInfoFromAuction(a)
     const currencyDisplay = new TokenDisplay(currency, 0n)
     const requiredCurrency = currencyDisplay.displayValue(
       a.required_currency_raised
     )
-    const clearingPriceValue = currencyDisplay.displayValue(a.clearing_price)
-    const raised = currencyDisplay.displayValue(a.total_demand_raised)
-    const participants = a.bids_count.toString()
+    const clearingPriceValue = currencyDisplay.displayValue(
+      au ? au.clearing_price : a.clearing_price
+    )
+    const raised = currencyDisplay.displayValue(
+      au ? au.cumulative_demand_raised : a.total_demand_raised
+    )
+    const totalCommitted = au
+      ? currencyDisplay.displayValue(au.total_amount)
+      : '—'
+    const bidsCount = (au ? au.bids_count : a.bids_count).toString()
+    const totalBidders = au ? au.total_bidders.toString() : '—'
     const remaining = timeRemainingLabel(a)
     const status = statusLabel(a)
     const isActive = status === 'Active'
@@ -95,7 +108,9 @@
       requiredCurrency,
       clearingPriceValue,
       raised,
-      participants,
+      totalCommitted,
+      bidsCount,
+      totalBidders,
       remaining,
       status,
       isActive,
@@ -204,20 +219,44 @@
     }
   ]
 
-  onMount(async () => {
-    const res = await listingActor.get_auction([])
-    latestAuction = res[0] || null
+  let timer: number | null = null
+  onMount(() => {
+    return toastRun(async (_signal, abortingQue) => {
+      const res = await listingActor.get_auction([])
+      latestAuction = res[0] || null
+      const auctionActor =
+        res[0] && 'Icp' in res[0].id ? icAuctionActor(res[0].id.Icp) : null
 
-    if (nowTimer == null) {
-      nowTimer = window.setInterval(() => {
+      if (auctionActor) {
+        auctionActor.auction_info().then((info) => {
+          auction = info[0] || null
+        })
+      }
+
+      timer = window.setInterval(() => {
         nowMs = Date.now()
-      }, 15_000)
-    }
+        if (
+          isActive() &&
+          latestAuction &&
+          auctionActor &&
+          nowMs < latestAuction.end_time
+        ) {
+          auctionActor.auction_info().then((info) => {
+            auction = info[0] || null
+          })
+        }
+      }, 10_000)
+
+      abortingQue.push(() => {
+        if (timer) clearInterval(timer)
+        timer == null
+      })
+    }).abort
   })
 
   onDestroy(() => {
-    if (nowTimer != null) window.clearInterval(nowTimer)
-    nowTimer = null
+    if (timer != null) window.clearInterval(timer)
+    timer = null
   })
 </script>
 
@@ -417,8 +456,42 @@
                 </div>
               </div>
 
-              <div class="mt-10 grid gap-8">
-                <div class="grid grid-cols-2 gap-6">
+              <div class="mt-10 space-y-8">
+                <div class="space-y-1">
+                  <p
+                    class="text-muted text-xs font-bold tracking-widest uppercase"
+                  >
+                    Total Raised
+                  </p>
+                  <div class="flex items-baseline gap-2">
+                    <span
+                      class="font-mono text-4xl font-bold tracking-tighter sm:text-5xl"
+                      >{latest.raised}</span
+                    >
+                    <span class="text-muted text-base font-bold uppercase"
+                      >{latest.currency.symbol}</span
+                    >
+                  </div>
+                </div>
+
+                <div
+                  class="border-border-subtle grid grid-cols-2 gap-x-6 gap-y-8 border-t pt-8"
+                >
+                  <div class="space-y-1">
+                    <p
+                      class="text-muted text-xs font-bold tracking-widest uppercase"
+                    >
+                      Total Committed
+                    </p>
+                    <div class="flex items-baseline gap-1.5">
+                      <span class="truncate font-mono text-xl font-bold"
+                        >{latest.totalCommitted}</span
+                      >
+                      <span class="text-muted text-[10px] font-bold uppercase"
+                        >{latest.currency.symbol}</span
+                      >
+                    </div>
+                  </div>
                   <div class="space-y-1">
                     <p
                       class="text-muted text-xs font-bold tracking-widest uppercase"
@@ -427,10 +500,10 @@
                     </p>
                     <div class="flex items-baseline gap-1.5">
                       <span
-                        class="font-mono text-3xl font-bold tracking-tighter text-indigo-500"
+                        class="truncate font-mono text-xl font-bold text-indigo-500"
                         >{latest.clearingPriceValue}</span
                       >
-                      <span class="text-muted text-sm font-bold uppercase"
+                      <span class="text-muted text-[10px] font-bold uppercase"
                         >{latest.currency.symbol}</span
                       >
                     </div>
@@ -439,45 +512,26 @@
                     <p
                       class="text-muted text-xs font-bold tracking-widest uppercase"
                     >
-                      Total Raised
+                      Bidders / Bids
                     </p>
-                    <div class="flex items-baseline gap-1.5">
-                      <span
-                        class="font-mono text-3xl font-bold tracking-tighter"
-                        >{latest.raised}</span
-                      >
-                      <span class="text-muted text-sm font-bold uppercase"
-                        >{latest.currency.symbol}</span
-                      >
-                    </div>
+                    <p class="truncate font-mono text-xl font-bold">
+                      {latest.totalBidders}
+                      <span class="text-muted text-sm font-medium">/</span>
+                      {latest.bidsCount}
+                    </p>
                   </div>
-                </div>
-
-                <div
-                  class="border-border-subtle grid grid-cols-2 gap-6 border-t pt-6"
-                >
                   <div class="space-y-1">
                     <p
                       class="text-muted text-xs font-bold tracking-widest uppercase"
                     >
                       Goal
                     </p>
-                    <p class="font-mono text-lg font-semibold">
+                    <p class="truncate font-mono text-xl font-bold">
                       {latest.requiredCurrency}
-                      <span class="text-muted text-xs font-bold uppercase"
+                      <span class="text-muted text-[10px] font-bold uppercase"
                         >{latest.currency.symbol}</span
                       >
                     </p>
-                  </div>
-                  <div class="space-y-1">
-                    <p
-                      class="text-muted text-xs font-bold tracking-widest uppercase"
-                    >
-                      Participants
-                    </p>
-                    <p class="font-mono text-lg font-semibold"
-                      >{latest.participants}</p
-                    >
                   </div>
                 </div>
 
@@ -515,14 +569,14 @@
                   </p>
                 </div>
               </div>
-            </div>
 
-            <!-- Decorative glow -->
-            <div
-              class="animate-pulse-glow absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl"
-              aria-hidden="true"
-            ></div>
-          </a>
+              <!-- Decorative glow -->
+              <div
+                class="animate-pulse-glow absolute -right-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl"
+                aria-hidden="true"
+              ></div>
+            </div></a
+          >
         {:else}
           <div
             class="glass-border bg-surface/30 relative animate-pulse overflow-hidden rounded-2xl p-8"
