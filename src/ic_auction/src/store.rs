@@ -662,7 +662,13 @@ pub mod state {
     }
 
     pub fn auction_info(now_ms: u64) -> Option<AuctionInfo> {
-        STATE.with_borrow(|s| s.auction.as_ref().map(|a| a.get_info(now_ms)))
+        STATE.with_borrow(|s| {
+            s.auction.as_ref().map(|a| {
+                let mut info = a.get_info(now_ms);
+                info.total_bidders = USERS.with_borrow(|u| u.len());
+                info
+            })
+        })
     }
 
     pub fn get_grouped_bids(precision: u128) -> Vec<(u128, u128)> {

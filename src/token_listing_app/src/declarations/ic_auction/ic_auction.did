@@ -12,6 +12,7 @@ type AuctionInfo = record {
   cumulative_demand_raised : nat;
   total_amount : nat;
   total_tokens_filled : nat;
+  total_bidders : nat64;
   bids_count : nat64;
   timestamp : nat64;
   clearing_price : nat;

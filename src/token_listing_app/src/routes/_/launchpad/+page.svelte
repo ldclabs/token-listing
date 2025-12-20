@@ -300,14 +300,15 @@
                 <!-- Price path area (integral) -->
                 <g class="text-purple-500/60">
                   <path
-                    d="M48 110 C 86 102, 108 64, 140 70 C 168 76, 188 96, 214 88 C 244 80, 268 54, 304 64 L304 126 L48 126 Z"
+                    d="M48 115 L90 115 L90 95 L140 95 L140 75 L190 75 L190 85 L240 85 L240 65 L304 65 L304 126 L48 126 Z"
                     class="fill-current"
                     opacity="0.18"
                   />
                   <path
-                    d="M48 110 C 86 102, 108 64, 140 70 C 168 76, 188 96, 214 88 C 244 80, 268 54, 304 64"
+                    d="M48 115 L90 115 L90 95 L140 95 L140 75 L190 75 L190 85 L240 85 L240 65 L304 65"
                     class="stroke-current"
                     stroke-width="2.5"
+                    stroke-linejoin="round"
                     stroke-linecap="round"
                   />
                 </g>
@@ -315,7 +316,7 @@
                 <!-- Average price (time-weighted) guide line -->
                 <g class="text-amber-500/60">
                   <path
-                    d="M48 78 H332"
+                    d="M48 88 H304"
                     class="stroke-current"
                     stroke-width="2"
                     stroke-dasharray="6 4"
@@ -327,13 +328,14 @@
                 <!-- Accumulator / cumulative allocation curve -->
                 <g class="text-yellow-500/40">
                   <path
-                    d="M48 99 C 92 90, 118 80, 144 68 C 174 55, 196 48, 222 40 C 252 31, 276 23, 304 15"
+                    d="M48 105 L90 90 L140 70 L190 55 L240 45 L304 25"
                     class="stroke-current"
                     stroke-width="2.5"
+                    stroke-linejoin="round"
                     stroke-linecap="round"
                   />
                   <path
-                    d="M48 99 C 92 90, 118 80, 144 68 C 174 55, 196 48, 222 40 C 252 31, 276 23, 304 15 L304 126 L48 126 Z"
+                    d="M48 105 L90 90 L140 70 L190 55 L240 45 L304 25 L304 126 L48 126 Z"
                     class="fill-current"
                     opacity="0.10"
                   />
@@ -351,7 +353,7 @@
                 </text>
                 <text
                   x="252"
-                  y="74"
+                  y="84"
                   class="fill-current"
                   font-size="10"
                   opacity="0.85"

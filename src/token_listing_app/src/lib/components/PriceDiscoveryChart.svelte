@@ -157,6 +157,22 @@
     return d
   }
 
+  const toStepFillPath = (points: XY[], bottomY: number) => {
+    if (points.length === 0) return ''
+    const first = points[0]!
+    const last = points[points.length - 1]!
+    let d = `M ${first.x} ${bottomY} L ${first.x} ${first.y}`
+
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1]!
+      const curr = points[i]!
+      d += ` L ${curr.x} ${prev.y} L ${curr.x} ${curr.y}`
+    }
+
+    d += ` L ${last.x} ${bottomY} Z`
+    return d
+  }
+
   const scaled = $derived.by(() => {
     if (!chartBounds || chartData.length === 0) return []
 
@@ -191,6 +207,14 @@
   const pricePath = $derived.by(() => {
     if (scaled.length < 2) return ''
     return toStepPath(scaled.map((p) => ({ x: p.x, y: p.yP })))
+  })
+
+  const priceFillPath = $derived.by(() => {
+    if (scaled.length < 2) return ''
+    return toStepFillPath(
+      scaled.map((p) => ({ x: p.x, y: p.yP })),
+      padT + plotH
+    )
   })
 
   const demandPath = $derived.by(() => {
@@ -300,15 +324,30 @@
           onpointermove={(e) => setHoverFromClientX(e.clientX, e.clientY)}
           onpointerleave={clearHover}
         >
+          <defs>
+            <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="0%"
+                stop-color="rgb(168, 85, 247)"
+                stop-opacity="0.2"
+              />
+              <stop
+                offset="100%"
+                stop-color="rgb(168, 85, 247)"
+                stop-opacity="0"
+              />
+            </linearGradient>
+          </defs>
+
           <!-- Plot background -->
           <rect
             x={padL}
             y={padT}
             width={plotW}
             height={plotH}
-            rx="10"
+            rx="12"
             fill="currentColor"
-            class="text-muted opacity-[0.04]"
+            class="text-muted opacity-[0.03]"
           />
 
           <!-- Grid (horizontal) -->
@@ -320,6 +359,7 @@
                 x2={padL + plotW}
                 y2={tk.y}
                 stroke="currentColor"
+                stroke-dasharray="4 4"
                 class="text-muted opacity-10"
               />
             {/each}
@@ -333,9 +373,15 @@
               x2={padL + plotW * r}
               y2={padT + plotH}
               stroke="currentColor"
+              stroke-dasharray="4 4"
               class="text-muted opacity-10"
             />
           {/each}
+
+          <!-- Price Fill -->
+          {#if priceFillPath}
+            <path d={priceFillPath} fill="url(#priceGradient)" />
+          {/if}
 
           <!-- Price line -->
           {#if pricePath}
@@ -343,7 +389,9 @@
               d={pricePath}
               fill="none"
               stroke="currentColor"
-              stroke-width="2.25"
+              stroke-width="2.5"
+              stroke-linejoin="round"
+              stroke-linecap="round"
               class="text-purple-500"
             />
           {/if}
@@ -355,8 +403,10 @@
               fill="none"
               stroke="currentColor"
               stroke-width="2"
-              stroke-dasharray="5 3"
-              class="text-amber-500 opacity-60"
+              stroke-dasharray="6 4"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+              class="text-amber-500 opacity-50"
             />
           {/if}
 
@@ -366,9 +416,16 @@
             <circle
               cx={last.x}
               cy={last.yP}
-              r="3.5"
+              r="4"
               fill="currentColor"
               class="text-purple-500"
+            />
+            <circle
+              cx={last.x}
+              cy={last.yP}
+              r="8"
+              fill="currentColor"
+              class="animate-pulse text-purple-500/20"
             />
           {/if}
 
@@ -376,26 +433,30 @@
           {#if hoverIndex !== null && hoverX !== null && scaled[hoverIndex]}
             {@const hp = scaled[hoverIndex]!}
             <line
-              x1={hoverX}
+              x1={hp.x}
               y1={padT}
-              x2={hoverX}
+              x2={hp.x}
               y2={padT + plotH}
               stroke="currentColor"
-              class="text-muted opacity-30"
+              stroke-width="1"
+              class="text-muted opacity-40"
             />
             <circle
               cx={hp.x}
               cy={hp.yP}
-              r="4"
-              fill="currentColor"
-              class="text-purple-500"
+              r="5"
+              fill="white"
+              stroke="rgb(168, 85, 247)"
+              stroke-width="2"
             />
             <circle
               cx={hp.x}
               cy={hp.yD}
               r="4"
-              fill="currentColor"
-              class="text-amber-500 opacity-70"
+              fill="white"
+              stroke="rgb(245, 158, 11)"
+              stroke-width="2"
+              class="opacity-80"
             />
           {/if}
 
@@ -403,12 +464,12 @@
           {#if ticks}
             {#each ticks.price as tk (tk.y)}
               <text
-                x={padL - 10}
-                y={tk.y + 3}
+                x={padL - 12}
+                y={tk.y + 4}
                 text-anchor="end"
-                class="fill-current text-purple-500"
-                font-size="10"
-                opacity="0.9"
+                class="fill-current text-purple-500/80"
+                font-size="11"
+                font-weight="500"
               >
                 {priceUnitsPerToken(tk.v)}
               </text>
@@ -417,12 +478,12 @@
             <!-- Axes labels (right: demand) -->
             {#each ticks.demand as tk (tk.y)}
               <text
-                x={padL + plotW + 10}
-                y={tk.y + 3}
+                x={padL + plotW + 12}
+                y={tk.y + 4}
                 text-anchor="start"
-                class="fill-current text-amber-500"
-                font-size="10"
-                opacity="0.7"
+                class="fill-current text-amber-500/70"
+                font-size="11"
+                font-weight="500"
               >
                 {currencyDisplay.displayValue(tk.v)}
               </text>
@@ -431,21 +492,21 @@
             <!-- X axis time range -->
             <text
               x={padL}
-              y={padT + plotH + 26}
+              y={padT + plotH + 28}
               text-anchor="start"
-              class="text-muted fill-current"
-              font-size="10"
-              opacity="0.8"
+              class="text-muted fill-current font-medium"
+              font-size="11"
+              opacity="0.7"
             >
               {formatTime(ticks.t0)}
             </text>
             <text
               x={padL + plotW}
-              y={padT + plotH + 26}
+              y={padT + plotH + 28}
               text-anchor="end"
-              class="text-muted fill-current"
-              font-size="10"
-              opacity="0.8"
+              class="text-muted fill-current font-medium"
+              font-size="11"
+              opacity="0.7"
             >
               {formatTime(ticks.t1)}
             </text>
@@ -456,21 +517,34 @@
         {#if hoverIndex !== null && scaled[hoverIndex]}
           {@const hp = scaled[hoverIndex]!}
           <div
-            class="pointer-events-none absolute rounded-lg border border-white/10 bg-slate-900/10 p-3 text-[11px] backdrop-blur-[1px] dark:bg-slate-950/70"
-            style={`left:${tooltipX}px; top:${tooltipY}px; width:220px;`}
+            class="pointer-events-none absolute rounded-xl border border-white/10 bg-slate-900/80 p-3 text-[12px] shadow-2xl backdrop-blur-md dark:bg-slate-950/90"
+            style={`left:${tooltipX}px; top:${tooltipY}px; width:220px; z-index: 50;`}
           >
-            <div class="flex items-center justify-between">
-              <div class="text-muted">{formatTime(hp.t)}</div>
-              <div class="text-muted">{currencyInfo.symbol}</div>
+            <div
+              class="mb-2 flex items-center justify-between border-b border-white/5 pb-1.5"
+            >
+              <div class="font-bold text-white">{formatTime(hp.t)}</div>
+              <div
+                class="text-muted text-[10px] font-bold tracking-wider uppercase"
+                >{currencyInfo.symbol}</div
+              >
             </div>
-            <div class="mt-2 grid gap-1">
+            <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-purple-500">Clearing Price</span>
-                <span class="font-semibold">{priceUnitsPerToken(hp.c)}</span>
+                <div class="flex items-center gap-1.5">
+                  <div class="h-2 w-2 rounded-full bg-purple-500"></div>
+                  <span class="text-muted">Clearing Price</span>
+                </div>
+                <span class="font-bold text-white"
+                  >{priceUnitsPerToken(hp.c)}</span
+                >
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-amber-500 opacity-70">Cumulative Demand</span>
-                <span class="font-semibold"
+                <div class="flex items-center gap-1.5">
+                  <div class="h-2 w-2 rounded-full bg-amber-500"></div>
+                  <span class="text-muted">Cumulative Demand</span>
+                </div>
+                <span class="font-bold text-white"
                   >{currencyDisplay.displayValue(hp.d)}
                   {currencyInfo.symbol}</span
                 >

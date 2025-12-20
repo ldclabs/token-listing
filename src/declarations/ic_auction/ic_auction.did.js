@@ -69,6 +69,7 @@ export const idlFactory = ({ IDL }) => {
     'cumulative_demand_raised' : IDL.Nat,
     'total_amount' : IDL.Nat,
     'total_tokens_filled' : IDL.Nat,
+    'total_bidders' : IDL.Nat64,
     'bids_count' : IDL.Nat64,
     'timestamp' : IDL.Nat64,
     'clearing_price' : IDL.Nat,

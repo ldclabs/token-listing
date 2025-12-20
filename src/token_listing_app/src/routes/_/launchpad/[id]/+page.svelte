@@ -18,6 +18,7 @@
   import { TOKEN_LISTING } from '$lib/constants'
   import ArrowDownSLine from '$lib/icons/arrow-down-s-line.svelte'
   import ArrowRightUpLine from '$lib/icons/arrow-right-up-line.svelte'
+  import CheckLine from '$lib/icons/check-line.svelte'
   import InformationLine from '$lib/icons/information-line.svelte'
   import Settings4Line from '$lib/icons/settings-4-line.svelte'
   import { authStore, EventLogin } from '$lib/stores/auth.svelte'
@@ -27,6 +28,7 @@
   import Button from '$lib/ui/Button.svelte'
   import Dropdown from '$lib/ui/Dropdown.svelte'
   import Spinner from '$lib/ui/Spinner.svelte'
+  import Tooltip from '$lib/ui/Tooltip.svelte'
   import {
     getAccountUrl,
     getSwapUrl,
@@ -39,7 +41,6 @@
     pruneAddress,
     sleep
   } from '$lib/utils/helper'
-  import { renderContent } from '$lib/utils/markdown'
   import {
     ICPToken,
     PANDAToken,
@@ -47,6 +48,7 @@
     type TokenInfo
   } from '$lib/utils/token'
   import { isActive } from '$lib/utils/window'
+  import MarkdownContent from '$src/lib/ui/MarkdownContent.svelte'
   import { Principal } from '@dfinity/principal'
   import { onDestroy, onMount, tick } from 'svelte'
 
@@ -55,6 +57,7 @@
   let canister = $state('kfzgd-diaaa-aaaap-an56q-cai')
   const actor = $derived(icAuctionActor(canister))
 
+  let now = $state(Date.now())
   let isListed = $state(true)
   let stateInfo = $state<StateInfo | null>(null)
   let auctionCfg = $state<AuctionConfig | null>(null)
@@ -81,20 +84,9 @@
   let bidAmount = $state('')
   let bidMaxPrice = $state('')
 
-  let isDetailExpanded = $state(false)
   const detailText = $derived.by(() =>
     (stateInfo?.detail || stateInfo?.description || '').trim()
   )
-  const isDetailLong = $derived.by(() => {
-    if (!detailText) return false
-    return detailText.length > 280 || detailText.split('\n').length > 6
-  })
-
-  $effect(() => {
-    // Reset to collapsed when project/description changes
-    detailText
-    isDetailExpanded = false
-  })
 
   let floorGroupedPrecision = $derived.by(() => {
     const val = Math.max(floorPrice.toString().length - 1, 1)
@@ -104,8 +96,8 @@
     if (!auctionCfg) return 'unconfigured' as const
     if (!auctionInfo) return 'configured' as const
 
-    const n = BigInt(Date.now())
-    if (n < auctionCfg.start_time) return 'prebid' as const
+    const n = BigInt(Math.max(Date.now(), now))
+    if (n < auctionCfg.start_time) return 'pre-bidding' as const
     if (n + auctionCfg.min_bid_duration < auctionCfg.end_time)
       return 'bidding' as const
     if (n < auctionCfg.end_time) return 'ending' as const
@@ -131,7 +123,7 @@
 
   function progress(cfg: AuctionConfig | null): number {
     if (!cfg) return 0
-    const n = BigInt(Date.now())
+    const n = BigInt(Math.max(Date.now(), now))
     const start = cfg.start_time
     const end = cfg.end_time
     if (end <= start) return 0
@@ -279,8 +271,8 @@
           ]
         if (amt > myInfo.currency_amount)
           return [
-            0n,
-            `You only have ${currencyDisplay.displayValue(myInfo.currency_amount)} ${currencyInfo.symbol} available`
+            amt,
+            `Insufficient balance: ${currencyDisplay.displayValue(myInfo.currency_amount)} ${currencyInfo.symbol} available`
           ]
       }
       return [amt, '']
@@ -335,7 +327,7 @@
       bidAmountUnits > 0n &&
       bidAmountUnits <= myInfo.currency_amount &&
       bidMaxPriceUnits > 0n &&
-      (phase == 'prebid' || phase == 'bidding')
+      (phase == 'pre-bidding' || phase == 'bidding')
     )
   })
 
@@ -479,13 +471,18 @@
       }
 
       timer = setInterval(() => {
+        now = Date.now()
         if (
           isActive() &&
-          (phase == 'prebid' || phase == 'bidding' || phase == 'ending')
+          (phase == 'pre-bidding' || phase == 'bidding' || phase == 'ending')
         ) {
           refreshAuction().catch((err) => {
             console.error('failed to refresh auction:', err)
           })
+        } else if (phase == 'ended' && timer) {
+          // Stop timer after auction ended
+          clearInterval(timer)
+          timer = null
         }
       }, 10000)
       abortingQue.push(() => {
@@ -603,99 +600,94 @@
                   >· {stateInfo.token_symbol}</span
                 >
               </div>
-              {#if detailText}
-                <div class="space-y-2">
-                  <div
-                    class={`md-content w-full text-pretty wrap-break-word ${!isDetailExpanded && isDetailLong ? 'cca-desc-clamp' : ''}`}
-                  >
-                    {@html renderContent(detailText)}
-                  </div>
-                  {#if isDetailLong}
-                    <button
-                      class="inline-flex items-center gap-1 text-xs font-semibold tracking-wide text-indigo-500 uppercase hover:text-indigo-700"
-                      onclick={() => (isDetailExpanded = !isDetailExpanded)}
-                      type="button"
-                    >
-                      {isDetailExpanded ? 'Show less' : 'Show more'}
-                    </button>
-                  {/if}
-                </div>
-              {:else}
-                <div class="md-content w-full text-pretty wrap-break-word"
-                  >—</div
-                >
-              {/if}
+              {#key detailText}
+                <MarkdownContent content={detailText} />
+              {/key}
             </div>
 
             <div class="grid gap-3 sm:grid-cols-3">
-              <div
-                class="border-border-subtle bg-surface group relative rounded-lg border p-3"
-                aria-label="Phase"
+              <Tooltip
+                containerClass="w-full"
+                contentClass="bg-card w-64 rounded-xl p-4 shadow-xl border border-white/10"
               >
-                <div
-                  class="text-muted text-xs font-semibold tracking-wide uppercase"
-                  >Phase</div
-                >
-                <div class="mt-1 text-lg font-bold">
-                  {phase}
-                </div>
-
-                <!-- Hover tooltip: show full phase flow -->
-                <div
-                  class=" bg-card pointer-events-none absolute bottom-full left-0 z-20 mb-2 w-40 rounded-lg p-3 text-xs opacity-0 shadow transition-opacity group-hover:opacity-100"
-                  role="tooltip"
-                >
+                {#snippet trigger()}
                   <div
-                    class="text-muted mb-2 font-semibold tracking-wide uppercase"
+                    class="border-border-subtle bg-surface relative rounded-lg border p-3 transition-colors hover:border-indigo-500/50"
+                    aria-label="Phase"
                   >
-                    All phases
-                  </div>
-                  <div class="space-y-1">
-                    <div
-                      class={phase === 'unconfigured'
-                        ? 'text-foreground font-semibold'
-                        : 'text-muted'}
-                    >
-                      unconfigured
+                    <div class="flex items-center justify-between">
+                      <div
+                        class="text-muted text-xs font-semibold tracking-wide uppercase"
+                        >Phase</div
+                      >
+                      <InformationLine class="text-muted h-3.5 w-3.5" />
                     </div>
-                    <div
-                      class={phase === 'configured'
-                        ? 'text-foreground font-semibold'
-                        : 'text-muted'}
-                    >
-                      configured
-                    </div>
-                    <div
-                      class={phase === 'prebid'
-                        ? 'text-foreground font-semibold'
-                        : 'text-muted'}
-                    >
-                      prebid
-                    </div>
-                    <div
-                      class={phase === 'bidding'
-                        ? 'text-foreground font-semibold'
-                        : 'text-muted'}
-                    >
-                      bidding
-                    </div>
-                    <div
-                      class={phase === 'ending'
-                        ? 'text-foreground font-semibold'
-                        : 'text-muted'}
-                    >
-                      ending
-                    </div>
-                    <div
-                      class={phase === 'ended'
-                        ? 'text-foreground font-semibold'
-                        : 'text-muted'}
-                    >
-                      ended
+                    <div class="mt-1 text-lg font-bold capitalize">
+                      {phase.replace('-', ' ')}
                     </div>
                   </div>
+                {/snippet}
+                <div
+                  class="text-muted mb-4 text-xs font-bold tracking-widest uppercase"
+                >
+                  Auction Lifecycle
                 </div>
-              </div>
+                <div class="space-y-0">
+                  {#each ['configured', 'pre-bidding', 'bidding', 'ending', 'ended'] as p, i}
+                    {@const isCurrent = phase === p}
+                    {@const isPast =
+                      [
+                        'configured',
+                        'pre-bidding',
+                        'bidding',
+                        'ending',
+                        'ended'
+                      ].indexOf(phase) > i}
+                    <div class="relative flex items-start gap-4 pb-5 last:pb-0">
+                      {#if i !== 5}
+                        <div
+                          class="absolute top-5 left-[9px] h-full w-0.5 {isPast
+                            ? 'bg-indigo-500/50'
+                            : 'bg-border-subtle'}"
+                        ></div>
+                      {/if}
+                      <div
+                        class="relative z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all duration-300 {isCurrent
+                          ? 'border-indigo-500 bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.6)]'
+                          : isPast
+                            ? 'border-indigo-500 bg-indigo-500'
+                            : 'border-muted bg-surface'}"
+                      >
+                        {#if isPast}
+                          <CheckLine class="h-3 w-3 text-white" />
+                        {:else if isCurrent}
+                          <div
+                            class="absolute inset-0 animate-ping rounded-full bg-indigo-500/40"
+                          ></div>
+                          <div class="h-1.5 w-1.5 rounded-full bg-white"></div>
+                        {/if}
+                      </div>
+                      <div class="flex min-h-5 flex-col justify-center">
+                        <span
+                          class="text-sm leading-5 font-bold capitalize transition-colors {isCurrent
+                            ? 'text-foreground'
+                            : isPast
+                              ? 'text-muted'
+                              : 'text-muted/40'}"
+                        >
+                          {p.replace('-', ' ')}
+                        </span>
+                        {#if isCurrent}
+                          <span
+                            class="text-[10px] leading-tight font-black tracking-wider text-indigo-500 uppercase"
+                            >Current Phase</span
+                          >
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </Tooltip>
 
               <div
                 class="border-border-subtle bg-surface rounded-lg border p-3"
@@ -705,8 +697,8 @@
                   >Bids / Bidders</div
                 >
                 <div class="mt-1 text-lg font-bold">
-                  {auctionInfo ? auctionInfo.bids_count : '0'} /
-                  {stateInfo.total_bidders}
+                  {auctionInfo?.bids_count || 0} /
+                  {auctionInfo?.total_bidders || stateInfo.total_bidders}
                 </div>
               </div>
               <div
@@ -721,27 +713,6 @@
                 </div>
               </div>
             </div>
-
-            {#if auctionCfg}
-              <div class="space-y-2">
-                <div class="flex items-center justify-between text-xs">
-                  <div class="text-muted"
-                    >{formatDatetime(auctionCfg.start_time)} → {formatDatetime(
-                      auctionCfg.end_time
-                    )}</div
-                  >
-                  <div class="text-muted"
-                    >{Math.round(progress(auctionCfg) * 100)}%</div
-                  >
-                </div>
-                <div class="bg-surface h-2 overflow-hidden rounded-full">
-                  <div
-                    class="h-2 rounded-full bg-linear-to-r from-purple-500 via-amber-500 to-yellow-400"
-                    style={`width:${Math.round(progress(auctionCfg) * 100)}%`}
-                  ></div>
-                </div>
-              </div>
-            {/if}
 
             {#if stateInfo.finalize_output.length > 0}
               {@const txid = stateInfo.finalize_output[0]?.txid || ''}
@@ -866,6 +837,25 @@
                   </div>
                 </div>
               </div>
+
+              <div class="mt-6 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                  <div class="text-muted"
+                    >{formatDatetime(auctionCfg.start_time)} → {formatDatetime(
+                      auctionCfg.end_time
+                    )}</div
+                  >
+                  <div class="text-muted"
+                    >{Math.round(progress(auctionCfg) * 100)}%</div
+                  >
+                </div>
+                <div class="bg-surface h-2 overflow-hidden rounded-full">
+                  <div
+                    class="h-2 rounded-full bg-linear-to-r from-purple-500 via-amber-500 to-yellow-400"
+                    style={`width:${Math.round(progress(auctionCfg) * 100)}%`}
+                  ></div>
+                </div>
+              </div>
             {:else}
               <div class="text-muted text-sm">Auction unconfigured</div>
             {/if}
@@ -936,79 +926,18 @@
                   menuClass="top-full mt-0 w-32 rounded-xl border border-white/20 bg-card shadow"
                 >
                   <ul class="py-4">
-                    <li>
-                      <button
-                        disabled={groupedPrecision == floorGroupedPrecision}
-                        onclick={() => handlePriceBucket(floorGroupedPrecision)}
-                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <span
-                          >{currencyDisplay.displayValue(
-                            floorGroupedPrecision
-                          )}</span
+                    {#each [1n, 5n, 10n, 50n, 100n] as multiplier}
+                      {@const precision = floorGroupedPrecision * multiplier}
+                      <li>
+                        <button
+                          disabled={groupedPrecision == precision}
+                          onclick={() => handlePriceBucket(precision)}
+                          class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        disabled={groupedPrecision ==
-                          floorGroupedPrecision * 5n}
-                        onclick={() =>
-                          handlePriceBucket(floorGroupedPrecision * 5n)}
-                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <span
-                          >{currencyDisplay.displayValue(
-                            floorGroupedPrecision * 5n
-                          )}</span
-                        >
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        disabled={groupedPrecision ==
-                          floorGroupedPrecision * 10n}
-                        onclick={() =>
-                          handlePriceBucket(floorGroupedPrecision * 10n)}
-                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <span
-                          >{currencyDisplay.displayValue(
-                            floorGroupedPrecision * 10n
-                          )}</span
-                        >
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        disabled={groupedPrecision ==
-                          floorGroupedPrecision * 50n}
-                        onclick={() =>
-                          handlePriceBucket(floorGroupedPrecision * 50n)}
-                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <span
-                          >{currencyDisplay.displayValue(
-                            floorGroupedPrecision * 50n
-                          )}</span
-                        >
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        disabled={groupedPrecision ==
-                          floorGroupedPrecision * 100n}
-                        onclick={() =>
-                          handlePriceBucket(floorGroupedPrecision * 100n)}
-                        class="hover:text-foreground text-muted px-2 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <span
-                          >{currencyDisplay.displayValue(
-                            floorGroupedPrecision * 100n
-                          )}</span
-                        >
-                      </button>
-                    </li>
+                          <span>{currencyDisplay.displayValue(precision)}</span>
+                        </button>
+                      </li>
+                    {/each}
                   </ul>
                 </Dropdown>
                 <span class="text-muted text-xs"
@@ -1066,118 +995,179 @@
               >The auction has not been set up yet</div
             >
           {:else}
-            <div class="mt-4 grid gap-3">
-              <div>
-                <label class="text-muted text-xs" for="bidAmount">
-                  <span class="font-semibold tracking-wide uppercase"
-                    >Amount</span
-                  >
-                  <span class=""
-                    >(Balance: {currencyDisplay.displayValue(
-                      myInfo.currency_amount
-                    )}
-                    {currencyInfo.symbol})</span
-                  >
-                  <button
-                    class="text-sm text-indigo-500 hover:text-indigo-700 disabled:cursor-not-allowed"
-                    onclick={onUserFundsModal}
-                    disabled={!stateInfo || !authStore.identity.isAuthenticated}
-                  >
-                    Deposit
-                  </button>
-                </label>
-
-                <input
-                  id="bidAmount"
-                  class="border-border-subtle bg-card mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                  placeholder={`e.g. ${currencyDisplay.displayValue(auctionCfg.min_amount)} ${currencyInfo.symbol}`}
-                  bind:value={bidAmount}
-                  onfocus={onBidAmountFocus}
-                  disabled={phase != 'prebid' && phase != 'bidding'}
-                  inputmode="decimal"
-                />
-              </div>
-
-              <div>
-                <label class="text-muted text-xs" for="bidMaxPrice">
-                  <span class="font-semibold tracking-wide uppercase"
-                    >Max Price</span
-                  >
-                  <span class="text-muted text-xs">
-                    {`(The maximum ${currencyInfo.symbol} price per 1 ${tokenInfo.symbol})`}</span
-                  >
-                </label>
-
-                <input
-                  id="bidMaxPrice"
-                  class="border-border-subtle bg-card mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                  placeholder={`e.g. ${currencyDisplay.displayValue(auctionInfo ? auctionInfo.clearing_price * 2n : floorPrice)} ${currencyInfo.symbol}/${tokenInfo.symbol}`}
-                  bind:value={bidMaxPrice}
-                  onfocus={estimateMaxPrice}
-                  disabled={phase != 'prebid' && phase != 'bidding'}
-                  inputmode="decimal"
-                />
-              </div>
-
-              <div class="flex flex-wrap items-center gap-2">
-                <Button
-                  class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
-                  onclick={estimateMaxPrice}
-                  isLoading={isEstimating}
-                  disabled={bidAmountUnits == 0n}
-                >
-                  Estimate
-                </Button>
-
-                {#if authStore.identity.isAuthenticated}
-                  <Button
-                    class="bg-foreground text-background flex-1 rounded-full px-4 py-2 text-xs font-semibold tracking-wide uppercase hover:opacity-90 disabled:opacity-50"
-                    onclick={submitBid}
-                    isLoading={isBidding}
-                    disabled={!isBidable}
-                  >
-                    Submit Bid
-                  </Button>
-                {:else}
-                  <Button
-                    class="bg-foreground text-background flex-1 rounded-full px-4 py-2 text-xs font-semibold tracking-wide uppercase hover:opacity-90 disabled:opacity-50"
-                    onclick={onSignWith}
-                    isLoading={isSigningIn}
-                  >
-                    Sign in
-                  </Button>
-                {/if}
-              </div>
-
+            <div class="mt-4 space-y-4">
               <div
-                class="border-border-subtle bg-surface rounded-lg border p-2 text-xs"
+                class="bg-surface/50 border-border-subtle flex items-center justify-between rounded-xl border px-4 py-3"
               >
-                {#if bidAmountErr || bidMaxPriceErr}
-                  <p class="text-red-500">
-                    {bidAmountErr || bidMaxPriceErr}
-                  </p>
-                {:else}
-                  {#if estimateClearingPrice}
-                    <div
-                      class="border-border-subtle mb-2 flex items-center justify-between border-b pb-2"
+                <div class="space-y-0.5">
+                  <div
+                    class="text-muted text-[10px] font-bold tracking-wide uppercase"
+                    >Available Balance</div
+                  >
+                  <div class="text-sm font-bold">
+                    {currencyDisplay.displayValue(myInfo.currency_amount)}
+                    {currencyInfo.symbol}
+                  </div>
+                </div>
+                <button
+                  class="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase transition-colors disabled:opacity-50 {phase ===
+                    'ending' || phase === 'ended'
+                    ? 'bg-surface border-border-subtle text-muted hover:text-foreground border'
+                    : 'bg-indigo-500 text-white hover:bg-indigo-600'}"
+                  onclick={onUserFundsModal}
+                  disabled={!stateInfo || !authStore.identity.isAuthenticated}
+                >
+                  {phase === 'ending' || phase === 'ended'
+                    ? 'Manage'
+                    : 'Deposit'}
+                </button>
+              </div>
+
+              <div class="grid gap-3">
+                <div>
+                  <label
+                    class="text-muted text-xs font-semibold tracking-wide uppercase"
+                    for="bidAmount"
+                  >
+                    Amount
+                  </label>
+                  <div class="relative mt-1">
+                    <input
+                      id="bidAmount"
+                      class="border-border-subtle bg-card transition-focus focus:border-foreground w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
+                      placeholder={`Min: ${currencyDisplay.displayValue(auctionCfg.min_amount)} ${currencyInfo.symbol}`}
+                      bind:value={bidAmount}
+                      onfocus={onBidAmountFocus}
+                      disabled={phase != 'pre-bidding' && phase != 'bidding'}
+                      inputmode="decimal"
+                    />
+                    <button
+                      class="text-muted hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 text-[10px] font-bold uppercase transition-colors disabled:opacity-30"
+                      onclick={() =>
+                        (bidAmount = currencyDisplay.displayValue(
+                          myInfo.currency_amount
+                        ))}
+                      disabled={myInfo.currency_amount === 0n ||
+                        (phase !== 'pre-bidding' && phase !== 'bidding')}
                     >
-                      <span class="text-muted font-semibold uppercase"
-                        >Estimated Clearing Price</span
-                      >
-                      <span class="font-bold text-indigo-500">
-                        {estimateClearingPrice}
-                        {currencyInfo.symbol}/{tokenInfo.symbol}
+                      Max
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label
+                    class="text-muted text-xs font-semibold tracking-wide uppercase"
+                    for="bidMaxPrice"
+                  >
+                    Max Price
+                  </label>
+                  <div class="mt-1">
+                    <input
+                      id="bidMaxPrice"
+                      class="border-border-subtle bg-card transition-focus focus:border-foreground w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
+                      placeholder={`e.g. ${currencyDisplay.displayValue(auctionInfo ? auctionInfo.clearing_price * 2n : floorPrice)} ${currencyInfo.symbol}/${tokenInfo.symbol}`}
+                      bind:value={bidMaxPrice}
+                      onfocus={estimateMaxPrice}
+                      disabled={phase != 'pre-bidding' && phase != 'bidding'}
+                      inputmode="decimal"
+                    />
+                    <p class="text-muted mt-1.5 text-[10px]">
+                      {`(The maximum ${currencyInfo.symbol} price per 1 ${tokenInfo.symbol})`}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  {#if phase === 'ending' || phase === 'ended'}
+                    <div
+                      class="bg-surface border-border-subtle text-muted flex flex-1 items-center justify-center gap-2 rounded-full border py-2.5 text-xs font-bold tracking-wide uppercase"
+                    >
+                      <span class="relative flex h-2 w-2">
+                        <span
+                          class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"
+                        ></span>
+                        <span
+                          class="relative inline-flex h-2 w-2 rounded-full bg-red-500"
+                        ></span>
                       </span>
+                      {phase === 'ending'
+                        ? 'Bidding Closed (Ending)'
+                        : 'Auction Ended'}
                     </div>
+                  {:else}
+                    <Button
+                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-4 py-2 text-xs font-semibold tracking-wide uppercase transition-colors"
+                      onclick={estimateMaxPrice}
+                      isLoading={isEstimating}
+                      disabled={bidAmountUnits == 0n}
+                    >
+                      Estimate
+                    </Button>
+
+                    {#if authStore.identity.isAuthenticated}
+                      {#if myInfo.currency_amount < auctionCfg.min_amount || bidAmountUnits > myInfo.currency_amount}
+                        <Button
+                          class="flex-1 rounded-full bg-indigo-500 px-4 py-2 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-indigo-600 disabled:opacity-50"
+                          onclick={onUserFundsModal}
+                        >
+                          Deposit to Bid
+                        </Button>
+                      {:else}
+                        <Button
+                          class="bg-foreground text-background flex-1 rounded-full px-4 py-2 text-xs font-semibold tracking-wide uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+                          onclick={submitBid}
+                          isLoading={isBidding}
+                          disabled={!isBidable}
+                        >
+                          Submit Bid
+                        </Button>
+                      {/if}
+                    {:else}
+                      <Button
+                        class="bg-foreground text-background flex-1 rounded-full px-4 py-2 text-xs font-semibold tracking-wide uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+                        onclick={onSignWith}
+                        isLoading={isSigningIn}
+                      >
+                        Sign in
+                      </Button>
+                    {/if}
                   {/if}
-                  <p class="">
-                    Bids are streamed linearly over the remaining time. Early
-                    entry maximizes capital deployment. <b
-                      >Note that bids cannot be manually cancelled</b
-                    >, but if the clearing price exceeds your max price, you
-                    will be automatically <b>outbid</b> and unspent funds are refundable.
-                  </p>
-                {/if}
+                </div>
+
+                <div
+                  class="border-border-subtle bg-surface rounded-xl border p-3 text-xs"
+                >
+                  {#if bidAmountErr || bidMaxPriceErr}
+                    <p class="text-red-500">
+                      {bidAmountErr || bidMaxPriceErr}
+                    </p>
+                  {:else}
+                    {#if estimateClearingPrice}
+                      <div
+                        class="border-border-subtle mb-2 flex items-center justify-between border-b pb-2"
+                      >
+                        <span class="text-muted font-semibold uppercase"
+                          >Estimated Clearing Price</span
+                        >
+                        <span class="font-bold text-indigo-500">
+                          {estimateClearingPrice}
+                          {currencyInfo.symbol}/{tokenInfo.symbol}
+                        </span>
+                      </div>
+                    {/if}
+                    <p class="text-muted leading-relaxed">
+                      Bids are streamed linearly over the remaining time. Early
+                      entry maximizes capital deployment. <b
+                        class="text-foreground"
+                        >Note that bids cannot be manually cancelled</b
+                      >, but if the clearing price exceeds your max price, you
+                      will be automatically
+                      <b class="text-foreground">outbid</b> and unspent funds are
+                      refundable.
+                    </p>
+                  {/if}
+                </div>
               </div>
             </div>
           {/if}
@@ -1201,21 +1191,21 @@
         >
           <div>
             <div
-              class="text-muted text-xs font-semibold tracking-wide uppercase"
+              class="text-muted text-[10px] font-bold tracking-wider uppercase"
               >Account</div
             >
-            <div class="text-lg font-bold">My Activity</div>
+            <div class="text-xl font-bold">My Activity</div>
           </div>
           <div class="flex items-center gap-2">
             <button
-              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
+              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-4 py-2 text-[10px] font-bold tracking-wider uppercase transition-colors"
               onclick={onUserFundsModal}
               disabled={!stateInfo || !authStore.identity.isAuthenticated}
             >
               My Funds
             </button>
             <Button
-              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
+              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-4 py-2 text-[10px] font-bold tracking-wider uppercase transition-colors"
               onclick={() => toastRun(claimAll, 'claim all failed')}
               disabled={!authStore.identity.isAuthenticated ||
                 myBids.length === 0}
@@ -1225,17 +1215,21 @@
           </div>
         </div>
 
-        <div class="mt-6">
+        <div class="mt-8">
           <div
-            class="text-muted mb-2 text-xs font-semibold tracking-wide uppercase"
+            class="text-muted mb-3 text-[10px] font-bold tracking-wider uppercase"
             >My Bids</div
           >
           {#if !auctionInfo || myBids.length === 0}
-            <div class="text-muted text-sm">No bids yet.</div>
+            <div
+              class="bg-surface/50 border-border-subtle rounded-xl border border-dashed py-8 text-center"
+            >
+              <p class="text-muted text-sm">No bids yet.</p>
+            </div>
           {:else}
             <div class="border-border-subtle overflow-hidden rounded-xl border">
               <div
-                class="bg-surface grid grid-cols-12 gap-2 px-3 py-2 text-xs font-semibold"
+                class="bg-surface/80 grid grid-cols-12 gap-2 px-4 py-3 text-[10px] font-bold tracking-wider uppercase"
               >
                 <div class="col-span-2">ID</div>
                 <div class="col-span-3">Amount</div>
@@ -1250,29 +1244,46 @@
                   !isClaimed &&
                   ((isOutbid && auctionInfo.is_graduated) || phase == 'ended')}
                 <div
-                  class="border-border-subtle grid grid-cols-12 gap-2 border-t px-3 py-2 text-xs"
+                  class="border-border-subtle hover:bg-surface/30 grid grid-cols-12 items-center gap-2 border-t px-4 py-3 text-xs transition-colors"
                 >
-                  <div class="col-span-2 font-semibold">{b.id.toString()}</div>
-                  <div class="col-span-3">
-                    {currencyDisplay.displayValue(b.amount)}
-                    {currencyInfo.symbol}
-                  </div>
-                  <div class="col-span-3">{priceUnitsPerToken(b.max_price)}</div
+                  <div class="col-span-2 font-mono font-medium text-indigo-500"
+                    >#{b.id.toString()}</div
                   >
-                  <div class="text-muted col-span-2">
+                  <div class="col-span-3 font-semibold">
+                    {currencyDisplay.displayValue(b.amount)}
+                    <span class="text-muted font-normal"
+                      >{currencyInfo.symbol}</span
+                    >
+                  </div>
+                  <div class="col-span-3 font-medium"
+                    >{priceUnitsPerToken(b.max_price)}</div
+                  >
+                  <div class="col-span-2">
                     {#if isClaimed}
-                      <span>claimed</span>
+                      <span
+                        class="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-500 uppercase"
+                        >claimed</span
+                      >
                     {:else if isOutbid}
-                      <span>outbid</span>
+                      <span
+                        class="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-500 uppercase"
+                        >outbid</span
+                      >
                     {:else if phase === 'ended'}
-                      <span>settled</span>
+                      <span
+                        class="rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-500 uppercase"
+                        >settled</span
+                      >
                     {:else}
-                      <span>active</span>
+                      <span
+                        class="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-500 uppercase"
+                        >active</span
+                      >
                     {/if}
                   </div>
                   <div class="col-span-2 text-right">
                     <Button
-                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground disabled:text-muted-foreground rounded-full border px-2 py-1 text-xs font-semibold {isClaimed
+                      class="border-border-subtle text-muted hover:border-foreground hover:text-foreground disabled:text-muted-foreground rounded-full border px-3 py-1 text-[10px] font-bold uppercase transition-colors {isClaimed
                         ? 'invisible'
                         : ''}"
                       onclick={() =>
@@ -1285,18 +1296,28 @@
                 </div>
                 {#if b.tokens_filled > 0n || b.refund > 0n}
                   <div
-                    class="border-border-subtle bg-surface grid grid-cols-12 gap-2 border-t px-3 py-2 text-xs"
+                    class="border-border-subtle bg-surface/50 grid grid-cols-12 gap-2 border-t px-4 py-2.5 text-[10px]"
                   >
-                    <div class="text-muted col-span-12">
-                      Filled: <span class="text-foreground font-semibold"
-                        >{tokenDisplay.displayValue(b.tokens_filled)}
-                        {tokenInfo.symbol}</span
-                      >
-                      · Refund:
-                      <span class="text-foreground font-semibold"
-                        >{currencyDisplay.displayValue(b.refund)}
-                        {currencyInfo.symbol}</span
-                      >
+                    <div class="text-muted col-span-12 flex items-center gap-3">
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-bold tracking-tight uppercase"
+                          >Filled:</span
+                        >
+                        <span class="text-foreground font-bold"
+                          >{tokenDisplay.displayValue(b.tokens_filled)}
+                          {tokenInfo.symbol}</span
+                        >
+                      </div>
+                      <span class="text-border-subtle">|</span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="font-bold tracking-tight uppercase"
+                          >Refund:</span
+                        >
+                        <span class="text-foreground font-bold"
+                          >{currencyDisplay.displayValue(b.refund)}
+                          {currencyInfo.symbol}</span
+                        >
+                      </div>
                     </div>
                   </div>
                 {/if}
@@ -1308,13 +1329,3 @@
     {/if}
   </main>
 </div>
-
-<style>
-  .cca-desc-clamp {
-    overflow: hidden;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    line-clamp: 3;
-    -webkit-line-clamp: 3;
-  }
-</style>

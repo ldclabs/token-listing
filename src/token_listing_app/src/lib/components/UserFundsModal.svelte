@@ -69,6 +69,11 @@
   let myDeposits = $state<DepositTxInfo[]>([])
   let myWithdraws = $state<WithdrawTxInfo[]>([])
 
+  let activeTab = $state<'deposit' | 'withdraw'>('deposit')
+  let depositMethod = $state<'1paying' | 'manual'>('1paying')
+  let withdrawType = $state<'currency' | 'token'>('currency')
+  let historyTab = $state<'deposits' | 'withdraws'>('deposits')
+
   const principal = $derived<string>(authStore.identity.getPrincipal().toText())
   const defaultBoundAddress = $derived.by(() => myInfo.bound_addresses[0] || '')
 
@@ -100,7 +105,7 @@
     isBinding = true
 
     toastRun(async (signal) => {
-      const x402 = await auction.x402_payment(1n, true)
+      const x402 = await auction.x402_payment(10000n, true)
       const res = unwrapResult(
         x402,
         'failed to create binding payment'
@@ -292,194 +297,355 @@
 </script>
 
 <div class="relative space-y-6">
-  <div class="flex flex-col gap-2">
-    <div class="text-muted text-xs font-semibold tracking-wide uppercase">
-      Account
-    </div>
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-      <div class="font-semibold">Principal</div>
-      <span>{pruneAddress(principal, true)}</span>
-      <TextClipboardButton
-        value={principal}
-        class="text-slate-400 transition *:size-5 hover:text-slate-600"
-      />
+  <div class="flex flex-col gap-4">
+    <div
+      class="border-border-subtle flex items-center justify-between border-b pb-2"
+    >
+      <div class="flex gap-6">
+        <button
+          class="relative py-2 text-sm font-bold tracking-wide uppercase transition-colors {activeTab ===
+          'deposit'
+            ? 'text-foreground'
+            : 'text-muted hover:text-foreground'}"
+          onclick={() => (activeTab = 'deposit')}
+        >
+          Deposit
+          {#if activeTab === 'deposit'}
+            <div class="bg-foreground absolute -bottom-2 left-0 h-0.5 w-full"
+            ></div>
+          {/if}
+        </button>
+        <button
+          class="relative py-2 text-sm font-bold tracking-wide uppercase transition-colors {activeTab ===
+          'withdraw'
+            ? 'text-foreground'
+            : 'text-muted hover:text-foreground'}"
+          onclick={() => (activeTab = 'withdraw')}
+        >
+          Withdraw
+          {#if activeTab === 'withdraw'}
+            <div class="bg-foreground absolute -bottom-2 left-0 h-0.5 w-full"
+            ></div>
+          {/if}
+        </button>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5 text-xs">
+          <span class="text-muted font-semibold uppercase">Principal</span>
+          <span class="font-mono">{pruneAddress(principal, true)}</span>
+          <TextClipboardButton
+            value={principal}
+            class="text-muted hover:text-foreground transition *:size-4"
+          />
+        </div>
+      </div>
     </div>
 
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-      <div class="font-semibold">Bound Addresses</div>
-      <ul class="">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+      <div class="text-muted font-semibold uppercase">Bound Addresses</div>
+      <div class="flex flex-wrap items-center gap-2">
         {#each myInfo.bound_addresses as a (a)}
-          <li class="mr-2 inline-flex items-center gap-1">
-            <span>{pruneAddress(a, true)}</span>
+          <div class="bg-surface flex items-center gap-1 rounded-md px-2 py-1">
+            <span class="font-mono">{pruneAddress(a, true)}</span>
             <TextClipboardButton
               value={a}
-              class="text-slate-400 transition *:size-5 hover:text-slate-600"
+              class="text-muted hover:text-foreground transition *:size-3.5"
             />
-          </li>
+          </div>
         {/each}
         {#if myInfo.bound_addresses.length === 0}
-          <li class="text-muted">No bound addresses.</li>
+          <span class="text-muted italic">No bound addresses.</span>
         {/if}
-      </ul>
-      <Button
-        class="border-border-subtle text-muted hover:border-foreground hover:text-foreground rounded-full border px-3 py-1 text-xs"
-        onclick={bindAddress}
-        isLoading={isBinding}
-      >
-        Bind address via 1Paying
-      </Button>
+        <Button
+          class="text-muted hover:text-foreground border-border-subtle hover:border-foreground rounded-md border px-2 py-1 text-[10px] font-bold uppercase transition-colors"
+          onclick={bindAddress}
+          isLoading={isBinding}
+        >
+          Bind via 1Paying
+        </Button>
+      </div>
     </div>
   </div>
 
-  <section class="space-y-4">
-    <div class="">
-      <div class="text-muted text-xs font-semibold tracking-wide uppercase">
-        Deposit Currency
-      </div>
-
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
-        <div class="border-border-subtle bg-card rounded-xl border p-4 shadow">
-          <div class="text-xs font-semibold">Deposit via 1Paying</div>
-          <div class="mt-3 space-y-2">
-            <input
-              class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-              placeholder={`amount (${currencyInfo.symbol})`}
-              bind:value={depositAmount}
-              inputmode="decimal"
-            />
-            {#if depositAmountErr}
-              <div class="text-muted text-xs">{depositAmountErr}</div>
-            {/if}
-            <Button
-              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
-              onclick={depositVia1Paying}
-              disabled={depositAmountUnits == 0n ||
-                !!depositAmountErr ||
-                !depositReq}
-              isLoading={isPaying}
-            >
-              Pay & Deposit
-            </Button>
-          </div>
+  <section class="min-h-80 space-y-6">
+    {#if activeTab === 'deposit'}
+      <div class="space-y-4">
+        <div class="flex gap-2">
+          <button
+            class="rounded-full px-4 py-1.5 text-xs font-semibold transition-colors {depositMethod ===
+            '1paying'
+              ? 'bg-foreground text-background'
+              : 'bg-surface text-muted hover:text-foreground'}"
+            onclick={() => (depositMethod = '1paying')}
+          >
+            via 1Paying
+          </button>
+          <button
+            class="rounded-full px-4 py-1.5 text-xs font-semibold transition-colors {depositMethod ===
+            'manual'
+              ? 'bg-foreground text-background'
+              : 'bg-surface text-muted hover:text-foreground'}"
+            onclick={() => (depositMethod = 'manual')}
+          >
+            Manual
+          </button>
         </div>
 
-        <div class="border-border-subtle bg-card rounded-xl border p-4 shadow">
-          <div class="text-xs font-semibold">Manual Deposit</div>
-          <div class="text-muted mt-1 text-xs">
-            Submit an on-chain deposit record for reconciliation.
-          </div>
-          <div class="mt-3 space-y-2">
-            <input
-              class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-              placeholder="txid"
-              bind:value={manualDepositTxid}
-            />
-            <input
-              class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-              placeholder="sender"
-              bind:value={manualDepositSender}
-              onfocus={() => (manualDepositSender = defaultBoundAddress)}
-            />
-            <Button
-              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
-              onclick={depositManually}
-              disabled={!manualDepositTxid || !manualDepositSender}
-              isLoading={isDepositingManually}
+        {#if depositMethod === '1paying'}
+          <div
+            class="border-border-subtle bg-card max-w-md rounded-2xl border p-6 shadow-sm"
+          >
+            <div class="mb-4 text-sm font-semibold"
+              >Deposit Currency via 1Paying</div
             >
-              Submit Deposit
-            </Button>
+            <div class="space-y-4">
+              <div class="space-y-1.5">
+                <label
+                  class="text-muted text-[10px] font-bold uppercase"
+                  for="deposit-amount"
+                >
+                  Amount ({currencyInfo.symbol})
+                </label>
+                <input
+                  id="deposit-amount"
+                  class="border-border-subtle bg-surface transition-focus focus:border-foreground w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
+                  placeholder="0.00"
+                  bind:value={depositAmount}
+                  inputmode="decimal"
+                />
+                {#if depositAmountErr}
+                  <div class="text-muted text-xs">{depositAmountErr}</div>
+                {/if}
+              </div>
+              <Button
+                class="bg-foreground text-background w-full rounded-xl py-3 text-sm font-bold tracking-wide uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+                onclick={depositVia1Paying}
+                disabled={depositAmountUnits == 0n ||
+                  !!depositAmountErr ||
+                  !depositReq}
+                isLoading={isPaying}
+              >
+                Pay & Deposit
+              </Button>
+            </div>
           </div>
-        </div>
+        {:else}
+          <div
+            class="border-border-subtle bg-card max-w-md rounded-2xl border p-6 shadow-sm"
+          >
+            <div class="mb-4 text-sm font-semibold">Manual Deposit</div>
+            <p class="text-muted mb-4 text-xs">
+              Submit an on-chain deposit record for reconciliation.
+            </p>
+            <div class="space-y-4">
+              <div class="space-y-1.5">
+                <label
+                  class="text-muted text-[10px] font-bold uppercase"
+                  for="manual-txid"
+                >
+                  Transaction ID
+                </label>
+                <input
+                  id="manual-txid"
+                  class="border-border-subtle bg-surface transition-focus focus:border-foreground w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
+                  placeholder="Enter txid"
+                  bind:value={manualDepositTxid}
+                />
+              </div>
+              <div class="space-y-1.5">
+                <label
+                  class="text-muted text-[10px] font-bold uppercase"
+                  for="manual-sender"
+                >
+                  Sender Address
+                </label>
+                <input
+                  id="manual-sender"
+                  class="border-border-subtle bg-surface transition-focus focus:border-foreground w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
+                  placeholder="Enter sender address"
+                  bind:value={manualDepositSender}
+                  onfocus={() => (manualDepositSender = defaultBoundAddress)}
+                />
+              </div>
+              <Button
+                class="bg-foreground text-background w-full rounded-xl py-3 text-sm font-bold tracking-wide uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+                onclick={depositManually}
+                disabled={!manualDepositTxid || !manualDepositSender}
+                isLoading={isDepositingManually}
+              >
+                Submit Deposit
+              </Button>
+            </div>
+          </div>
+        {/if}
       </div>
-    </div>
-
-    <div class="">
-      <div class="text-muted text-xs font-semibold tracking-wide uppercase">
-        Balances
-      </div>
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
-        <div class="border-border-subtle bg-card rounded-xl border p-4 shadow">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold">Currency</span>
-            <span class="text-xs">
-              {currencyDisplay.displayValue(myInfo.currency_amount)}
-              {currencyInfo.symbol}
-            </span>
-          </div>
-          <div class="mt-3 space-y-2">
-            <input
-              class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-              placeholder="recipient"
-              bind:value={withdrawCurrencyRecipient}
-              onfocus={() => (withdrawCurrencyRecipient = defaultBoundAddress)}
-            />
-            <Button
-              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
-              onclick={withdrawCurrency}
-              disabled={myInfo.currency_amount == 0n ||
-                !withdrawCurrencyRecipient}
-              isLoading={isWithdrawingCurrency}
-            >
-              Withdraw
-            </Button>
-          </div>
+    {:else}
+      <div class="space-y-4">
+        <div class="flex gap-2">
+          <button
+            class="rounded-full px-4 py-1.5 text-xs font-semibold transition-colors {withdrawType ===
+            'currency'
+              ? 'bg-foreground text-background'
+              : 'bg-surface text-muted hover:text-foreground'}"
+            onclick={() => (withdrawType = 'currency')}
+          >
+            {currencyInfo.symbol}
+          </button>
+          <button
+            class="rounded-full px-4 py-1.5 text-xs font-semibold transition-colors {withdrawType ===
+            'token'
+              ? 'bg-foreground text-background'
+              : 'bg-surface text-muted hover:text-foreground'}"
+            onclick={() => (withdrawType = 'token')}
+          >
+            {tokenInfo.symbol}
+          </button>
         </div>
 
-        <div class="border-border-subtle bg-card rounded-xl border p-4 shadow">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold">Token</span>
-            <span class="text-xs">
-              {tokenDisplay.displayValue(myInfo.token_amount)}
-              {tokenInfo.symbol}
-            </span>
+        {#if withdrawType === 'currency'}
+          <div
+            class="border-border-subtle bg-card max-w-md rounded-2xl border p-6 shadow-sm"
+          >
+            <div class="mb-4 flex items-center justify-between">
+              <span class="text-sm font-semibold"
+                >Withdraw {currencyInfo.symbol}</span
+              >
+              <span class="text-muted text-xs">
+                Balance: {currencyDisplay.displayValue(myInfo.currency_amount)}
+              </span>
+            </div>
+            <div class="space-y-4">
+              <div class="space-y-1.5">
+                <label
+                  class="text-muted text-[10px] font-bold uppercase"
+                  for="withdraw-currency-recipient"
+                >
+                  Recipient Address
+                </label>
+                <input
+                  id="withdraw-currency-recipient"
+                  class="border-border-subtle bg-surface transition-focus focus:border-foreground w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
+                  placeholder="Enter recipient address"
+                  bind:value={withdrawCurrencyRecipient}
+                  onfocus={() =>
+                    (withdrawCurrencyRecipient = defaultBoundAddress)}
+                />
+              </div>
+              <Button
+                class="bg-foreground text-background w-full rounded-xl py-3 text-sm font-bold tracking-wide uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+                onclick={withdrawCurrency}
+                disabled={myInfo.currency_amount == 0n ||
+                  !withdrawCurrencyRecipient}
+                isLoading={isWithdrawingCurrency}
+              >
+                Withdraw {currencyInfo.symbol}
+              </Button>
+            </div>
           </div>
-          <div class="mt-3 space-y-2">
-            <input
-              class="border-border-subtle bg-card w-full rounded-lg border px-3 py-2 text-xs"
-              placeholder="recipient"
-              bind:value={withdrawTokenRecipient}
-              onfocus={() => (withdrawTokenRecipient = defaultBoundAddress)}
-            />
-            <Button
-              class="border-border-subtle text-muted hover:border-foreground hover:text-foreground w-full rounded-full border px-3 py-2 text-xs font-semibold tracking-wide uppercase"
-              onclick={withdrawToken}
-              disabled={myInfo.token_amount == 0n || !withdrawTokenRecipient}
-              isLoading={isWithdrawingToken}
-            >
-              Withdraw
-            </Button>
+        {:else}
+          <div
+            class="border-border-subtle bg-card max-w-md rounded-2xl border p-6 shadow-sm"
+          >
+            <div class="mb-4 flex items-center justify-between">
+              <span class="text-sm font-semibold"
+                >Withdraw {tokenInfo.symbol}</span
+              >
+              <span class="text-muted text-xs">
+                Balance: {tokenDisplay.displayValue(myInfo.token_amount)}
+              </span>
+            </div>
+            <div class="space-y-4">
+              <div class="space-y-1.5">
+                <label
+                  class="text-muted text-[10px] font-bold uppercase"
+                  for="withdraw-token-recipient"
+                >
+                  Recipient Address
+                </label>
+                <input
+                  id="withdraw-token-recipient"
+                  class="border-border-subtle bg-surface transition-focus focus:border-foreground w-full rounded-xl border px-4 py-3 text-sm focus:outline-none"
+                  placeholder="Enter recipient address"
+                  bind:value={withdrawTokenRecipient}
+                  onfocus={() => (withdrawTokenRecipient = defaultBoundAddress)}
+                />
+              </div>
+              <Button
+                class="bg-foreground text-background w-full rounded-xl py-3 text-sm font-bold tracking-wide uppercase transition-opacity hover:opacity-90 disabled:opacity-50"
+                onclick={withdrawToken}
+                disabled={myInfo.token_amount == 0n || !withdrawTokenRecipient}
+                isLoading={isWithdrawingToken}
+              >
+                Withdraw {tokenInfo.symbol}
+              </Button>
+            </div>
           </div>
-        </div>
+        {/if}
       </div>
-    </div>
+    {/if}
+  </section>
 
-    <div class="grid gap-4 lg:grid-cols-2">
-      <div>
-        <div
-          class="text-muted mb-2 text-xs font-semibold tracking-wide uppercase"
+  <div class="space-y-4 pt-4">
+    <div
+      class="border-border-subtle flex items-center justify-between border-b pb-2"
+    >
+      <div class="flex gap-6">
+        <button
+          class="relative py-2 text-xs font-bold tracking-wide uppercase transition-colors {historyTab ===
+          'deposits'
+            ? 'text-foreground'
+            : 'text-muted hover:text-foreground'}"
+          onclick={() => (historyTab = 'deposits')}
         >
           Deposits
-        </div>
+          {#if historyTab === 'deposits'}
+            <div class="bg-foreground absolute -bottom-2 left-0 h-0.5 w-full"
+            ></div>
+          {/if}
+        </button>
+        <button
+          class="relative py-2 text-xs font-bold tracking-wide uppercase transition-colors {historyTab ===
+          'withdraws'
+            ? 'text-foreground'
+            : 'text-muted hover:text-foreground'}"
+          onclick={() => (historyTab = 'withdraws')}
+        >
+          Withdraws
+          {#if historyTab === 'withdraws'}
+            <div class="bg-foreground absolute -bottom-2 left-0 h-0.5 w-full"
+            ></div>
+          {/if}
+        </button>
+      </div>
+    </div>
+
+    <div class="min-h-[200px]">
+      {#if historyTab === 'deposits'}
         {#if myDeposits.length === 0}
-          <div class="text-muted text-sm">No records yet.</div>
+          <div class="text-muted py-8 text-center text-sm italic"
+            >No deposit records yet.</div
+          >
         {:else}
-          <div class="border-border-subtle overflow-hidden rounded-xl border">
+          <div
+            class="border-border-subtle divide-border-subtle divide-y overflow-hidden rounded-xl border"
+          >
             {#each myDeposits as d (d.txid)}
               {@const txUrl = getTxUrl(stateInfo.chain, d.txid)}
               <div
-                class="border-border-subtle border-t px-3 py-2 text-xs first:border-t-0"
+                class="bg-card hover:bg-surface px-4 py-3 text-xs transition-colors"
               >
                 <div class="flex items-center justify-between">
                   <div class="font-semibold">
                     {#if txUrl}
                       <a
-                        class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1"
+                        class="hover:text-foreground inline-flex items-center gap-1 underline decoration-dotted underline-offset-2"
                         href={txUrl}
                         target="_blank"
                         rel="noreferrer"
                       >
                         {pruneAddress(d.txid, true)}
-                        <ArrowRightUpLine class="h-4 w-4" />
+                        <ArrowRightUpLine class="size-3" />
                       </a>
                     {:else}
                       {pruneAddress(d.txid, true)}
@@ -487,67 +653,68 @@
                   </div>
                   <div class="text-muted">{formatDatetime(d.timestamp)}</div>
                 </div>
-                <div class="text-muted mt-1">
-                  {currencyDisplay.displayValue(d.amount)}
-                  {currencyInfo.symbol} · sender: {pruneAddress(d.sender)}
+                <div class="text-muted mt-1.5 flex items-center gap-2">
+                  <span class="text-foreground font-medium">
+                    {currencyDisplay.displayValue(d.amount)}
+                    {currencyInfo.symbol}
+                  </span>
+                  <span>·</span>
+                  <span>sender: {pruneAddress(d.sender)}</span>
                 </div>
               </div>
             {/each}
           </div>
         {/if}
-      </div>
-
-      <div>
-        <div
-          class="text-muted mb-2 text-xs font-semibold tracking-wide uppercase"
+      {:else if myWithdraws.length === 0}
+        <div class="text-muted py-8 text-center text-sm italic"
+          >No withdraw records yet.</div
         >
-          Withdraws
-        </div>
-        {#if myWithdraws.length === 0}
-          <div class="text-muted text-sm">No records yet.</div>
-        {:else}
-          <div class="border-border-subtle overflow-hidden rounded-xl border">
-            {#each myWithdraws as w (w.id)}
-              {@const txUrl = getTxUrl(stateInfo.chain, w.txid)}
-              <div
-                class="border-border-subtle border-t px-3 py-2 text-xs first:border-t-0"
-              >
-                <div class="flex items-center justify-between">
-                  <div class="font-semibold">#{w.id.toString()}</div>
-                  <div class="text-muted">{formatDatetime(w.timestamp)}</div>
-                </div>
-                <div class="text-muted mt-1">
-                  {#if w.kind == 0}
-                    <span>
-                      {currencyDisplay.displayValue(w.amount)}
-                      {currencyInfo.symbol}
-                    </span>
-                  {:else}
-                    <span>
-                      {tokenDisplay.displayValue(w.amount)}
-                      {tokenInfo.symbol}
-                    </span>
-                  {/if}
-                  <span>{` · recipient: ${pruneAddress(w.recipient)} · `}</span>
-                  {#if txUrl}
-                    <a
-                      class="hover:border-foreground hover:text-foreground inline-flex items-center gap-1"
-                      href={txUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {pruneAddress(w.txid, true)}
-                      <ArrowRightUpLine class="h-4 w-4" />
-                    </a>
-                  {:else}
-                    {pruneAddress(w.txid, true)}
-                  {/if}
-                </div>
+      {:else}
+        <div
+          class="border-border-subtle divide-border-subtle divide-y overflow-hidden rounded-xl border"
+        >
+          {#each myWithdraws as w (w.id)}
+            {@const txUrl = getTxUrl(stateInfo.chain, w.txid)}
+            <div
+              class="bg-card hover:bg-surface px-4 py-3 text-xs transition-colors"
+            >
+              <div class="flex items-center justify-between">
+                <div class="font-semibold">#{w.id.toString()}</div>
+                <div class="text-muted">{formatDatetime(w.timestamp)}</div>
               </div>
-            {/each}
-          </div>
-        {/if}
-      </div>
+              <div
+                class="text-muted mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1"
+              >
+                <span class="text-foreground font-medium">
+                  {#if w.kind == 0}
+                    {currencyDisplay.displayValue(w.amount)}
+                    {currencyInfo.symbol}
+                  {:else}
+                    {tokenDisplay.displayValue(w.amount)}
+                    {tokenInfo.symbol}
+                  {/if}
+                </span>
+                <span>·</span>
+                <span>recipient: {pruneAddress(w.recipient)}</span>
+                <span>·</span>
+                {#if txUrl}
+                  <a
+                    class="hover:text-foreground inline-flex items-center gap-1 underline decoration-dotted underline-offset-2"
+                    href={txUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {pruneAddress(w.txid, true)}
+                    <ArrowRightUpLine class="size-3" />
+                  </a>
+                {:else}
+                  {pruneAddress(w.txid, true)}
+                {/if}
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
-  </section>
+  </div>
 </div>

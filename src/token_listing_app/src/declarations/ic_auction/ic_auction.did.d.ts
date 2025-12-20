@@ -16,6 +16,7 @@ export interface AuctionInfo {
   'cumulative_demand_raised' : bigint,
   'total_amount' : bigint,
   'total_tokens_filled' : bigint,
+  'total_bidders' : bigint,
   'bids_count' : bigint,
   'timestamp' : bigint,
   'clearing_price' : bigint,

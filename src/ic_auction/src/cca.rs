@@ -125,7 +125,7 @@ impl PartialOrd for BidOrder {
 // Main struct: Auction State
 #[derive(Clone, Deserialize, Serialize)]
 pub struct Auction {
-    pub cfg: AuctionConfig,
+    cfg: AuctionConfig,
     // 10 ** token_decimals
     one_token: u128,
     // Floor price per token, in currency atomic units
@@ -234,6 +234,7 @@ impl Auction {
             cumulative_supply_released: self.cumulative_supply_released,
             is_graduated: self.is_graduated(),
             bids_count: self.next_bid_id - 1,
+            total_bidders: 0, // Placeholder, requires external tracking
         };
 
         if now_ms < self.cfg.end_time && now_ms > self.last_update_time {

@@ -189,6 +189,8 @@ pub struct AuctionInfo {
     pub is_graduated: bool,
     // Number of bids
     pub bids_count: u64,
+    // Number of unique bidders
+    pub total_bidders: u64,
 }
 
 /// Auction Snapshot
