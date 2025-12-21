@@ -565,13 +565,13 @@
           <div class="relative space-y-6">
             <div class="flex flex-col gap-4">
               <div class="flex items-center justify-between">
-                <div class="flex min-w-0 items-center gap-3">
+                <div class="group flex min-w-0 items-center gap-3">
                   <div
-                    class="bg-surface ring-border-subtle h-14 w-14 shrink-0 overflow-hidden rounded-2xl shadow-inner ring-1"
+                    class="bg-surface ring-border-subtle h-14 w-14 shrink-0 overflow-hidden rounded-2xl p-1 shadow-inner ring-1"
                   >
                     {#if stateInfo.token_logo_url}
                       <img
-                        class="h-full w-full object-contain p-2"
+                        class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                         src={stateInfo.token_logo_url}
                         alt={stateInfo.token_symbol}
                       />

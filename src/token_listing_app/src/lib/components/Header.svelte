@@ -59,7 +59,7 @@
         <img
           alt="TokenList.ing Logo"
           src="/_assets/logo.webp"
-          class="h-10 w-10 rounded-xl object-contain transition-transform group-hover:scale-105 dark:invert"
+          class="h-10 w-10 rounded-xl object-contain transition-transform duration-500 group-hover:scale-105 dark:invert"
         />
         <div class="hidden flex-col sm:flex">
           <span

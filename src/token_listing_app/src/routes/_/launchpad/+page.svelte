@@ -1,8 +1,10 @@
 <script lang="ts">
+  import type { AuctionInfo as Auction } from '$declarations/ic_auction/ic_auction.did'
   import type {
     AuctionId,
     AuctionInfo
   } from '$declarations/token_listing_canister/token_listing_canister.did'
+  import { icAuctionActor } from '$lib/canisters/icAuction'
   import { tokenListingActor } from '$lib/canisters/tokenListing'
   import Header from '$lib/components/Header.svelte'
   import { TOKEN_LISTING } from '$lib/constants'
@@ -12,11 +14,14 @@
   import { chainLabel } from '$lib/utils/chain'
   import { formatDatetime } from '$lib/utils/helper'
   import { TokenDisplay, type TokenInfo } from '$lib/utils/token'
+  import { isActive } from '$lib/utils/window'
   import { onMount } from 'svelte'
 
   const listingActor = tokenListingActor(TOKEN_LISTING)
   let auctions = $state<AuctionInfo[]>([])
+  let liveAuction = $state<Auction | null>(null)
   let isLoading = $state(true)
+  let nowMs = $state(Date.now())
 
   function auctionIdText(id: AuctionId): string {
     if ('Icp' in id) return id.Icp
@@ -24,12 +29,81 @@
     return id.Evm
   }
 
-  function statusLabel(a: AuctionInfo): 'Upcoming' | 'Live' | 'Ended' {
-    const n = BigInt(Date.now())
+  function statusLabel(a: AuctionInfo): 'Upcoming' | 'Active' | 'Ended' {
+    const n = BigInt(nowMs)
     if (n < a.start_time) return 'Upcoming'
-    if (n < a.end_time) return 'Live'
+    if (n < a.end_time) return 'Active'
     return 'Ended'
   }
+
+  function timeRemainingLabel(a: AuctionInfo): string {
+    const endMs =
+      nowMs > a.start_time ? Number(a.end_time) : Number(a.start_time)
+    const delta = Math.max(0, endMs - nowMs)
+    const totalMinutes = Math.floor(delta / 60000)
+    const days = Math.floor(totalMinutes / (60 * 24))
+    const hours = Math.floor((totalMinutes - days * 60 * 24) / 60)
+    const minutes = Math.max(0, totalMinutes - days * 60 * 24 - hours * 60)
+    if (days > 0) return `${days}d ${hours}h ${minutes}m`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
+  }
+
+  const latest = $derived.by(() => {
+    const a = auctions[0]
+    if (!a) return null
+    const la = liveAuction
+    const token = tokenInfoFromAuction(a)
+    const currency = currencyInfoFromAuction(a)
+    const currencyDisplay = new TokenDisplay(currency, 0n)
+    const requiredCurrency = currencyDisplay.displayValue(
+      a.required_currency_raised
+    )
+    const clearingPriceValue = currencyDisplay.displayValue(
+      la ? la.clearing_price : a.clearing_price
+    )
+    const raised = currencyDisplay.displayValue(
+      la ? la.cumulative_demand_raised : a.total_demand_raised
+    )
+    const totalCommitted = la
+      ? currencyDisplay.displayValue(la.total_amount)
+      : '—'
+    const bidsCount = (la ? la.bids_count : a.bids_count).toString()
+    const totalBidders = la ? la.total_bidders.toString() : '—'
+    const remaining = timeRemainingLabel(a)
+    const status = statusLabel(a)
+    const isActive = status === 'Active'
+    const id = auctionIdText(a.id)
+    const href = `/_/launchpad/${id}`
+
+    const start = Number(a.start_time)
+    const end = Number(a.end_time)
+    const progress =
+      status === 'Upcoming'
+        ? 0
+        : status === 'Ended'
+          ? 100
+          : Math.min(100, Math.max(0, ((nowMs - start) / (end - start)) * 100))
+
+    return {
+      a,
+      token,
+      currency,
+      requiredCurrency,
+      clearingPriceValue,
+      raised,
+      totalCommitted,
+      bidsCount,
+      totalBidders,
+      remaining,
+      status,
+      isActive,
+      href,
+      total_demand_raised: a.total_demand_raised,
+      chain: chainLabel(a.chain),
+      progress
+    }
+  })
 
   function tokenInfoFromAuction(a: AuctionInfo): TokenInfo {
     return {
@@ -80,10 +154,41 @@
     return `${d.displayValue(a.clearing_price)} ${currency.symbol}/${token.symbol}`
   }
 
+  let timer: number | null = null
   onMount(() => {
-    return toastRun(async (_signal, _abortingQue) => {
+    return toastRun(async (_signal, abortingQue) => {
       isLoading = true
       auctions = await listingActor.list_auctions(20n, [])
+      const latestAuction = auctions[0] || null
+      const auctionActor =
+        auctions[0] && 'Icp' in auctions[0].id
+          ? icAuctionActor(auctions[0].id.Icp)
+          : null
+
+      if (auctionActor) {
+        auctionActor.auction_info().then((info) => {
+          liveAuction = info[0] || null
+        })
+      }
+
+      timer = window.setInterval(() => {
+        nowMs = Date.now()
+        if (
+          isActive() &&
+          latestAuction &&
+          auctionActor &&
+          nowMs < latestAuction.end_time
+        ) {
+          auctionActor.auction_info().then((info) => {
+            liveAuction = info[0] || null
+          })
+        }
+      }, 10_000)
+
+      abortingQue.push(() => {
+        if (timer) clearInterval(timer)
+        timer = null
+      })
       isLoading = false
     }).abort
   })
@@ -157,16 +262,17 @@
         </div>
       {:else}
         <section class="grid gap-6 md:grid-cols-2">
-          {#each auctions as a (auctionIdText(a.id))}
+          {#each auctions as a, i (auctionIdText(a.id))}
             {@const id = auctionIdText(a.id)}
+            {@const isLatest = i === 0 && latest}
             <a
               class="glass-border group bg-surface/30 hover:bg-surface/50 relative flex flex-col overflow-hidden rounded-2xl p-6 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl"
-              href={`/_/launchpad/${id}`}
+              href={isLatest ? latest.href : `/_/launchpad/${id}`}
             >
               <div class="flex items-start justify-between gap-4">
                 <div class="flex min-w-0 items-center gap-4">
                   <div
-                    class="bg-surface ring-border-subtle relative h-12 w-12 shrink-0 overflow-hidden rounded-xl shadow-inner ring-1"
+                    class="bg-surface ring-border-subtle relative h-12 w-12 shrink-0 overflow-hidden rounded-xl p-1 shadow-inner ring-1"
                   >
                     {#if a.token_logo_url}
                       <img
@@ -207,7 +313,7 @@
                   <span
                     class="bg-surface border-border-subtle text-muted rounded-full border px-2 py-0.5 text-xs font-bold tracking-wider uppercase"
                   >
-                    {statusLabel(a)}
+                    {isLatest ? latest.status : statusLabel(a)}
                   </span>
                 </div>
               </div>
@@ -224,13 +330,15 @@
                   >
                   <div class="mt-1 flex items-baseline gap-2">
                     <span class="truncate text-2xl font-bold tracking-tight"
-                      >{displayRaised(a)}</span
+                      >{isLatest
+                        ? `${latest.raised} ${latest.currency.symbol}`
+                        : displayRaised(a)}</span
                     >
                   </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
-                  {#each [{ label: 'Current Price', value: displayClearingPrice(a) }, { label: 'Bidders / Bids', value: `0 / ${a.bids_count}` }, { label: 'Goal', value: displayRequired(a) }, { label: 'Released', value: displayReleased(a) }] as stat}
+                  {#each [{ label: 'Current Price', value: isLatest ? `${latest.clearingPriceValue} ${latest.currency.symbol}` : displayClearingPrice(a) }, { label: 'Bidders / Bids', value: isLatest ? `${latest.totalBidders} / ${latest.bidsCount}` : `0 / ${a.bids_count}` }, { label: 'Goal', value: isLatest ? `${latest.requiredCurrency} ${latest.currency.symbol}` : displayRequired(a) }, { label: 'Released', value: displayReleased(a) }] as stat}
                     <div class="bg-surface/50 rounded-xl p-3">
                       <p
                         class="text-muted text-xs font-bold tracking-widest uppercase"
@@ -242,6 +350,33 @@
                     </div>
                   {/each}
                 </div>
+
+                {#if isLatest}
+                  <div class="bg-surface/50 rounded-xl p-3">
+                    <div class="flex items-center justify-between">
+                      <p
+                        class="text-muted text-[10px] font-bold tracking-widest uppercase"
+                      >
+                        {latest.status === 'Upcoming'
+                          ? 'Starts In'
+                          : 'Remaining'}
+                      </p>
+                      <p
+                        class="font-mono text-[10px] font-bold text-indigo-500"
+                      >
+                        {latest.status === 'Ended' ? 'Ended' : latest.remaining}
+                      </p>
+                    </div>
+                    <div
+                      class="mt-2 flex h-1 overflow-hidden rounded-full bg-black/10 dark:bg-white/10"
+                    >
+                      <div
+                        class="bg-linear-to-r from-indigo-500 to-purple-500 transition-all duration-1000"
+                        style="width: {latest.progress}%"
+                      ></div>
+                    </div>
+                  </div>
+                {/if}
               </div>
 
               <div

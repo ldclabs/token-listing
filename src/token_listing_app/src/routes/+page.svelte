@@ -21,7 +21,7 @@
   const listingActor = tokenListingActor(TOKEN_LISTING)
 
   let latestAuction = $state<AuctionInfo | null>(null)
-  let auction = $state<Auction | null>(null)
+  let liveAuction = $state<Auction | null>(null)
 
   let nowMs = $state(Date.now())
 
@@ -78,7 +78,7 @@
   const latest = $derived.by(() => {
     if (!latestAuction) return null
     const a = latestAuction
-    const au = auction
+    const la = liveAuction
     const token = tokenInfoFromAuction(a)
     const currency = currencyInfoFromAuction(a)
     const currencyDisplay = new TokenDisplay(currency, 0n)
@@ -86,21 +86,31 @@
       a.required_currency_raised
     )
     const clearingPriceValue = currencyDisplay.displayValue(
-      au ? au.clearing_price : a.clearing_price
+      la ? la.clearing_price : a.clearing_price
     )
     const raised = currencyDisplay.displayValue(
-      au ? au.cumulative_demand_raised : a.total_demand_raised
+      la ? la.cumulative_demand_raised : a.total_demand_raised
     )
-    const totalCommitted = au
-      ? currencyDisplay.displayValue(au.total_amount)
+    const totalCommitted = la
+      ? currencyDisplay.displayValue(la.total_amount)
       : '—'
-    const bidsCount = (au ? au.bids_count : a.bids_count).toString()
-    const totalBidders = au ? au.total_bidders.toString() : '—'
+    const bidsCount = (la ? la.bids_count : a.bids_count).toString()
+    const totalBidders = la ? la.total_bidders.toString() : '—'
     const remaining = timeRemainingLabel(a)
     const status = statusLabel(a)
     const isActive = status === 'Active'
     const id = auctionIdText(a.id)
     const href = `/_/launchpad/${id}`
+
+    const start = Number(a.start_time)
+    const end = Number(a.end_time)
+    const progress =
+      status === 'Upcoming'
+        ? 0
+        : status === 'Ended'
+          ? 100
+          : Math.min(100, Math.max(0, ((nowMs - start) / (end - start)) * 100))
+
     return {
       a,
       token,
@@ -116,7 +126,8 @@
       isActive,
       href,
       total_demand_raised: a.total_demand_raised,
-      chain: chainLabel(a.chain)
+      chain: chainLabel(a.chain),
+      progress
     }
   })
 
@@ -229,7 +240,7 @@
 
       if (auctionActor) {
         auctionActor.auction_info().then((info) => {
-          auction = info[0] || null
+          liveAuction = info[0] || null
         })
       }
 
@@ -242,7 +253,7 @@
           nowMs < latestAuction.end_time
         ) {
           auctionActor.auction_info().then((info) => {
-            auction = info[0] || null
+            liveAuction = info[0] || null
           })
         }
       }, 10_000)
@@ -418,7 +429,7 @@
               <div class="mt-10 flex items-center justify-between gap-4">
                 <div class="flex min-w-0 items-center gap-4">
                   <div
-                    class="bg-surface ring-border-subtle relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl shadow-inner ring-1"
+                    class="bg-surface ring-border-subtle relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl p-1 shadow-inner ring-1"
                   >
                     {#if latest.a.token_logo_url}
                       <img
@@ -559,7 +570,7 @@
                   >
                     <div
                       class="bg-linear-to-r from-indigo-500 to-purple-500 transition-all duration-1000"
-                      style="width: 65%"
+                      style="width: {latest.progress}%"
                     ></div>
                   </div>
                   <p class="text-muted mt-3 text-xs font-medium">
