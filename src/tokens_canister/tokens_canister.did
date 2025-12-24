@@ -1,0 +1,106 @@
+type Announcement = record {
+  id : nat64;
+  url : opt text;
+  title : text;
+  content : text;
+  "type" : text;
+  published_at : nat64;
+};
+type CanisterArgs = variant { Upgrade : InitArgs; Init : InitArgs };
+type InitArgs = record { governance_canister : opt principal };
+type LinkItem = record { rel : LinkType; url : text; name : text };
+type LinkType = variant {
+  Homepage;
+  Bridge;
+  Social;
+  SourceCode;
+  Whitepaper;
+  Browser;
+  Documentation;
+  Exchange;
+  Audit;
+  Governance;
+};
+type PayingResultInput = record {
+  result : blob;
+  signature : blob;
+  timestamp : nat64;
+};
+type Result = variant { Ok : vec nat64; Err : text };
+type Result_1 = variant { Ok; Err : text };
+type Result_2 = variant { Ok : TokenProfile; Err : text };
+type Result_3 = variant { Ok : StateInfo; Err : text };
+type Result_4 = variant { Ok : nat64; Err : text };
+type Result_5 = variant { Ok : text; Err : text };
+type Result_6 = variant { Ok : X402PaymentOutput; Err : text };
+type StateInfo = record {
+  governance_canister : opt principal;
+  x402_prices : vec record { text; nat64 };
+  x402_pay_to : text;
+  total_tokens : nat64;
+  x402_paying_public_keys : vec blob;
+};
+type TokenMetadata = record {
+  decimals : nat8;
+  external_url : text;
+  name : text;
+  description : text;
+  links : vec LinkItem;
+  locations : vec text;
+  image : text;
+  symbol : text;
+};
+type TokenProfile = record {
+  id : nat64;
+  status : TokenStatus;
+  updated_at : nat64;
+  controllers : vec principal;
+  metadata : TokenMetadata;
+  tags : vec text;
+  created_at : nat64;
+  verification : VerificationBadge;
+  announcements : vec Announcement;
+};
+type TokenStatus = variant { Active; Deprecated; Locked };
+type VerificationBadge = record {
+  methods : vec text;
+  is_verified : bool;
+  verified_at : nat64;
+};
+type X402PaymentOutput = record {
+  x402 : blob;
+  nonce : text;
+  timestamp : nat64;
+};
+service : (opt CanisterArgs) -> {
+  admin_batch_register_tokens : (vec TokenMetadata) -> (Result);
+  admin_set_paying_public_keys : (vec text) -> (Result_1);
+  admin_set_payment_requirements_extra : (text) -> (Result_1);
+  admin_set_x402_pay_to : (text) -> (Result_1);
+  admin_set_x402_prices : (vec record { text; nat64 }) -> (Result_1);
+  admin_update_token_status : (nat64, TokenStatus) -> (Result_1);
+  admin_update_token_tags : (nat64, vec text) -> (Result_1);
+  admin_update_token_verification_badge : (nat64, VerificationBadge) -> (
+      Result_1,
+    );
+  get_token_profile : (nat64) -> (Result_2) query;
+  info : () -> (Result_3) query;
+  list_tokens : (nat64, opt nat64) -> (
+      vec record { nat64; TokenMetadata },
+    ) query;
+  query_token : (text) -> (vec record { nat64; TokenMetadata }) query;
+  register_token : (TokenMetadata, PayingResultInput) -> (Result_4);
+  set_announcement : (nat64, Announcement, PayingResultInput) -> (Result_1);
+  set_location : (nat64, PayingResultInput) -> (Result_1);
+  update_token_controllers : (nat64, vec principal, PayingResultInput) -> (
+      Result_1,
+    );
+  update_token_metadata : (nat64, TokenMetadata, PayingResultInput) -> (
+      Result_1,
+    );
+  validate_admin_set_paying_public_keys : (vec text) -> (Result_5);
+  validate_admin_set_payment_requirements_extra : (text) -> (Result_5);
+  validate_admin_set_x402_pay_to : (text) -> (Result_5);
+  validate_admin_set_x402_prices : (vec record { text; nat64 }) -> (Result_5);
+  x402_payment : (text) -> (Result_6) query;
+}

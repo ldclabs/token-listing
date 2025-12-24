@@ -204,7 +204,7 @@ async fn x402_deposit_currency(input: types::PayingResultInput) -> Result<u128, 
         let pv: types::PaymentSettleResult =
             ciborium::from_reader(&input.result[..]).map_err(format_error)?;
         if input.timestamp + 600 * 1000 < now_ms {
-            return Err("payment verification result expired".to_string());
+            return Err("payment settlement result expired".to_string());
         }
 
         if !pv.settle_response.success {

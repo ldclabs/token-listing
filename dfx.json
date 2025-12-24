@@ -20,6 +20,16 @@
       "gzip": true,
       "type": "rust"
     },
+    "tokens_canister": {
+      "candid": "src/tokens_canister/tokens_canister.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "package": "tokens_canister",
+      "optimize": "cycles",
+      "gzip": true,
+      "type": "rust"
+    },
     "token_listing_app": {
       "dependencies": [],
       "build": [

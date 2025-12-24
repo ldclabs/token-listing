@@ -15,8 +15,8 @@ jobs:
           rustup update --no-self-update stable
           rustup target add wasm32-unknown-unknown
           cargo install ic-wasm
-          cargo build --target wasm32-unknown-unknown --release --locked -p ic_auction -p token_listing_canister
-          for CAN in ic_auction token_listing_canister
+          cargo build --target wasm32-unknown-unknown --release --locked -p ic_auction -p token_listing_canister -p tokens_canister
+          for CAN in ic_auction token_listing_canister tokens_canister
           do
             cp "target/wasm32-unknown-unknown/release/$CAN.wasm" out/
             cp "src/$CAN/$CAN.did" "out/$CAN.did"

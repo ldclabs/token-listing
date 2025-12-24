@@ -123,14 +123,14 @@
 
   function progress(cfg: AuctionConfig | null): number {
     if (!cfg) return 0
-    const n = BigInt(Math.max(Date.now(), nowMs))
-    const start = cfg.start_time
-    const end = cfg.end_time
+    const n = Math.max(Date.now(), nowMs)
+    const start = Number(cfg.start_time)
+    const end = Number(cfg.end_time)
     if (end <= start) return 0
     if (n <= start) return 0
     if (n >= end) return 1
-    const done = Number(n - start)
-    const total = Number(end - start)
+    const done = n - start
+    const total = end - start
     return Math.max(0, Math.min(1, done / total))
   }
 
@@ -879,7 +879,7 @@
                   {formatDatetime(auctionCfg.end_time)}
                 </div>
                 <div class="font-black text-indigo-500"
-                  >{Math.round(progress(auctionCfg) * 100)}%</div
+                  >{Math.floor(progress(auctionCfg) * 100)}%</div
                 >
               </div>
               <div
@@ -887,7 +887,7 @@
               >
                 <div
                   class="h-full rounded-full bg-linear-to-r from-indigo-500 via-purple-500 to-amber-500 transition-all duration-1000"
-                  style={`width:${Math.round(progress(auctionCfg) * 100)}%`}
+                  style={`width:${Math.floor(progress(auctionCfg) * 100)}%`}
                 ></div>
               </div>
             </div>
