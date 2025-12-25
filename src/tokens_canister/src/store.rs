@@ -1,4 +1,4 @@
-use candid::{CandidType, Principal};
+use candid::Principal;
 use ciborium::{from_reader, into_writer};
 use ic_http_certification::{
     HttpCertification, HttpCertificationPath, HttpCertificationTree, HttpCertificationTreeEntry,
@@ -35,6 +35,7 @@ pub struct State {
     pub x402: X402State,
     pub x402_prices: BTreeMap<String, u64>,
     pub x402_pay_to: String,
+    pub total_incoming: u128,
     pub governance_canister: Option<Principal>,
 }
 
@@ -45,6 +46,7 @@ impl From<&State> for StateInfo {
             x402_paying_public_keys: s.x402.paying_public_keys.clone(),
             x402_prices: s.x402_prices.clone(),
             x402_pay_to: s.x402_pay_to.clone(),
+            total_incoming: s.total_incoming,
             governance_canister: s.governance_canister,
         }
     }
@@ -65,6 +67,7 @@ impl State {
             },
             x402_prices: BTreeMap::new(),
             x402_pay_to: String::new(),
+            total_incoming: 0,
             governance_canister: None,
         }
     }
@@ -376,8 +379,34 @@ impl Storable for AnnouncementState {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+struct Txs {
+    pub txs: Vec<String>,
+}
+
+impl Storable for Txs {
+    const BOUND: Bound = Bound::Unbounded;
+
+    fn into_bytes(self) -> Vec<u8> {
+        let mut buf = vec![];
+        into_writer(&self, &mut buf).expect("failed to encode Txs data");
+        buf
+    }
+
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
+        let mut buf = vec![];
+        into_writer(&self, &mut buf).expect("failed to encode Txs data");
+        Cow::Owned(buf)
+    }
+
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
+        from_reader(&bytes[..]).expect("failed to decode Txs data")
+    }
+}
+
 const STATE_MEMORY_ID: MemoryId = MemoryId::new(0);
 const TOKENS_MEMORY_ID: MemoryId = MemoryId::new(1);
+const X402_TXS_MEMORY_ID: MemoryId = MemoryId::new(2);
 
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State::new());
@@ -396,6 +425,12 @@ thread_local! {
     static TOKENS: RefCell<StableBTreeMap<u64, TokenProfileState, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with_borrow(|m| m.get(TOKENS_MEMORY_ID)),
+        )
+    );
+
+    static TXS: RefCell<StableBTreeMap<Principal, Txs, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with_borrow(|m| m.get(X402_TXS_MEMORY_ID)),
         )
     );
 }
@@ -572,9 +607,10 @@ pub mod state {
 
             for loc in &token.locations {
                 if let Some(_id) = s.location_index.get(&loc.to_ascii_lowercase())
-                    && _id != &id {
-                        return Err(format!("token location {} already registered", loc));
-                    }
+                    && _id != &id
+                {
+                    return Err(format!("token location {} already registered", loc));
+                }
             }
 
             let token_state = TokenMetadataState {
@@ -796,10 +832,11 @@ pub mod state {
         STATE.with_borrow(|s| {
             let mut result: Vec<(u64, TokenMetadata)> = Vec::with_capacity(10);
             if let Some(id) = s.location_index.get(&q)
-                && let Some(token) = s.tokens.get(id) {
-                    result.push((*id, token.into()));
-                    return result;
-                }
+                && let Some(token) = s.tokens.get(id)
+            {
+                result.push((*id, token.into()));
+                return result;
+            }
 
             if let Some(ids) = s.inverted_index.get(&q) {
                 for id in ids {
@@ -864,16 +901,17 @@ pub mod state {
             for (_, token) in s.tokens.iter() {
                 for loc in &token.locations {
                     if let Ok(chain) = ChainLocation::from_str(loc)
-                        && let Ok(chain_id) = u64::from_str(&chain.reference) {
-                            result.push(UniswapToken {
-                                chain_id,
-                                symbol: token.symbol.clone(),
-                                name: token.name.clone(),
-                                decimals: token.decimals,
-                                logo_uri: token.image.clone(),
-                                address: chain.asset_reference.clone(),
-                            });
-                        }
+                        && let Ok(chain_id) = u64::from_str(&chain.reference)
+                    {
+                        result.push(UniswapToken {
+                            chain_id,
+                            symbol: token.symbol.clone(),
+                            name: token.name.clone(),
+                            decimals: token.decimals,
+                            logo_uri: token.image.clone(),
+                            address: chain.asset_reference.clone(),
+                        });
+                    }
                 }
                 if result.len() >= 10000 {
                     break;
@@ -881,5 +919,17 @@ pub mod state {
             }
             result
         })
+    }
+
+    pub fn add_tx(user: Principal, tx: String) {
+        TXS.with_borrow_mut(|t| {
+            let mut txs = t.get(&user).unwrap_or(Txs { txs: Vec::new() });
+            txs.txs.push(tx);
+            t.insert(user, txs);
+        });
+    }
+
+    pub fn list_txs(user: Principal) -> Vec<String> {
+        TXS.with_borrow(|t| t.get(&user).map(|txs| txs.txs.clone()).unwrap_or_default())
     }
 }

@@ -30,13 +30,15 @@ type Result = variant { Ok : vec nat64; Err : text };
 type Result_1 = variant { Ok; Err : text };
 type Result_2 = variant { Ok : TokenProfile; Err : text };
 type Result_3 = variant { Ok : StateInfo; Err : text };
-type Result_4 = variant { Ok : nat64; Err : text };
-type Result_5 = variant { Ok : text; Err : text };
-type Result_6 = variant { Ok : X402PaymentOutput; Err : text };
+type Result_4 = variant { Ok : vec text; Err : text };
+type Result_5 = variant { Ok : nat64; Err : text };
+type Result_6 = variant { Ok : text; Err : text };
+type Result_7 = variant { Ok : X402PaymentOutput; Err : text };
 type StateInfo = record {
   governance_canister : opt principal;
   x402_prices : vec record { text; nat64 };
   x402_pay_to : text;
+  total_incoming : nat;
   total_tokens : nat64;
   x402_paying_public_keys : vec blob;
 };
@@ -88,8 +90,9 @@ service : (opt CanisterArgs) -> {
   list_tokens : (nat64, opt nat64) -> (
       vec record { nat64; TokenMetadata },
     ) query;
+  my_txs : () -> (Result_4) query;
   query_token : (text) -> (vec record { nat64; TokenMetadata }) query;
-  register_token : (TokenMetadata, PayingResultInput) -> (Result_4);
+  register_token : (TokenMetadata, PayingResultInput) -> (Result_5);
   set_announcement : (nat64, Announcement, PayingResultInput) -> (Result_1);
   set_location : (nat64, PayingResultInput) -> (Result_1);
   update_token_controllers : (nat64, vec principal, PayingResultInput) -> (
@@ -98,9 +101,9 @@ service : (opt CanisterArgs) -> {
   update_token_metadata : (nat64, TokenMetadata, PayingResultInput) -> (
       Result_1,
     );
-  validate_admin_set_paying_public_keys : (vec text) -> (Result_5);
-  validate_admin_set_payment_requirements_extra : (text) -> (Result_5);
-  validate_admin_set_x402_pay_to : (text) -> (Result_5);
-  validate_admin_set_x402_prices : (vec record { text; nat64 }) -> (Result_5);
-  x402_payment : (text) -> (Result_6) query;
+  validate_admin_set_paying_public_keys : (vec text) -> (Result_6);
+  validate_admin_set_payment_requirements_extra : (text) -> (Result_6);
+  validate_admin_set_x402_pay_to : (text) -> (Result_6);
+  validate_admin_set_x402_prices : (vec record { text; nat64 }) -> (Result_6);
+  x402_payment : (text) -> (Result_7) query;
 }

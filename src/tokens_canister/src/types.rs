@@ -9,6 +9,7 @@ pub struct StateInfo {
     pub x402_paying_public_keys: Vec<ByteArrayB64<32>>,
     pub x402_prices: BTreeMap<String, u64>,
     pub x402_pay_to: String,
+    pub total_incoming: u128,
     pub governance_canister: Option<Principal>,
 }
 

@@ -37,16 +37,19 @@ export type Result_2 = { 'Ok' : TokenProfile } |
   { 'Err' : string };
 export type Result_3 = { 'Ok' : StateInfo } |
   { 'Err' : string };
-export type Result_4 = { 'Ok' : bigint } |
+export type Result_4 = { 'Ok' : Array<string> } |
   { 'Err' : string };
-export type Result_5 = { 'Ok' : string } |
+export type Result_5 = { 'Ok' : bigint } |
   { 'Err' : string };
-export type Result_6 = { 'Ok' : X402PaymentOutput } |
+export type Result_6 = { 'Ok' : string } |
+  { 'Err' : string };
+export type Result_7 = { 'Ok' : X402PaymentOutput } |
   { 'Err' : string };
 export interface StateInfo {
   'governance_canister' : [] | [Principal],
   'x402_prices' : Array<[string, bigint]>,
   'x402_pay_to' : string,
+  'total_incoming' : bigint,
   'total_tokens' : bigint,
   'x402_paying_public_keys' : Array<Uint8Array | number[]>,
 }
@@ -102,8 +105,9 @@ export interface _SERVICE {
     [bigint, [] | [bigint]],
     Array<[bigint, TokenMetadata]>
   >,
+  'my_txs' : ActorMethod<[], Result_4>,
   'query_token' : ActorMethod<[string], Array<[bigint, TokenMetadata]>>,
-  'register_token' : ActorMethod<[TokenMetadata, PayingResultInput], Result_4>,
+  'register_token' : ActorMethod<[TokenMetadata, PayingResultInput], Result_5>,
   'set_announcement' : ActorMethod<
     [bigint, Announcement, PayingResultInput],
     Result_1
@@ -119,18 +123,18 @@ export interface _SERVICE {
   >,
   'validate_admin_set_paying_public_keys' : ActorMethod<
     [Array<string>],
-    Result_5
+    Result_6
   >,
   'validate_admin_set_payment_requirements_extra' : ActorMethod<
     [string],
-    Result_5
+    Result_6
   >,
-  'validate_admin_set_x402_pay_to' : ActorMethod<[string], Result_5>,
+  'validate_admin_set_x402_pay_to' : ActorMethod<[string], Result_6>,
   'validate_admin_set_x402_prices' : ActorMethod<
     [Array<[string, bigint]>],
-    Result_5
+    Result_6
   >,
-  'x402_payment' : ActorMethod<[string], Result_6>,
+  'x402_payment' : ActorMethod<[string], Result_7>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

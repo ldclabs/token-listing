@@ -1,4 +1,5 @@
 use candid::Principal;
+use std::collections::BTreeSet;
 
 use crate::{helper, store, types, x402};
 
@@ -8,6 +9,12 @@ static X402_ASSET: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 #[ic_cdk::query]
 fn info() -> Result<types::StateInfo, String> {
     Ok(store::state::info())
+}
+
+#[ic_cdk::query]
+fn my_txs() -> Result<Vec<String>, String> {
+    let caller = helper::msg_caller()?;
+    Ok(store::state::list_txs(caller))
 }
 
 #[ic_cdk::query]
@@ -83,13 +90,13 @@ fn update_token_metadata(
 #[ic_cdk::update]
 fn update_token_controllers(
     token_id: u64,
-    input: Vec<Principal>,
+    input: BTreeSet<Principal>,
     payment: x402::PayingResultInput,
 ) -> Result<(), String> {
     let caller = helper::msg_caller()?;
     let now_ms = ic_cdk::api::time() / 1_000_000;
     x402_settle(caller, "update_token_controllers", payment, now_ms)?;
-    store::state::update_token_controllers(token_id, caller, input, now_ms)
+    store::state::update_token_controllers(token_id, caller, input.into_iter().collect(), now_ms)
 }
 
 #[ic_cdk::update]
@@ -118,21 +125,26 @@ fn x402_settle(
     payment: x402::PayingResultInput,
     now_ms: u64,
 ) -> Result<(), String> {
-    let _rt = store::state::with_mut(|s| {
+    store::state::with_mut(|s| {
         let amount = s.x402_prices.get(action).cloned().ok_or_else(|| {
             format!(
                 "No price set for action: {}, please contact the administrator",
                 action
             )
         })?;
-        s.x402.settle_response(
+        let rt = s.x402.settle_response(
             payment,
             caller,
             X402_ASSET,
             amount.into(),
             &s.x402_pay_to,
             now_ms,
-        )
+        )?;
+
+        s.total_incoming += amount as u128;
+
+        store::state::add_tx(caller, rt.settle_response.transaction);
+        Ok::<_, String>(())
     })?;
     Ok(())
 }

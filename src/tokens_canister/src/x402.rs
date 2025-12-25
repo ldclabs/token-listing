@@ -18,6 +18,7 @@ pub struct X402State {
 }
 
 impl X402State {
+    #[allow(clippy::too_many_arguments)]
     pub fn get_x402_exact_payment(
         &self,
         user: &Principal,
@@ -62,8 +63,9 @@ impl X402State {
         })
     }
 
+    #[allow(dead_code)]
     pub fn verify_response(
-        &mut self,
+        &self,
         input: PayingResultInput,
         user: Principal,
         asset: &str,
@@ -115,10 +117,6 @@ impl X402State {
         if nonce != pv.nonce {
             return Err("nonce mismatch".to_string());
         }
-        self.user_nonce
-            .entry(user)
-            .and_modify(|e| *e += 1)
-            .or_insert(1);
         Ok(pv)
     }
 

@@ -66,23 +66,25 @@ export const idlFactory = ({ IDL }) => {
     'governance_canister' : IDL.Opt(IDL.Principal),
     'x402_prices' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)),
     'x402_pay_to' : IDL.Text,
+    'total_incoming' : IDL.Nat,
     'total_tokens' : IDL.Nat64,
     'x402_paying_public_keys' : IDL.Vec(IDL.Vec(IDL.Nat8)),
   });
   const Result_3 = IDL.Variant({ 'Ok' : StateInfo, 'Err' : IDL.Text });
+  const Result_4 = IDL.Variant({ 'Ok' : IDL.Vec(IDL.Text), 'Err' : IDL.Text });
   const PayingResultInput = IDL.Record({
     'result' : IDL.Vec(IDL.Nat8),
     'signature' : IDL.Vec(IDL.Nat8),
     'timestamp' : IDL.Nat64,
   });
-  const Result_4 = IDL.Variant({ 'Ok' : IDL.Nat64, 'Err' : IDL.Text });
-  const Result_5 = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
+  const Result_5 = IDL.Variant({ 'Ok' : IDL.Nat64, 'Err' : IDL.Text });
+  const Result_6 = IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text });
   const X402PaymentOutput = IDL.Record({
     'x402' : IDL.Vec(IDL.Nat8),
     'nonce' : IDL.Text,
     'timestamp' : IDL.Nat64,
   });
-  const Result_6 = IDL.Variant({ 'Ok' : X402PaymentOutput, 'Err' : IDL.Text });
+  const Result_7 = IDL.Variant({ 'Ok' : X402PaymentOutput, 'Err' : IDL.Text });
   return IDL.Service({
     'admin_batch_register_tokens' : IDL.Func(
         [IDL.Vec(TokenMetadata)],
@@ -127,6 +129,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Nat64, TokenMetadata))],
         ['query'],
       ),
+    'my_txs' : IDL.Func([], [Result_4], ['query']),
     'query_token' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(IDL.Tuple(IDL.Nat64, TokenMetadata))],
@@ -134,7 +137,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'register_token' : IDL.Func(
         [TokenMetadata, PayingResultInput],
-        [Result_4],
+        [Result_5],
         [],
       ),
     'set_announcement' : IDL.Func(
@@ -155,21 +158,21 @@ export const idlFactory = ({ IDL }) => {
       ),
     'validate_admin_set_paying_public_keys' : IDL.Func(
         [IDL.Vec(IDL.Text)],
-        [Result_5],
+        [Result_6],
         [],
       ),
     'validate_admin_set_payment_requirements_extra' : IDL.Func(
         [IDL.Text],
-        [Result_5],
+        [Result_6],
         [],
       ),
-    'validate_admin_set_x402_pay_to' : IDL.Func([IDL.Text], [Result_5], []),
+    'validate_admin_set_x402_pay_to' : IDL.Func([IDL.Text], [Result_6], []),
     'validate_admin_set_x402_prices' : IDL.Func(
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64))],
-        [Result_5],
+        [Result_6],
         [],
       ),
-    'x402_payment' : IDL.Func([IDL.Text], [Result_6], ['query']),
+    'x402_payment' : IDL.Func([IDL.Text], [Result_7], ['query']),
   });
 };
 export const init = ({ IDL }) => {
