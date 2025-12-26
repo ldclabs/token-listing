@@ -18,8 +18,8 @@ use std::{
 
 use crate::{
     types::{
-        Announcement, ChainLocation, LinkItem, LinkType, StateInfo, TokenMetadata, TokenProfile,
-        TokenStatus, VerificationBadge,
+        Announcement, ChainLocation, LinkItem, StateInfo, TokenMetadata, TokenProfile, TokenStatus,
+        UniswapToken, VerificationBadge,
     },
     x402::*,
 };
@@ -150,7 +150,7 @@ pub struct LinkItemState {
     #[serde(rename = "u")]
     pub url: String,
     #[serde(rename = "r")]
-    pub rel: LinkType,
+    pub rel: String,
 }
 
 impl From<&LinkItemState> for LinkItem {
@@ -200,7 +200,7 @@ pub struct TokenProfileState {
     #[serde(rename = "c")]
     pub controllers: BTreeSet<Principal>,
     #[serde(rename = "s")]
-    pub status: TokenStatus,
+    pub status: String,
     #[serde(rename = "ca")]
     pub created_at: u64,
     #[serde(rename = "ua")]
@@ -436,14 +436,11 @@ thread_local! {
 }
 
 pub mod state {
-    use std::str::FromStr;
-
-    use crate::types::UniswapToken;
-
     use super::*;
 
     use lazy_static::lazy_static;
     use once_cell::sync::Lazy;
+    use std::str::FromStr;
 
     lazy_static! {
         pub static ref DEFAULT_EXPR_PATH: HttpCertificationPath<'static> =
@@ -573,13 +570,17 @@ pub mod state {
             for loc in &token_state.locations {
                 s.location_index.insert(loc.to_ascii_lowercase(), id);
             }
+            let symbol = token_state.symbol.to_ascii_lowercase();
+            if !s.location_index.contains_key(&symbol) {
+                s.location_index.insert(symbol, id);
+            }
 
             s.tokens.insert(id, token_state.clone());
             TOKENS.with_borrow_mut(|t| {
                 let profile = TokenProfileState {
                     id,
                     controllers: BTreeSet::from([caller]),
-                    status: TokenStatus::Active,
+                    status: TokenStatus::Active.to_string(),
                     created_at: now_ms,
                     updated_at: now_ms,
                     metadata: token_state,
@@ -719,6 +720,18 @@ pub mod state {
         })
     }
 
+    pub fn check_permission(id: u64, user: Principal) -> Vec<String> {
+        TOKENS.with_borrow(|t| {
+            if let Some(token) = t.get(&id)
+                && token.controllers.contains(&user)
+            {
+                return token.metadata.locations;
+            }
+            vec![]
+        })
+    }
+
+    #[allow(unused)]
     pub fn set_location(id: u64) -> Result<(), String> {
         STATE.with_borrow_mut(|s| {
             let token = s
@@ -789,7 +802,7 @@ pub mod state {
             let mut profile = t
                 .get(&id)
                 .ok_or_else(|| format!("Token with id {} not found", id))?;
-            profile.status = status;
+            profile.status = status.to_string();
             profile.updated_at = now_ms;
             t.insert(id, profile);
             Ok(())
@@ -862,14 +875,22 @@ pub mod state {
     }
 
     pub fn list_tokens(take: usize, prev_id: Option<u64>) -> Vec<(u64, TokenMetadata)> {
-        STATE.with_borrow(|s| {
-            let started = prev_id.unwrap_or_default();
-            s.tokens
+        STATE.with_borrow(|s| match prev_id {
+            Some(id) => s
+                .tokens
                 .iter()
-                .filter(|(k, _)| k > &&started)
+                .rev()
+                .filter(|(k, _)| k < &&id)
                 .take(take)
                 .map(|(id, token)| (*id, token.into()))
-                .collect()
+                .collect(),
+            None => s
+                .tokens
+                .iter()
+                .rev()
+                .take(take)
+                .map(|(id, token)| (*id, token.into()))
+                .collect(),
         })
     }
 

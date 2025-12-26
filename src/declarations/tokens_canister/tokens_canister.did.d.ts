@@ -13,17 +13,7 @@ export interface Announcement {
 export type CanisterArgs = { 'Upgrade' : InitArgs } |
   { 'Init' : InitArgs };
 export interface InitArgs { 'governance_canister' : [] | [Principal] }
-export interface LinkItem { 'rel' : LinkType, 'url' : string, 'name' : string }
-export type LinkType = { 'Homepage' : null } |
-  { 'Bridge' : null } |
-  { 'Social' : null } |
-  { 'SourceCode' : null } |
-  { 'Whitepaper' : null } |
-  { 'Browser' : null } |
-  { 'Documentation' : null } |
-  { 'Exchange' : null } |
-  { 'Audit' : null } |
-  { 'Governance' : null };
+export interface LinkItem { 'rel' : string, 'url' : string, 'name' : string }
 export interface PayingResultInput {
   'result' : Uint8Array | number[],
   'signature' : Uint8Array | number[],
@@ -65,7 +55,7 @@ export interface TokenMetadata {
 }
 export interface TokenProfile {
   'id' : bigint,
-  'status' : TokenStatus,
+  'status' : string,
   'updated_at' : bigint,
   'controllers' : Array<Principal>,
   'metadata' : TokenMetadata,
@@ -74,9 +64,6 @@ export interface TokenProfile {
   'verification' : VerificationBadge,
   'announcements' : Array<Announcement>,
 }
-export type TokenStatus = { 'Active' : null } |
-  { 'Deprecated' : null } |
-  { 'Locked' : null };
 export interface VerificationBadge {
   'methods' : Array<string>,
   'is_verified' : boolean,
@@ -93,12 +80,13 @@ export interface _SERVICE {
   'admin_set_payment_requirements_extra' : ActorMethod<[string], Result_1>,
   'admin_set_x402_pay_to' : ActorMethod<[string], Result_1>,
   'admin_set_x402_prices' : ActorMethod<[Array<[string, bigint]>], Result_1>,
-  'admin_update_token_status' : ActorMethod<[bigint, TokenStatus], Result_1>,
+  'admin_update_token_status' : ActorMethod<[bigint, string], Result_1>,
   'admin_update_token_tags' : ActorMethod<[bigint, Array<string>], Result_1>,
   'admin_update_token_verification_badge' : ActorMethod<
     [bigint, VerificationBadge],
     Result_1
   >,
+  'check_permission' : ActorMethod<[bigint, Principal], Array<string>>,
   'get_token_profile' : ActorMethod<[bigint], Result_2>,
   'info' : ActorMethod<[], Result_3>,
   'list_tokens' : ActorMethod<
@@ -112,15 +100,11 @@ export interface _SERVICE {
     [bigint, Announcement, PayingResultInput],
     Result_1
   >,
-  'set_location' : ActorMethod<[bigint, PayingResultInput], Result_1>,
   'update_token_controllers' : ActorMethod<
-    [bigint, Array<Principal>, PayingResultInput],
+    [bigint, Array<Principal>],
     Result_1
   >,
-  'update_token_metadata' : ActorMethod<
-    [bigint, TokenMetadata, PayingResultInput],
-    Result_1
-  >,
+  'update_token_metadata' : ActorMethod<[bigint, TokenMetadata], Result_1>,
   'validate_admin_set_paying_public_keys' : ActorMethod<
     [Array<string>],
     Result_6

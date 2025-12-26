@@ -79,6 +79,9 @@ fn admin_batch_register_tokens(tokens: Vec<types::TokenMetadata>) -> Result<Vec<
     let caller = ic_cdk::api::msg_caller();
     let mut rt = Vec::new();
     for token in tokens {
+        if token.validate().is_err() {
+            continue;
+        }
         if let Ok(id) = store::state::register_token(caller, token, now_ms) {
             rt.push(id);
         }
@@ -87,8 +90,9 @@ fn admin_batch_register_tokens(tokens: Vec<types::TokenMetadata>) -> Result<Vec<
 }
 
 #[ic_cdk::update(guard = "is_controller")]
-fn admin_update_token_status(token_id: u64, status: types::TokenStatus) -> Result<(), String> {
+fn admin_update_token_status(token_id: u64, status: String) -> Result<(), String> {
     let now_ms = ic_cdk::api::time() / 1_000_000;
+    let status: types::TokenStatus = status.parse()?;
     store::state::admin_update_token_status(token_id, status, now_ms)
 }
 

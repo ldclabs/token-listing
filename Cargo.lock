@@ -902,10 +902,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
 dependencies = [
  "iana-time-zone",
- "js-sys",
  "num-traits",
  "serde",
- "wasm-bindgen",
  "windows-link",
 ]
 
@@ -2193,6 +2191,29 @@ checksum = "3acae9609540aa318d1bc588455225fb2085b9ed0c4f6bd0d9d5bcd86f1a0344"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
+]
+
+[[package]]
+name = "images_canister"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "candid",
+ "chrono",
+ "ciborium",
+ "ic-cdk",
+ "ic-dummy-getrandom-for-wasm",
+ "ic-ed25519",
+ "ic-http-certification",
+ "ic-stable-structures 0.7.2",
+ "ic_auth_types",
+ "lazy_static",
+ "once_cell",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha2",
+ "sha3",
 ]
 
 [[package]]

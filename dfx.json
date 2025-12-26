@@ -10,6 +10,16 @@
       "gzip": true,
       "type": "rust"
     },
+    "images_canister": {
+      "candid": "src/images_canister/images_canister.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "package": "images_canister",
+      "optimize": "cycles",
+      "gzip": true,
+      "type": "rust"
+    },
     "token_listing_canister": {
       "candid": "src/token_listing_canister/token_listing_canister.did",
       "declarations": {

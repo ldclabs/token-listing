@@ -63,6 +63,19 @@ pub struct TokenMetadata {
     pub locations: Vec<String>,
 }
 
+impl TokenMetadata {
+    pub fn validate(&self) -> Result<(), String> {
+        for link in &self.links {
+            link.validate()?;
+        }
+        for loc in &self.locations {
+            let _chain_location: ChainLocation = loc.parse()?;
+        }
+        // TODO: further validation can be added here
+        Ok(())
+    }
+}
+
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
 pub struct UniswapToken {
     #[serde(rename = "chainId")]
@@ -114,10 +127,22 @@ impl std::str::FromStr for ChainLocation {
 pub struct LinkItem {
     pub name: String,
     pub url: String,
-    pub rel: LinkType,
+    pub rel: String,
 }
 
-#[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
+impl LinkItem {
+    pub fn link_type(&self) -> Result<LinkType, String> {
+        self.rel.parse()
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        self.link_type()?;
+        // TODO: further URL validation can be added here
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LinkType {
     /// Main project website.
@@ -142,12 +167,50 @@ pub enum LinkType {
     Bridge,
 }
 
+impl std::str::FromStr for LinkType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "homepage" => Ok(LinkType::Homepage),
+            "whitepaper" => Ok(LinkType::Whitepaper),
+            "documentation" => Ok(LinkType::Documentation),
+            "source_code" => Ok(LinkType::SourceCode),
+            "governance" => Ok(LinkType::Governance),
+            "audit" => Ok(LinkType::Audit),
+            "social" => Ok(LinkType::Social),
+            "browser" => Ok(LinkType::Browser),
+            "exchange" => Ok(LinkType::Exchange),
+            "bridge" => Ok(LinkType::Bridge),
+            _ => Err(format!("Unknown link type: {}", s)),
+        }
+    }
+}
+
+impl std::fmt::Display for LinkType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            LinkType::Homepage => "homepage",
+            LinkType::Whitepaper => "whitepaper",
+            LinkType::Documentation => "documentation",
+            LinkType::SourceCode => "source_code",
+            LinkType::Governance => "governance",
+            LinkType::Audit => "audit",
+            LinkType::Social => "social",
+            LinkType::Browser => "browser",
+            LinkType::Exchange => "exchange",
+            LinkType::Bridge => "bridge",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 /// Auction Information
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
 pub struct TokenProfile {
     pub id: u64,
     pub controllers: Vec<Principal>,
-    pub status: TokenStatus,
+    pub status: String,
     pub created_at: u64, // Unix timestamp in milliseconds
     pub updated_at: u64,
     pub metadata: TokenMetadata,
@@ -156,12 +219,42 @@ pub struct TokenProfile {
     pub announcements: Vec<Announcement>,
 }
 
-#[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TokenStatus {
     Active,
     Locked,
     Deprecated,
+}
+
+impl TokenProfile {
+    pub fn token_status(&self) -> Result<TokenStatus, String> {
+        self.status.parse()
+    }
+}
+
+impl std::str::FromStr for TokenStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "active" => Ok(TokenStatus::Active),
+            "locked" => Ok(TokenStatus::Locked),
+            "deprecated" => Ok(TokenStatus::Deprecated),
+            _ => Err(format!("Unknown token status: {}", s)),
+        }
+    }
+}
+
+impl std::fmt::Display for TokenStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            TokenStatus::Active => "active",
+            TokenStatus::Locked => "locked",
+            TokenStatus::Deprecated => "deprecated",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
@@ -179,4 +272,11 @@ pub struct Announcement {
     pub content: String, // Markdown content
     pub url: Option<String>,
     pub published_at: u64,
+}
+
+impl Announcement {
+    pub fn validate(&self) -> Result<(), String> {
+        // TODO: further validation can be added here
+        Ok(())
+    }
 }

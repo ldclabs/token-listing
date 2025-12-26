@@ -6,11 +6,19 @@
     "ic": "kfzgd-diaaa-aaaap-an56q-cai",
     "local": "kfzgd-diaaa-aaaap-an56q-cai"
   },
+  "images_canister": {
+    "ic": "5rxic-dqaaa-aaaap-an6aa-cai",
+    "local": "5rxic-dqaaa-aaaap-an6aa-cai"
+  },
   "token_listing_app": {
     "ic": "nd6u2-wqaaa-aaaap-an5oa-cai"
   },
   "token_listing_canister": {
     "ic": "km2n7-vaaaa-aaaap-an57a-cai",
     "local": "km2n7-vaaaa-aaaap-an57a-cai"
+  },
+  "tokens_canister": {
+    "ic": "kl3ll-yyaaa-aaaap-an57q-cai",
+    "local": "kl3ll-yyaaa-aaaap-an57q-cai"
   }
 }

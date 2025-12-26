@@ -64,6 +64,11 @@ fn x402_payment(action: String) -> Result<x402::X402PaymentOutput, String> {
     })
 }
 
+#[ic_cdk::query]
+fn check_permission(token_id: u64, user: Principal) -> Vec<String> {
+    store::state::check_permission(token_id, user)
+}
+
 #[ic_cdk::update]
 fn register_token(
     input: types::TokenMetadata,
@@ -72,39 +77,23 @@ fn register_token(
     let caller = helper::msg_caller()?;
     let now_ms = ic_cdk::api::time() / 1_000_000;
     x402_settle(caller, "register_token", payment, now_ms)?;
+    input.validate()?;
     store::state::register_token(caller, input, now_ms)
 }
 
 #[ic_cdk::update]
-fn update_token_metadata(
-    token_id: u64,
-    input: types::TokenMetadata,
-    payment: x402::PayingResultInput,
-) -> Result<(), String> {
+fn update_token_metadata(token_id: u64, input: types::TokenMetadata) -> Result<(), String> {
     let caller = helper::msg_caller()?;
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    x402_settle(caller, "update_token_metadata", payment, now_ms)?;
+    input.validate()?;
     store::state::update_token_metadata(token_id, caller, input, now_ms)
 }
 
 #[ic_cdk::update]
-fn update_token_controllers(
-    token_id: u64,
-    input: BTreeSet<Principal>,
-    payment: x402::PayingResultInput,
-) -> Result<(), String> {
+fn update_token_controllers(token_id: u64, input: BTreeSet<Principal>) -> Result<(), String> {
     let caller = helper::msg_caller()?;
     let now_ms = ic_cdk::api::time() / 1_000_000;
-    x402_settle(caller, "update_token_controllers", payment, now_ms)?;
     store::state::update_token_controllers(token_id, caller, input.into_iter().collect(), now_ms)
-}
-
-#[ic_cdk::update]
-fn set_location(token_id: u64, payment: x402::PayingResultInput) -> Result<(), String> {
-    let caller = helper::msg_caller()?;
-    let now_ms = ic_cdk::api::time() / 1_000_000;
-    x402_settle(caller, "set_location", payment, now_ms)?;
-    store::state::set_location(token_id)
 }
 
 #[ic_cdk::update]

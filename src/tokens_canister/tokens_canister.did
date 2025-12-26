@@ -8,19 +8,7 @@ type Announcement = record {
 };
 type CanisterArgs = variant { Upgrade : InitArgs; Init : InitArgs };
 type InitArgs = record { governance_canister : opt principal };
-type LinkItem = record { rel : LinkType; url : text; name : text };
-type LinkType = variant {
-  Homepage;
-  Bridge;
-  Social;
-  SourceCode;
-  Whitepaper;
-  Browser;
-  Documentation;
-  Exchange;
-  Audit;
-  Governance;
-};
+type LinkItem = record { rel : text; url : text; name : text };
 type PayingResultInput = record {
   result : blob;
   signature : blob;
@@ -54,7 +42,7 @@ type TokenMetadata = record {
 };
 type TokenProfile = record {
   id : nat64;
-  status : TokenStatus;
+  status : text;
   updated_at : nat64;
   controllers : vec principal;
   metadata : TokenMetadata;
@@ -63,7 +51,6 @@ type TokenProfile = record {
   verification : VerificationBadge;
   announcements : vec Announcement;
 };
-type TokenStatus = variant { Active; Deprecated; Locked };
 type VerificationBadge = record {
   methods : vec text;
   is_verified : bool;
@@ -80,11 +67,12 @@ service : (opt CanisterArgs) -> {
   admin_set_payment_requirements_extra : (text) -> (Result_1);
   admin_set_x402_pay_to : (text) -> (Result_1);
   admin_set_x402_prices : (vec record { text; nat64 }) -> (Result_1);
-  admin_update_token_status : (nat64, TokenStatus) -> (Result_1);
+  admin_update_token_status : (nat64, text) -> (Result_1);
   admin_update_token_tags : (nat64, vec text) -> (Result_1);
   admin_update_token_verification_badge : (nat64, VerificationBadge) -> (
       Result_1,
     );
+  check_permission : (nat64, principal) -> (vec text) query;
   get_token_profile : (nat64) -> (Result_2) query;
   info : () -> (Result_3) query;
   list_tokens : (nat64, opt nat64) -> (
@@ -94,13 +82,8 @@ service : (opt CanisterArgs) -> {
   query_token : (text) -> (vec record { nat64; TokenMetadata }) query;
   register_token : (TokenMetadata, PayingResultInput) -> (Result_5);
   set_announcement : (nat64, Announcement, PayingResultInput) -> (Result_1);
-  set_location : (nat64, PayingResultInput) -> (Result_1);
-  update_token_controllers : (nat64, vec principal, PayingResultInput) -> (
-      Result_1,
-    );
-  update_token_metadata : (nat64, TokenMetadata, PayingResultInput) -> (
-      Result_1,
-    );
+  update_token_controllers : (nat64, vec principal) -> (Result_1);
+  update_token_metadata : (nat64, TokenMetadata) -> (Result_1);
   validate_admin_set_paying_public_keys : (vec text) -> (Result_6);
   validate_admin_set_payment_requirements_extra : (text) -> (Result_6);
   validate_admin_set_x402_pay_to : (text) -> (Result_6);

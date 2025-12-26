@@ -3,20 +3,8 @@ export const idlFactory = ({ IDL }) => {
     'governance_canister' : IDL.Opt(IDL.Principal),
   });
   const CanisterArgs = IDL.Variant({ 'Upgrade' : InitArgs, 'Init' : InitArgs });
-  const LinkType = IDL.Variant({
-    'Homepage' : IDL.Null,
-    'Bridge' : IDL.Null,
-    'Social' : IDL.Null,
-    'SourceCode' : IDL.Null,
-    'Whitepaper' : IDL.Null,
-    'Browser' : IDL.Null,
-    'Documentation' : IDL.Null,
-    'Exchange' : IDL.Null,
-    'Audit' : IDL.Null,
-    'Governance' : IDL.Null,
-  });
   const LinkItem = IDL.Record({
-    'rel' : LinkType,
+    'rel' : IDL.Text,
     'url' : IDL.Text,
     'name' : IDL.Text,
   });
@@ -32,11 +20,6 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'Ok' : IDL.Vec(IDL.Nat64), 'Err' : IDL.Text });
   const Result_1 = IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text });
-  const TokenStatus = IDL.Variant({
-    'Active' : IDL.Null,
-    'Deprecated' : IDL.Null,
-    'Locked' : IDL.Null,
-  });
   const VerificationBadge = IDL.Record({
     'methods' : IDL.Vec(IDL.Text),
     'is_verified' : IDL.Bool,
@@ -52,7 +35,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const TokenProfile = IDL.Record({
     'id' : IDL.Nat64,
-    'status' : TokenStatus,
+    'status' : IDL.Text,
     'updated_at' : IDL.Nat64,
     'controllers' : IDL.Vec(IDL.Principal),
     'metadata' : TokenMetadata,
@@ -108,7 +91,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'admin_update_token_status' : IDL.Func(
-        [IDL.Nat64, TokenStatus],
+        [IDL.Nat64, IDL.Text],
         [Result_1],
         [],
       ),
@@ -121,6 +104,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat64, VerificationBadge],
         [Result_1],
         [],
+      ),
+    'check_permission' : IDL.Func(
+        [IDL.Nat64, IDL.Principal],
+        [IDL.Vec(IDL.Text)],
+        ['query'],
       ),
     'get_token_profile' : IDL.Func([IDL.Nat64], [Result_2], ['query']),
     'info' : IDL.Func([], [Result_3], ['query']),
@@ -145,14 +133,13 @@ export const idlFactory = ({ IDL }) => {
         [Result_1],
         [],
       ),
-    'set_location' : IDL.Func([IDL.Nat64, PayingResultInput], [Result_1], []),
     'update_token_controllers' : IDL.Func(
-        [IDL.Nat64, IDL.Vec(IDL.Principal), PayingResultInput],
+        [IDL.Nat64, IDL.Vec(IDL.Principal)],
         [Result_1],
         [],
       ),
     'update_token_metadata' : IDL.Func(
-        [IDL.Nat64, TokenMetadata, PayingResultInput],
+        [IDL.Nat64, TokenMetadata],
         [Result_1],
         [],
       ),

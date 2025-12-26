@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "src/ic_auction",
+  "src/images_canister",
   "src/token_listing_canister",
   "src/tokens_canister",
 ]
@@ -29,7 +30,7 @@ alloy-signer = "1"
 base64 = "0.22"
 bincode = "1.3.3"
 borsh = "1.5"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 candid = { version = "0.10", features = ["value", "printer"] }
 ciborium = "0.2"
 futures = "0.3"

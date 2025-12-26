@@ -5,9 +5,8 @@ use ic_auth_types::cbor_into_vec;
 use ic_http_certification::{HeaderField, HttpRequest};
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
-use serde_json::json;
 
-use crate::store;
+use crate::{store, types};
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Default)]
 pub struct HttpResponse {
@@ -69,12 +68,50 @@ async fn http_request(request: HttpRequest<'static>) -> HttpResponse {
         }
     };
 
+    let ims = get_request_header(&request, "if-modified-since")
+        .and_then(parse_http_date)
+        .map(|dt| dt.timestamp_millis() as u64);
+
     let rt = match (request.method().as_str(), req_path.as_str()) {
         ("HEAD", _) => Ok(Vec::new()),
         ("GET", "/") => get_info(),
         ("GET", "/.well-known/ic-domains") => get_domains(),
-        ("GET", "/uniswap/all.json") => get_tokens(),
-        ("GET", path) if path.ends_with(".json") => get_token(path),
+        ("GET", path) => match get_image(path, ims) {
+            Ok((metadata, body)) => {
+                let last_modified_sec = (metadata.updated_at / 1000) as i64;
+                let dt = Utc.timestamp_opt(last_modified_sec, 0).unwrap();
+                headers.push((
+                    "last-modified".to_string(),
+                    dt.format("%a, %d %b %Y %H:%M:%S GMT").to_string(),
+                ));
+                headers.push(("content-type".to_string(), metadata.r#type));
+                headers.push(("content-disposition".to_string(), "inline".to_string()));
+                headers.push((
+                    "cache-control".to_string(),
+                    "max-age=2592000, public".to_string(),
+                ));
+
+                if let Some(body) = body {
+                    headers.push(("content-length".to_string(), metadata.size.to_string()));
+
+                    return HttpResponse {
+                        status_code: 200,
+                        headers,
+                        body: body.into(),
+                        upgrade: None,
+                    };
+                }
+
+                headers.push(("content-length".to_string(), "0".to_string()));
+                return HttpResponse {
+                    status_code: 304,
+                    headers,
+                    body: Vec::new().into(),
+                    upgrade: None,
+                };
+            }
+            Err(err) => Err(err),
+        },
         (method, path) => Err(HttpError {
             status_code: 404,
             message: format!("method {method}, path: {path}"),
@@ -113,39 +150,32 @@ fn get_info() -> Result<Vec<u8>, HttpError> {
 }
 
 fn get_domains() -> Result<Vec<u8>, HttpError> {
-    Ok(b"metadata.tokenlist.ing".to_vec())
+    Ok(b"image.tokenlist.ing".to_vec())
 }
 
-fn get_tokens() -> Result<Vec<u8>, HttpError> {
-    let now_ms = ic_cdk::api::time() / 1_000_000;
-    let dt = Utc.timestamp_millis_opt(now_ms as i64).unwrap();
-    let tokens = store::state::list_uniswap_tokens();
-    let body = json!({
-        "name": "TokenList.ing",
-        "timestamp": dt.to_rfc3339(),
-        "logoURI": "https://tokenlist.ing/_assets/logo.webp",
-        "version": {
-          "major": 1,
-          "minor": 0,
-          "patch": 0
-        },
-        "tokens": tokens,
-    });
-    serde_json::to_vec(&body).map_err(|err| HttpError {
-        status_code: 500,
-        message: format!("failed to serialize tokens, error: {err}"),
-    })
-}
-
-fn get_token(path: &str) -> Result<Vec<u8>, HttpError> {
+fn get_image(
+    path: &str,
+    ims: Option<u64>,
+) -> Result<(types::ImageMetadata, Option<Vec<u8>>), HttpError> {
     let path = path.trim_start_matches('/');
-    let path = path.trim_end_matches(".json");
-    let token = store::state::get_token_by_location(path).map_err(|err| HttpError {
+    let (metadata, body) = store::state::get_image(path, ims).ok_or_else(|| HttpError {
         status_code: 404,
-        message: err,
+        message: format!("Image not found for path: {}", path),
     })?;
-    serde_json::to_vec(&token).map_err(|err| HttpError {
-        status_code: 500,
-        message: format!("failed to serialize tokens, error: {err}"),
-    })
+
+    Ok((metadata, body))
+}
+
+fn get_request_header<'a>(request: &'a HttpRequest<'static>, name: &str) -> Option<&'a str> {
+    request
+        .headers()
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case(name))
+        .map(|(_, v)| v.as_str())
+}
+
+fn parse_http_date(value: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc2822(value)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
 }
