@@ -25,6 +25,7 @@ export const idlFactory = ({ IDL }) => {
     'is_verified' : IDL.Bool,
     'verified_at' : IDL.Nat64,
   });
+  const Result_2 = IDL.Variant({ 'Ok' : IDL.Vec(IDL.Text), 'Err' : IDL.Text });
   const Announcement = IDL.Record({
     'id' : IDL.Nat64,
     'url' : IDL.Opt(IDL.Text),
@@ -44,7 +45,7 @@ export const idlFactory = ({ IDL }) => {
     'verification' : VerificationBadge,
     'announcements' : IDL.Vec(Announcement),
   });
-  const Result_2 = IDL.Variant({ 'Ok' : TokenProfile, 'Err' : IDL.Text });
+  const Result_3 = IDL.Variant({ 'Ok' : TokenProfile, 'Err' : IDL.Text });
   const StateInfo = IDL.Record({
     'governance_canister' : IDL.Opt(IDL.Principal),
     'x402_prices' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)),
@@ -53,8 +54,7 @@ export const idlFactory = ({ IDL }) => {
     'total_tokens' : IDL.Nat64,
     'x402_paying_public_keys' : IDL.Vec(IDL.Vec(IDL.Nat8)),
   });
-  const Result_3 = IDL.Variant({ 'Ok' : StateInfo, 'Err' : IDL.Text });
-  const Result_4 = IDL.Variant({ 'Ok' : IDL.Vec(IDL.Text), 'Err' : IDL.Text });
+  const Result_4 = IDL.Variant({ 'Ok' : StateInfo, 'Err' : IDL.Text });
   const PayingResultInput = IDL.Record({
     'result' : IDL.Vec(IDL.Nat8),
     'signature' : IDL.Vec(IDL.Nat8),
@@ -107,17 +107,17 @@ export const idlFactory = ({ IDL }) => {
       ),
     'check_permission' : IDL.Func(
         [IDL.Nat64, IDL.Principal],
-        [IDL.Vec(IDL.Text)],
+        [Result_2],
         ['query'],
       ),
-    'get_token_profile' : IDL.Func([IDL.Nat64], [Result_2], ['query']),
-    'info' : IDL.Func([], [Result_3], ['query']),
+    'get_token_profile' : IDL.Func([IDL.Nat64], [Result_3], ['query']),
+    'info' : IDL.Func([], [Result_4], ['query']),
     'list_tokens' : IDL.Func(
         [IDL.Nat64, IDL.Opt(IDL.Nat64)],
         [IDL.Vec(IDL.Tuple(IDL.Nat64, TokenMetadata))],
         ['query'],
       ),
-    'my_txs' : IDL.Func([], [Result_4], ['query']),
+    'my_txs' : IDL.Func([], [Result_2], ['query']),
     'query_token' : IDL.Func(
         [IDL.Text],
         [IDL.Vec(IDL.Tuple(IDL.Nat64, TokenMetadata))],

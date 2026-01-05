@@ -23,11 +23,11 @@ export type Result = { 'Ok' : BigUint64Array | bigint[] } |
   { 'Err' : string };
 export type Result_1 = { 'Ok' : null } |
   { 'Err' : string };
-export type Result_2 = { 'Ok' : TokenProfile } |
+export type Result_2 = { 'Ok' : Array<string> } |
   { 'Err' : string };
-export type Result_3 = { 'Ok' : StateInfo } |
+export type Result_3 = { 'Ok' : TokenProfile } |
   { 'Err' : string };
-export type Result_4 = { 'Ok' : Array<string> } |
+export type Result_4 = { 'Ok' : StateInfo } |
   { 'Err' : string };
 export type Result_5 = { 'Ok' : bigint } |
   { 'Err' : string };
@@ -86,14 +86,14 @@ export interface _SERVICE {
     [bigint, VerificationBadge],
     Result_1
   >,
-  'check_permission' : ActorMethod<[bigint, Principal], Array<string>>,
-  'get_token_profile' : ActorMethod<[bigint], Result_2>,
-  'info' : ActorMethod<[], Result_3>,
+  'check_permission' : ActorMethod<[bigint, Principal], Result_2>,
+  'get_token_profile' : ActorMethod<[bigint], Result_3>,
+  'info' : ActorMethod<[], Result_4>,
   'list_tokens' : ActorMethod<
     [bigint, [] | [bigint]],
     Array<[bigint, TokenMetadata]>
   >,
-  'my_txs' : ActorMethod<[], Result_4>,
+  'my_txs' : ActorMethod<[], Result_2>,
   'query_token' : ActorMethod<[string], Array<[bigint, TokenMetadata]>>,
   'register_token' : ActorMethod<[TokenMetadata, PayingResultInput], Result_5>,
   'set_announcement' : ActorMethod<

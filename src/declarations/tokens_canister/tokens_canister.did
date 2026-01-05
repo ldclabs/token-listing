@@ -16,9 +16,9 @@ type PayingResultInput = record {
 };
 type Result = variant { Ok : vec nat64; Err : text };
 type Result_1 = variant { Ok; Err : text };
-type Result_2 = variant { Ok : TokenProfile; Err : text };
-type Result_3 = variant { Ok : StateInfo; Err : text };
-type Result_4 = variant { Ok : vec text; Err : text };
+type Result_2 = variant { Ok : vec text; Err : text };
+type Result_3 = variant { Ok : TokenProfile; Err : text };
+type Result_4 = variant { Ok : StateInfo; Err : text };
 type Result_5 = variant { Ok : nat64; Err : text };
 type Result_6 = variant { Ok : text; Err : text };
 type Result_7 = variant { Ok : X402PaymentOutput; Err : text };
@@ -72,13 +72,13 @@ service : (opt CanisterArgs) -> {
   admin_update_token_verification_badge : (nat64, VerificationBadge) -> (
       Result_1,
     );
-  check_permission : (nat64, principal) -> (vec text) query;
-  get_token_profile : (nat64) -> (Result_2) query;
-  info : () -> (Result_3) query;
+  check_permission : (nat64, principal) -> (Result_2) query;
+  get_token_profile : (nat64) -> (Result_3) query;
+  info : () -> (Result_4) query;
   list_tokens : (nat64, opt nat64) -> (
       vec record { nat64; TokenMetadata },
     ) query;
-  my_txs : () -> (Result_4) query;
+  my_txs : () -> (Result_2) query;
   query_token : (text) -> (vec record { nat64; TokenMetadata }) query;
   register_token : (TokenMetadata, PayingResultInput) -> (Result_5);
   set_announcement : (nat64, Announcement, PayingResultInput) -> (Result_1);

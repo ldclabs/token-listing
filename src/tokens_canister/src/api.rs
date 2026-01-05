@@ -65,7 +65,7 @@ fn x402_payment(action: String) -> Result<x402::X402PaymentOutput, String> {
 }
 
 #[ic_cdk::query]
-fn check_permission(token_id: u64, user: Principal) -> Vec<String> {
+fn check_permission(token_id: u64, user: Principal) -> Result<Vec<String>, String> {
     store::state::check_permission(token_id, user)
 }
 

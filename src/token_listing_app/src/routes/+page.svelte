@@ -132,6 +132,7 @@
   })
 
   const navLinks = [
+    { label: 'Tokens', href: '/_/tokens' },
     { label: 'Launchpad', href: '/_/launchpad' },
     { label: 'Features', href: '#features' },
     { label: 'Chains', href: '#chains' },

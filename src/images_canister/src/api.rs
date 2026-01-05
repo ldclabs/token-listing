@@ -22,10 +22,11 @@ async fn update_image(token_id: u64, input: types::ImageInput) -> Result<u64, St
     }
     input.validate()?;
     let canister = store::state::with(|s| s.tokens_canister);
-    let locations: Vec<String> =
+    let rt: Result<Vec<String>, String> =
         helper::call(canister, "check_permission", (token_id, caller), 0).await?;
+    let locations = rt?;
     if locations.is_empty() {
-        return Err("Caller does not have permission to update image for this token".to_string());
+        return Err("No location on token for storing images".to_string());
     }
 
     let image = store::ImageMetadataState {

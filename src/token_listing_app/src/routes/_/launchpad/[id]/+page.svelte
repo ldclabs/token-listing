@@ -42,9 +42,9 @@
     sleep
   } from '$lib/utils/helper'
   import {
-    ICPToken,
     PANDAToken,
     TokenDisplay,
+    USDCToken,
     type TokenInfo
   } from '$lib/utils/token'
   import { isActive } from '$lib/utils/window'
@@ -72,7 +72,7 @@
   let grouped = $state<Array<[bigint, bigint]>>([])
   let snapshots = $state<Array<AuctionSnapshot>>([])
   let tokenInfo = $state<TokenInfo>(PANDAToken)
-  let currencyInfo = $state<TokenInfo>(ICPToken)
+  let currencyInfo = $state<TokenInfo>(USDCToken)
 
   const tokenDisplay = $derived.by(() => new TokenDisplay(tokenInfo, 0n))
   const currencyDisplay = $derived.by(() => new TokenDisplay(currencyInfo, 0n))
@@ -80,7 +80,7 @@
   let myBids = $state<BidInfo[]>([])
 
   // Inputs
-  let floorPrice = $state(ICPToken.one)
+  let floorPrice = $state(USDCToken.one)
   let bidAmount = $state('')
   let bidMaxPrice = $state('')
 

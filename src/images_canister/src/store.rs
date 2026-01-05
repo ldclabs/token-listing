@@ -231,19 +231,23 @@ pub mod state {
         if_modified_since: Option<u64>, // millis
     ) -> Option<(ImageMetadata, Option<Vec<u8>>)> {
         STATE.with_borrow(|s| {
-            if let Some(id) = s.location_index.get(loc) {
-                if let Some(image) = s.images.get(id) {
-                    if let Some(ims) = if_modified_since
-                        && image.updated_at <= ims
-                    {
-                        return Some((image.into(), None));
-                    }
+            let id: u64 = match s.location_index.get(loc) {
+                Some(id) => *id,
+                None => loc.parse().ok()?,
+            };
 
-                    if let Some(data) = IMAGES.with_borrow(|i| i.get(id)) {
-                        return Some((image.into(), Some(data)));
-                    }
+            if let Some(image) = s.images.get(&id) {
+                if let Some(ims) = if_modified_since
+                    && image.updated_at <= ims
+                {
+                    return Some((image.into(), None));
+                }
+
+                if let Some(data) = IMAGES.with_borrow(|i| i.get(&id)) {
+                    return Some((image.into(), Some(data)));
                 }
             }
+
             None
         })
     }

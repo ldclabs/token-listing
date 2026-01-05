@@ -36,6 +36,14 @@ impl ImageInput {
         if len != self.name.len() {
             return Err("Name contains leading or trailing whitespace".to_string());
         }
+        if !self.name.ends_with(".png")
+            && !self.name.ends_with(".webp")
+            && !self.name.ends_with(".svg")
+        {
+            return Err(
+                "Unsupported file extension. Only .png, .webp, .svg are allowed".to_string(),
+            );
+        }
         let len = self.r#type.trim().len();
         if len == 0 || len > 32 {
             return Err("Invalid type length".to_string());

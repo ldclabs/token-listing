@@ -82,26 +82,29 @@ export interface TokenInfo extends Token {
   one: bigint
   logo: string
   address: string
+  maxDigits?: number
 }
 
 export const PANDAToken: TokenInfo = {
-  name: 'PANDA',
+  name: 'ICPanda',
   symbol: 'PANDA',
   decimals: 8,
   fee: 10000n,
   one: 100000000n,
-  logo: 'https://panda.fans/_assets/logo.webp',
-  address: 'druyg-tyaaa-aaaaq-aactq-cai'
+  logo: 'https://tokenlist.ing/_assets/images/panda.webp',
+  address: 'druyg-tyaaa-aaaaq-aactq-cai',
+  maxDigits: 4
 }
 
-export const ICPToken: TokenInfo = {
-  name: 'ICP',
-  symbol: 'ICP',
-  decimals: 8,
-  fee: 10000n,
-  one: 100000000n,
-  logo: 'https://1bridge.app/_assets/icp.webp',
-  address: 'ryjl3-tyaaa-aaaaa-aaaba-cai'
+export const USDCToken: TokenInfo = {
+  name: 'Circle',
+  symbol: 'USDC',
+  decimals: 6,
+  fee: 0n,
+  one: 1000000n,
+  logo: 'https://tokenlist.ing/_assets/images/usdc.webp',
+  address: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  maxDigits: 4
 }
 
 export function formatNumber(val: number, maxDigits: number = 4): string {

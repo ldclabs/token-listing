@@ -65,11 +65,35 @@ pub struct TokenMetadata {
 
 impl TokenMetadata {
     pub fn validate(&self) -> Result<(), String> {
+        let len = self.name.trim().len();
+        if len == 0 || len > 32 {
+            return Err("Invalid name length".to_string());
+        }
+        if len != self.name.len() {
+            return Err("Name contains leading or trailing whitespace".to_string());
+        }
+        let len = self.symbol.trim().len();
+        if len == 0 || len > 12 {
+            return Err("Invalid symbol length".to_string());
+        }
+        if len != self.symbol.len() {
+            return Err("Symbol contains leading or trailing whitespace".to_string());
+        }
+        let len = self.description.trim().len();
+        if len == 0 || len > 256 {
+            return Err("Invalid description length".to_string());
+        }
+        if len != self.description.len() {
+            return Err("Description contains leading or trailing whitespace".to_string());
+        }
         for link in &self.links {
             link.validate()?;
         }
         for loc in &self.locations {
             let _chain_location: ChainLocation = loc.parse()?;
+        }
+        if self.locations.len() > 8 {
+            return Err("too many locations, maximum is 8".to_string());
         }
         // TODO: further validation can be added here
         Ok(())

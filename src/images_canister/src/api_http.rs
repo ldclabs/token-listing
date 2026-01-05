@@ -157,8 +157,12 @@ fn get_image(
     path: &str,
     ims: Option<u64>,
 ) -> Result<(types::ImageMetadata, Option<Vec<u8>>), HttpError> {
-    let path = path.trim_start_matches('/');
-    let (metadata, body) = store::state::get_image(path, ims).ok_or_else(|| HttpError {
+    let path = path.trim_start_matches('/').to_ascii_lowercase();
+    let path = path
+        .trim_end_matches(".png")
+        .trim_end_matches(".webp")
+        .trim_end_matches(".svg");
+    let (metadata, body) = store::state::get_image(&path, ims).ok_or_else(|| HttpError {
         status_code: 404,
         message: format!("Image not found for path: {}", path),
     })?;

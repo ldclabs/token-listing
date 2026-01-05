@@ -58,7 +58,7 @@ impl State {
             tokens: BTreeMap::new(),
             location_index: BTreeMap::new(),
             inverted_index: BTreeMap::new(),
-            next_id: 1,
+            next_id: 1000001,
             x402: X402State {
                 canister: ic_cdk::api::canister_self(),
                 user_nonce: HashMap::new(), // 付费 user 的 nonce 记录，数量有限
@@ -454,10 +454,6 @@ pub mod state {
         Lazy::new(|| HttpCertificationTreeEntry::new(&*DEFAULT_EXPR_PATH, *DEFAULT_CERTIFICATION));
 
     fn inverted_index_keys(meta: &TokenMetadataState) -> Result<BTreeSet<String>, String> {
-        if meta.locations.is_empty() {
-            return Err("token locations cannot be empty".to_string());
-        }
-
         let locations = meta
             .locations
             .iter()
@@ -468,7 +464,9 @@ pub mod state {
         keys.insert(meta.symbol.to_ascii_lowercase());
         keys.insert(meta.name.to_ascii_lowercase());
         for loc in locations {
-            keys.insert(loc.asset_reference.to_ascii_lowercase());
+            if loc.asset_reference.len() >= 20 {
+                keys.insert(loc.asset_reference.to_ascii_lowercase());
+            }
         }
         Ok(keys)
     }
@@ -527,10 +525,6 @@ pub mod state {
         now_ms: u64,
     ) -> Result<u64, String> {
         STATE.with_borrow_mut(|s| {
-            if token.locations.is_empty() {
-                return Err("token locations cannot be empty".to_string());
-            }
-
             for loc in &token.locations {
                 if s.location_index.contains_key(&loc.to_ascii_lowercase()) {
                     return Err(format!("token location {} already registered", loc));
@@ -683,8 +677,17 @@ pub mod state {
             for loc in new_keys {
                 s.location_index.insert(loc, id);
             }
-            s.tokens.insert(id, token_state.clone());
+            if !existing_state
+                .symbol
+                .eq_ignore_ascii_case(&token_state.symbol)
+            {
+                s.location_index
+                    .remove(&existing_state.symbol.to_ascii_lowercase());
+                s.location_index
+                    .insert(token_state.symbol.to_ascii_lowercase(), id);
+            }
 
+            s.tokens.insert(id, token_state.clone());
             // Finally, persist profile changes.
             TOKENS.with_borrow_mut(|t| {
                 let mut profile = t
@@ -720,14 +723,21 @@ pub mod state {
         })
     }
 
-    pub fn check_permission(id: u64, user: Principal) -> Vec<String> {
+    pub fn check_permission(id: u64, user: Principal) -> Result<Vec<String>, String> {
         TOKENS.with_borrow(|t| {
             if let Some(token) = t.get(&id)
                 && token.controllers.contains(&user)
             {
-                return token.metadata.locations;
+                let mut locations = token.metadata.locations;
+                return STATE.with_borrow(|s| {
+                    let symbol = token.metadata.symbol.to_ascii_lowercase();
+                    if s.location_index.get(&symbol) == Some(&id) {
+                        locations.push(symbol);
+                    }
+                    Ok(locations)
+                });
             }
-            vec![]
+            Err(format!("no permission for token id {}", id))
         })
     }
 
